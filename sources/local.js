@@ -59,11 +59,9 @@ class LocalDirectorySource {
         this._zipScanBootCache = null;
         try {
             const _bootCacheFile = path.join(this.rootPaths[0] || '.', '..', 'cache', 'zip-scan-cache.json');
-            const _bootStat = require('fs').statSync(_bootCacheFile);
-            if (Date.now() - _bootStat.mtimeMs < 24 * 60 * 60 * 1000) {
-                this._zipScanBootCache = JSON.parse(require('fs').readFileSync(_bootCacheFile, 'utf8'));
-                logger.info('LocalDirectorySource: ZIP cache pre-loaded into memory for fast startup');
-            }
+            // Use cache regardless of age — background rescan after startup will refresh it.
+            this._zipScanBootCache = JSON.parse(require('fs').readFileSync(_bootCacheFile, 'utf8'));
+            logger.info('LocalDirectorySource: ZIP cache pre-loaded into memory for fast startup');
         } catch (e) {
             logger.debug('LocalDirectorySource: Could not pre-load ZIP cache:', e?.message);
         }
