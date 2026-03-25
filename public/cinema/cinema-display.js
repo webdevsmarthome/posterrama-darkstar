@@ -1469,12 +1469,26 @@
                 trailerEl.appendChild(playerDiv);
                 document.body.appendChild(trailerEl);
                 // PATCH18: Overlay erst einblenden wenn Video wirklich läuft (kein Ladekreisel)
+                // Fix Chromium autoplay block: set allow="autoplay" on the iframe as soon as it's created
+                const _autoplayObserver1 = new MutationObserver((mutations) => {
+                    for (const mutation of mutations) {
+                        for (const node of mutation.addedNodes) {
+                            if (node.nodeName === 'IFRAME') {
+                                node.allow = 'autoplay; encrypted-media; picture-in-picture';
+                                _autoplayObserver1.disconnect();
+                            }
+                        }
+                    }
+                });
+                _autoplayObserver1.observe(playerDiv, { childList: true, subtree: true });
                 ytPlayer = new window.YT.Player(playerId, {
                     videoId: ytMatch[1],
                     playerVars: { autoplay:1, mute:1, controls:0, disablekb:1, fs:0,
                                   iv_load_policy:3, modestbranding:1, rel:0, playsinline:1,
                                   vq:'hd1080', origin: window.location.origin },
-                    events: { onReady: e => { e.target.playVideo(); if (!trailerConfig.muted) e.target.unMute(); try { e.target.setPlaybackQualityRange('hd1080','highres'); } catch(_){} setTimeout(() => { if (trailerEl) trailerEl.classList.add('visible'); }, 1100); },
+                    events: { onReady: e => {
+                                  if (e.target.getPlayerState() === window.YT.PlayerState.CUED) { e.target.loadVideoById(ytMatch[1]); }
+                                  e.target.playVideo(); if (!trailerConfig.muted) e.target.unMute(); try { e.target.setPlaybackQualityRange('hd1080','highres'); } catch(_){} setTimeout(() => { if (trailerEl) trailerEl.classList.add('visible'); }, 1100); },
                               onStateChange: e => { if (e.data === window.YT.PlayerState.ENDED) { handleTrailerLoopEnd(trailerConfig); setTimeout(() => { showNextPoster(); startRotation(); }, 7000); } } } // PATCH-TIMING: 7s Pause
                 });
                 setupAutohideTimer(trailerConfig);
@@ -1622,6 +1636,18 @@
 
             // Create YouTube player using the API with unique player ID
             // Note: Autoplay with sound requires browser flag: chrome://flags/#autoplay-policy → "No user gesture is required"
+            // Fix Chromium autoplay block: set allow="autoplay" on the iframe as soon as it's created
+            const _autoplayObserver2 = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeName === 'IFRAME') {
+                            node.allow = 'autoplay; encrypted-media; picture-in-picture';
+                            _autoplayObserver2.disconnect();
+                        }
+                    }
+                }
+            });
+            _autoplayObserver2.observe(playerDiv, { childList: true, subtree: true });
             debug('Trailer creating YouTube player', { playerId });
             ytPlayer = new window.YT.Player(playerId, {
                 videoId: data.trailer.key,
@@ -1649,6 +1675,10 @@
                                 document.querySelectorAll('.cinema-trailer-overlay').length,
                         });
                         log('YouTube player ready');
+                        // If video is in CUED state (autoplay was blocked), reload to trigger autoplay
+                        if (event.target.getPlayerState?.() === window.YT.PlayerState.CUED) {
+                            event.target.loadVideoById(data.trailer.key);
+                        }
                         // Set playback quality if specified
                         if (quality && quality !== 'default') {
                             try {
