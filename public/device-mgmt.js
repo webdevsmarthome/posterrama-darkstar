@@ -2130,6 +2130,11 @@ button#pr-do-pair, button#pr-close, button#pr-skip-setup {display: inline-block 
                                 }
                                 // No early return - fall through to handleCommand for fallback
                             }
+                            if (t === 'playlist.refresh' && api.refreshPlaylist) {
+                                liveDbg('[Live] invoking playlist.refresh');
+                                api.refreshPlaylist();
+                                return void sendAck('ok');
+                            }
                         } catch (_) {
                             /* ignore playback hook errors */
                         }

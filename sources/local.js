@@ -1477,6 +1477,24 @@ class LocalDirectorySource {
      * @param {Object} metadata - Metadata object
      * @returns {Object} Media item
      */
+    /**
+     * Check if a local trailer .mp4 file exists in media/trailers/
+     * @param {string} title - Film title (without year)
+     * @param {number|string} year - Release year
+     * @returns {string|null} URL path like /trailers/Film%20(2024)-trailer.mp4 or null
+     */
+    _findLocalTrailer(title, year) {
+        if (!title || !year) return null;
+        try {
+            const filename = `${title} (${year})-trailer.mp4`;
+            const trailerPath = path.join(__dirname, '..', 'media', 'trailers', filename);
+            if (fs.existsSync(trailerPath)) {
+                return `/trailers/${encodeURIComponent(filename)}`;
+            }
+        } catch (_) { /* ignore */ }
+        return null;
+    }
+
     createMediaItem(file, metadata) {
         // Generate URL path relative to local directory
         // Build URL relative to the first matching root
@@ -1535,6 +1553,7 @@ class LocalDirectorySource {
 
         return {
             title: enrichedMeta.title || metadata.title,
+            fileTitle: metadata.title || '', // title parsed from ZIP filename (without year)
             year: enrichedMeta.year || metadata.year,
             poster: mediaUrl,
             background: backgroundUrl,
@@ -1545,7 +1564,7 @@ class LocalDirectorySource {
             clearLogoUrl: clearlogoPath || metadata.clearlogoPath || null,
             thumbnailUrl: thumbnailUrl,
             bannerUrl: bannerUrl,
-            trailerUrl: trailerUrl || (typeof enrichedMeta.trailer === 'string' ? enrichedMeta.trailer : enrichedMeta.trailer?.thumb) || null, // PATCH12
+            trailerUrl: trailerUrl || this._findLocalTrailer(metadata.title, enrichedMeta.year || metadata.year) || (typeof enrichedMeta.trailer === 'string' ? enrichedMeta.trailer : enrichedMeta.trailer?.thumb) || null, // PATCH12 + LOCAL-TRAILER
             themeUrl: themeUrl || enrichedMeta.themeMusic || enrichedMeta.themeUrl || null,
             metadata: {
                 genre: enrichedMeta.genres || metadata.genre || [],

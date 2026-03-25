@@ -595,7 +595,7 @@ module.exports = function createMediaRouter({
                             let added = 0;
                             const url = `https://api.themoviedb.org/3/search/multi?api_key=${encodeURIComponent(
                                 apiKey
-                            )}&query=${encodeURIComponent(q)}&include_adult=false&language=en-US&page=1`;
+                            )}&query=${encodeURIComponent(q)}&include_adult=false&language=de-DE&page=1`;
                             const resp = await fetch(url);
                             const json = await resp.json().catch(() => null);
                             if (resp.ok && Array.isArray(json?.results)) {

@@ -1229,23 +1229,22 @@
 
     // Load YouTube IFrame API (once)
     function loadYouTubeAPI() {
-        return new Promise(resolve => {
-            if (ytApiReady) {
-                resolve();
-                return;
-            }
-            if (window.YT && window.YT.Player) {
-                ytApiReady = true;
-                resolve();
-                return;
-            }
+        return new Promise((resolve, reject) => {
+            if (ytApiReady) { resolve(); return; }
+            if (window.YT && window.YT.Player) { ytApiReady = true; resolve(); return; }
+
+            // Timeout nach 10s falls API nicht lädt
+            const timeout = setTimeout(() => {
+                reject(new Error('YouTube API Timeout nach 10s'));
+            }, 10000);
+
             // Check if script is already being loaded
             if (document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-                // Wait for it to load
                 const checkReady = setInterval(() => {
                     if (window.YT && window.YT.Player) {
                         ytApiReady = true;
                         clearInterval(checkReady);
+                        clearTimeout(timeout);
                         resolve();
                     }
                 }, 100);
@@ -1254,11 +1253,13 @@
             // Load the API
             const tag = document.createElement('script');
             tag.src = 'https://www.youtube.com/iframe_api';
+            tag.onerror = () => { clearTimeout(timeout); reject(new Error('YouTube API Script konnte nicht geladen werden')); };
             const firstScriptTag = document.getElementsByTagName('script')[0];
             firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
             window.onYouTubeIframeAPIReady = () => {
                 ytApiReady = true;
+                clearTimeout(timeout);
                 resolve();
             };
         });
@@ -1428,101 +1429,103 @@
     async function startTrailerPlayback(media, trailerConfig) {
         stopRotation(); // PATCH-TIMING: Rotations-Timer stoppen solange Trailer läuft
 
-        // PATCH17: directTrailerUrl VOR tmdbId prüfen – lokale Trailer brauchen keine TMDB-ID
+        // --- Priorität 1: Lokaler Trailer (.mp4 Datei) ---
         const directTrailerUrl = media.trailerUrl || null;
 
-        // Get TMDB ID from media (can be in different fields or in guids array)
-        let tmdbId = media.tmdbId || media.tmdb_id;
+        if (directTrailerUrl && (directTrailerUrl.startsWith('/trailers/') ||
+            directTrailerUrl.startsWith('/local-posterpack?') ||
+            directTrailerUrl.match(/\.(mp4|webm|mkv)$/i))) {
 
-        // Check guids array if tmdbId not found directly
-        if (!tmdbId && Array.isArray(media.guids)) {
-            const tmdbGuid = media.guids.find(g => g.source === 'tmdb');
-            if (tmdbGuid) {
-                tmdbId = tmdbGuid.id;
-            }
-        }
+            log('Trailer: Lokale Datei gefunden', { title: media.title, url: directTrailerUrl });
 
-        if (!tmdbId && !directTrailerUrl) {
-            log('Trailer skipped - no TMDB ID and no direct trailerUrl', { title: media.title });
-            removeTrailerOverlay();
+            // Bestehenden Trailer entfernen
+            removeTrailerOverlaySync();
+            const existing = document.getElementById('trailer-video-local');
+            if (existing) existing.remove();
+
+            // Trailer-Container erstellen (gleicher Style wie YouTube-Overlay)
+            trailerEl = document.createElement('div');
+            trailerEl.className = 'cinema-trailer-overlay';
+            currentTrailerKey = 'local-' + media.title;
+
+            // Video-Element
+            const video = document.createElement('video');
+            video.id = 'trailer-video-local';
+            video.src = directTrailerUrl;
+            video.autoplay = true;
+            video.controls = false;
+            video.muted = true; // PATCH-AUTOPLAY: stumm starten
+            video.playsInline = true;
+            video.style.cssText = 'width:100%;height:100%;object-fit:cover;border:0;';
+
+            video.onplay = () => {
+                // Overlay einblenden wenn Video laeuft
+                setTimeout(() => { if (trailerEl) trailerEl.classList.add('visible'); }, 500);
+                // Nach 2s Ton einschalten
+                if (!trailerConfig.muted) {
+                    setTimeout(() => { try { video.muted = false; video.volume = 1.0; } catch(_){} }, 2000);
+                }
+            };
+
+            const shouldLoop = trailerConfig.loop === true;
+            video.onended = () => {
+                if (shouldLoop && !trailerHidden) {
+                    video.currentTime = 0;
+                    video.play().catch(() => {});
+                    handleTrailerLoopEnd(trailerConfig);
+                } else {
+                    removeTrailerOverlay();
+                    setTimeout(() => { showNextPoster(); startRotation(); }, 7000); // PATCH-TIMING
+                }
+            };
+            video.onerror = () => {
+                log('Trailer: Lokales Video Fehler', { title: media.title });
+                removeTrailerOverlay();
+                startRotation();
+            };
+
+            trailerEl.appendChild(video);
+            document.body.appendChild(trailerEl);
+            setupAutohideTimer(trailerConfig);
             return;
         }
 
-        // Determine media type (movie or tv)
-        const type = media.type === 'show' || media.type === 'episode' ? 'tv' : 'movie';
+        // --- Priorität 2: Kein lokaler Trailer → Poster normal anzeigen ---
+        if (!directTrailerUrl || !directTrailerUrl.match(/youtube\.com|youtu\.be/)) {
+            log('Trailer: Kein lokaler Trailer vorhanden, Poster wird normal angezeigt', { title: media.title });
+            removeTrailerOverlay();
+            startRotation();
+            return;
+        }
 
-        // PATCH4: Check for direct trailerUrl (from ZIP metadata.json or trailer.mp4)
-        if (directTrailerUrl) {
-            const ytMatch = directTrailerUrl.match(
-                /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/
-            );
-            if (ytMatch) {
-                // YouTube-URL direkt verwenden (überspringt TMDB-Fetch)
-                await loadYouTubeAPI();
-                removeTrailerOverlaySync();
-                trailerEl = document.createElement('div');
-                trailerEl.className = 'cinema-trailer-overlay';
-                currentTrailerKey = 'direct-' + ytMatch[1];
-                // Create iframe with allow="autoplay" set BEFORE src loads — required by Safari and Chromium
-                const _ytEmbedUrl1 = `https://www.youtube.com/embed/${ytMatch[1]}?enablejsapi=1&autoplay=1&mute=1&controls=0&disablekb=1&fs=0&iv_load_policy=3&modestbranding=1&rel=0&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`;
-                const _ytIframe1 = document.createElement('iframe');
-                _ytIframe1.allow = 'autoplay; encrypted-media; picture-in-picture';
-                _ytIframe1.setAttribute('allowfullscreen', '');
-                _ytIframe1.style.cssText = 'width:100%;height:100%;border:0;';
-                _ytIframe1.src = _ytEmbedUrl1;
-                trailerEl.appendChild(_ytIframe1);
-                document.body.appendChild(trailerEl);
-                // PATCH18: Overlay erst einblenden wenn Video wirklich läuft (kein Ladekreisel)
-                ytPlayer = new window.YT.Player(_ytIframe1, {
-                    events: { onReady: e => {
-                                  e.target.playVideo(); if (!trailerConfig.muted) e.target.unMute(); try { e.target.setPlaybackQualityRange('hd1080','highres'); } catch(_){} setTimeout(() => { if (trailerEl) trailerEl.classList.add('visible'); }, 1100); },
-                              onStateChange: e => { if (e.data === window.YT.PlayerState.ENDED) { handleTrailerLoopEnd(trailerConfig); setTimeout(() => { showNextPoster(); startRotation(); }, 7000); } } } // PATCH-TIMING: 7s Pause
-                });
-                setupAutohideTimer(trailerConfig);
-                return;
-            } else if (directTrailerUrl.startsWith('/local-posterpack?') ||
-                       directTrailerUrl.match(/\.(mp4|webm|mkv)$/i)) {
-                // Lokales Video via HTML5
-                const existing = document.getElementById('trailer-video-local');
-                if (existing) existing.remove();
-                const video = document.createElement('video');
-                video.id = 'trailer-video-local';
-                video.src = directTrailerUrl;
-                video.autoplay = true; video.controls = false; video.muted = false;
-                video.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:9999;background:#000';
-                video.onended = () => { video.remove(); removeTrailerOverlay(); setTimeout(() => { showNextPoster(); startRotation(); }, 7000); }; // PATCH-TIMING
-                video.onerror = () => { video.remove(); removeTrailerOverlay(); };
-                document.body.appendChild(video);
-                return;
-            }
+        // --- Fallback: YouTube (nur wenn explizite YouTube-URL und kein lokaler Trailer) ---
+        let videoId = null;
+        const ytMatch = directTrailerUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        if (ytMatch) videoId = ytMatch[1];
+
+        if (!videoId) {
+            removeTrailerOverlay();
+            startRotation();
+            return;
+        }
+
+        try {
+            await loadYouTubeAPI();
+        } catch (err) {
+            log('Trailer: YouTube API konnte nicht geladen werden', { error: err.message });
+            removeTrailerOverlay();
+            startRotation();
+            return;
         }
 
         // Check if we already have this trailer loaded
-        const trailerKey = `${tmdbId}-${type}`;
+        const trailerKey = `yt-${videoId}`;
         if (currentTrailerKey === trailerKey && trailerEl) {
             log('Trailer already loaded for this media');
             return;
         }
 
         try {
-            // Fetch trailer URL from backend
-            const response = await fetch(`/get-trailer?tmdbId=${tmdbId}&type=${type}`);
-            if (!response.ok) {
-                log('Trailer fetch failed', { status: response.status, title: media.title });
-                removeTrailerOverlay();
-                return;
-            }
-
-            const data = await response.json();
-            if (!data.success || !data.trailer) {
-                log('No trailer available', { title: media.title });
-                removeTrailerOverlay();
-                return;
-            }
-
-            // Load YouTube API if needed
-            await loadYouTubeAPI();
-
             debug('Trailer DOM state (before remove)', {
                 trailerElsInDom: document.querySelectorAll('.cinema-trailer-overlay').length,
                 ytPlayerDivsInDom: document.querySelectorAll('[id^="yt-trailer-player"]').length,
@@ -1597,12 +1600,12 @@
             const quality = trailerConfig.quality || 'hd1080'; // PATCH-HD: Full-HD default
 
             // Create iframe with allow="autoplay" set BEFORE src loads — required by Safari and Chromium
-            const _ytEmbedParams2 = `enablejsapi=1&autoplay=1&mute=1&controls=0&disablekb=1&fs=0&iv_load_policy=3&modestbranding=1&rel=0&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`;
+            const _ytEmbedParams2 = `enablejsapi=1&autoplay=1&mute=1&controls=0&disablekb=1&fs=0&iv_load_policy=3&modestbranding=1&rel=0&showinfo=0&cc_load_policy=0&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`;
             const _ytIframe2 = document.createElement('iframe');
             _ytIframe2.allow = 'autoplay; encrypted-media; picture-in-picture';
             _ytIframe2.setAttribute('allowfullscreen', '');
-            _ytIframe2.style.cssText = 'width:100%;height:100%;border:0;';
-            _ytIframe2.src = `https://www.youtube.com/embed/${data.trailer.key}?${_ytEmbedParams2}`;
+            _ytIframe2.style.cssText = 'width:100%;height:100%;border:0;pointer-events:none;'; /* PATCH-NOCLK: keine Klicks auf YouTube-UI */
+            _ytIframe2.src = `https://www.youtube-nocookie.com/embed/${videoId}?${_ytEmbedParams2}`;
             trailerEl.appendChild(_ytIframe2);
             document.body.appendChild(trailerEl);
 
@@ -1645,7 +1648,7 @@
                             }
                         }
                         event.target.playVideo();
-                        if (!shouldMute) event.target.unMute(); // PATCH4b: unmute for audio
+                        // PATCH-AUTOPLAY: Stumm starten (Autoplay-Policy), nach 2s laut schalten
                         try { event.target.setPlaybackQualityRange('hd1080', 'highres'); } catch(_) {} // PATCH-HD
                         // Fade in the trailer overlay smoothly
                         if (trailerEl) {
@@ -1658,6 +1661,12 @@
                                 });
                                 if (trailerEl) trailerEl.classList.add('visible'); // PATCH18: 1s Delay, kein Lade-Spinner
                             }, 1100);
+                            // PATCH-AUTOPLAY: Verzögertes Unmute nach 2s — Safari/Chromium blockiert Autoplay mit Ton
+                            if (!shouldMute) {
+                                setTimeout(() => {
+                                    try { event.target.unMute(); event.target.setVolume(100); } catch(_) {}
+                                }, 2000);
+                            }
                         } else {
                             warn('Trailer trailerEl is NULL in onReady callback');
                         }
@@ -1716,7 +1725,7 @@
 
             log('Trailer overlay created (YouTube API)', {
                 title: media.title,
-                trailerName: data.trailer.name,
+                videoId,
                 muted: trailerConfig.muted,
                 loop: shouldLoop,
             });
@@ -3992,6 +4001,20 @@
                 error('Failed to show previous poster', e);
             }
         },
+        refreshPlaylist: async () => {
+            try {
+                log('Playlist refresh triggered via WebSocket');
+                mediaQueue = await fetchMediaQueue();
+                if (mediaQueue.length > 0) {
+                    currentMediaIndex = 0;
+                    isFirstPoster = false;
+                    updateCinemaDisplay(mediaQueue[0]);
+                    log('Playlist refreshed — showing first item', { title: mediaQueue[0]?.title });
+                }
+            } catch (e) {
+                error('Failed to refresh playlist', e);
+            }
+        },
         remoteKey: key => {
             try {
                 switch (key) {
@@ -4110,6 +4133,31 @@
         }
     }
 
+    // PATCH: Listen for playlist changes from admin Poster Selector
+    try {
+        if (typeof BroadcastChannel !== 'undefined') {
+            const playlistChannel = new BroadcastChannel('posterrama-config');
+            playlistChannel.addEventListener('message', async (event) => {
+                try {
+                    if (event.data && event.data.type === 'playlist-updated') {
+                        log('Playlist update received via BroadcastChannel', { enabled: event.data.enabled });
+                        mediaQueue = await fetchMediaQueue();
+                        if (mediaQueue.length > 0) {
+                            currentMediaIndex = 0;
+                            isFirstPoster = false;
+                            updateCinemaDisplay(mediaQueue[0]);
+                            log('Playlist switched — showing first item', { title: mediaQueue[0]?.title });
+                        }
+                    }
+                } catch (e) {
+                    error('Playlist BroadcastChannel handler failed', e);
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('[Cinema] Playlist BroadcastChannel setup failed:', e);
+    }
+
     async function fetchMediaQueue() {
         try {
             // Wait for config to be available
@@ -4166,11 +4214,11 @@
                     const pl = await plRes.json();
                     if (pl && pl.enabled === true && Array.isArray(pl.titles) && pl.titles.length > 0) {
                         // Nur gelistete Titel, in definierter Reihenfolge
-                        const normalize = t => String(t || '').toLowerCase().trim().replace(/[''`]/g, '').replace(/[-–—]/g, ' ').replace(/\s+/g, ' '); // PATCH16b: Apostroph+Bindestrich-tolerant
+                        const normalize = t => String(t || '').toLowerCase().trim().replace(/\s*\(\d{4}\)\s*$/, '').replace(/[''`]/g, '').replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim(); // PATCH16b+c: Apostroph+Bindestrich+Jahreszahl-tolerant
                         const plNorm = pl.titles.map(normalize);
                         const ordered = [];
                         for (const t of plNorm) {
-                            const match = items.find(it => normalize(it.title) === t);
+                            const match = items.find(it => normalize(it.title) === t || normalize(it.fileTitle) === t);
                             if (match) ordered.push(match);
                         }
                         if (ordered.length > 0) {

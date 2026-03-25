@@ -1,7 +1,7 @@
 // Posterrama PWA Service Worker
-// Version 2.2.9 - Bypass SW cache for critical modules
+// Version 2.3.0 - Bypass SW cache for cinema-display.js
 
-const CACHE_NAME = 'posterrama-pwa-v2.2.9';
+const CACHE_NAME = 'posterrama-pwa-v2.3.0';
 const MEDIA_CACHE_NAME = 'posterrama-media-v1.1.1';
 
 // Cache limits to avoid QuotaExceededError
@@ -138,7 +138,7 @@ self.addEventListener('fetch', event => {
 
     // Always fetch latest critical boot modules from network (no SW cache). Fallback to cache only if offline.
     // These scripts are loaded on many pages and can cause broad breakage if a buggy cached version persists.
-    if (url.pathname === '/error-handler.js' || url.pathname === '/ui/auto-loader.js') {
+    if (url.pathname === '/error-handler.js' || url.pathname === '/ui/auto-loader.js' || url.pathname === '/cinema/cinema-display.js') {
         event.respondWith(fetch(request, { cache: 'no-store' }).catch(() => caches.match(request)));
         return;
     }

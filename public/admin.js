@@ -3619,6 +3619,8 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                 'section-devices': 'devices',
                 'section-performance': 'performance',
                 'section-operations': 'operations',
+                'section-poster-updater': 'poster-updater',
+                'section-poster-selector': 'poster-selector',
             };
             const key = map[sectionId];
             const all = document.querySelectorAll('.sidebar-nav .nav-item');
@@ -3692,6 +3694,12 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                 pageHeader.style.display = 'none';
             } else if (id === 'section-display') {
                 // Hide the big page header for Display Settings (compact panel)
+                pageHeader.style.display = 'none';
+            } else if (id === 'section-poster-updater') {
+                // Hide the big page header for Poster Updater (compact panel)
+                pageHeader.style.display = 'none';
+            } else if (id === 'section-poster-selector') {
+                // Hide the big page header for Poster Selector (compact panel)
                 pageHeader.style.display = 'none';
             } else {
                 // Default (Dashboard and any other sections using the big header)
@@ -11042,6 +11050,10 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                     refreshOperationsPanels();
                     // refresh API key status since API Access is now in Operations
                     refreshApiKeyStatus();
+                } else if (nav === 'poster-updater') {
+                    showSection('section-poster-updater');
+                } else if (nav === 'poster-selector') {
+                    showSection('section-poster-selector');
                 } else if (nav === 'media-sources') {
                     // Always land on Plex tab by default
                     showSection('section-media-sources');
@@ -32590,4 +32602,927 @@ if (!document.__niwDelegatedFallback) {
         loadGenres: loadMusicGenres,
         loadArtists: loadMusicArtists,
     };
+})();
+
+/* =========================================================
+   Poster Updater – embedded in Operations section
+   ========================================================= */
+(function () {
+    'use strict';
+
+    let puInited = false;
+    let puFilmData = [];
+    let puFilmNamesLower = new Set();
+    let puDeleteTarget = null;
+    let puSearchTimer = null;
+    let puActiveStatusFilter = 'all';
+    let puLastSearchResults = [];
+    let puEvtSource = null;
+    let puRunnerCounts = { success: 0, skipped: 0, error: 0 };
+    let puActiveRunnerFilter = 'all';
+    let puStdoutBuffer = '';
+
+    function puEscHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function puEscAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;'); }
+
+    function puToast(msg, type) {
+        if (window.notify) {
+            if (type === 'error') window.notify.error(msg);
+            else window.notify.success(msg);
+        }
+    }
+
+    async function puApiFetch(url, opts) {
+        const res = await fetch(url, { credentials: 'same-origin', ...opts });
+        const data = await res.json();
+        if (!res.ok && !data.success) throw new Error(data.error || 'HTTP ' + res.status);
+        return data;
+    }
+
+    // --- Tab switching ---
+    function initPuTabs() {
+        const tabBar = document.querySelector('.pu-tabs');
+        if (!tabBar) return;
+        tabBar.addEventListener('click', e => {
+            const btn = e.target.closest('[data-pu-tab]');
+            if (!btn) return;
+            tabBar.querySelectorAll('.pu-tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.pu-pane').forEach(p => p.classList.remove('active'));
+            const pane = document.getElementById('pu-pane-' + btn.dataset.puTab);
+            if (pane) pane.classList.add('active');
+        });
+    }
+
+    // ============================================================
+    // Film List
+    // ============================================================
+    async function puLoadFilms() {
+        try {
+            const data = await puApiFetch('/api/poster-updater/films');
+            puFilmData = data.films || [];
+            puFilmNamesLower = new Set(puFilmData.map(f => f.name.toLowerCase()));
+            puRenderFilmList();
+            puRenderFilmStats(data);
+        } catch (err) {
+            const el = document.getElementById('pu-filmList');
+            if (el) el.innerHTML = '<div class="pu-film-empty">Fehler: ' + puEscHtml(err.message) + '</div>';
+        }
+    }
+
+    function puRenderFilmStats(data) {
+        const el = document.getElementById('pu-filmStats');
+        if (!el) return;
+        el.innerHTML =
+            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'all' ? 'active' : '') + '" data-filter="all"><span class="dot dot-total"></span> ' + data.total + ' Filme</button>' +
+            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'zip' ? 'active' : '') + '" data-filter="zip"><span class="dot dot-green"></span> ' + data.withZip + ' mit ZIP</button>' +
+            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'pending' ? 'active' : '') + '" data-filter="pending"><span class="dot dot-orange"></span> ' + data.pending + ' ausstehend</button>';
+    }
+
+    function puRenderFilmList() {
+        const el = document.getElementById('pu-filmList');
+        if (!el) return;
+        const filterEl = document.getElementById('pu-filmFilter');
+        const filter = filterEl ? filterEl.value.toLowerCase() : '';
+        let filtered = puFilmData;
+        if (puActiveStatusFilter === 'zip') filtered = filtered.filter(f => f.hasZip);
+        else if (puActiveStatusFilter === 'pending') filtered = filtered.filter(f => !f.hasZip);
+        if (filter) filtered = filtered.filter(f => f.name.toLowerCase().includes(filter));
+
+        if (!filtered.length) {
+            el.innerHTML = '<div class="pu-film-empty">' + (filter ? 'Keine Treffer' : 'Liste ist leer') + '</div>';
+            return;
+        }
+        el.innerHTML = filtered.map(f =>
+            '<div class="pu-film-row">' +
+            '<span class="pu-film-dot ' + (f.hasZip ? 'has-zip' : 'pending') + '" title="' + (f.hasZip ? 'ZIP vorhanden' : 'Ausstehend') + '"></span>' +
+            '<span class="pu-film-name">' + puEscHtml(f.name) + '</span>' +
+            '<button class="pu-btn-delete" data-pu-delete="' + puEscAttr(f.name) + '" title="Entfernen"><i class="fas fa-trash-alt"></i></button>' +
+            '</div>'
+        ).join('');
+    }
+
+    // ============================================================
+    // TMDB Search
+    // ============================================================
+    async function puDoSearch(query) {
+        const el = document.getElementById('pu-searchResults');
+        if (!el) return;
+        el.innerHTML = '<div class="pu-search-empty">Suche...</div>';
+        try {
+            const data = await puApiFetch('/api/admin/media/search?q=' + encodeURIComponent(query) + '&type=movie&source=tmdb&limit=25');
+            puLastSearchResults = data.results || [];
+            puRenderSearchResults();
+        } catch (err) {
+            el.innerHTML = '<div class="pu-search-empty">Fehler: ' + puEscHtml(err.message) + '</div>';
+        }
+    }
+
+    function puRenderSearchResults() {
+        const el = document.getElementById('pu-searchResults');
+        if (!el) return;
+        if (!puLastSearchResults.length) {
+            el.innerHTML = '<div class="pu-search-empty">Keine Ergebnisse</div>';
+            return;
+        }
+        el.innerHTML = '<div class="pu-search-results">' + puLastSearchResults.map(function (r, i) {
+            var title = r.title || 'Unbekannt';
+            var year = r.year || '';
+            var entry = year ? title + ' (' + year + ')' : title;
+            var exists = puFilmNamesLower.has(entry.toLowerCase());
+            var posterSrc = r.posterUrl || '';
+            return '<div class="pu-search-card" data-entry="' + puEscAttr(entry) + '">' +
+                (posterSrc
+                    ? '<img class="pu-search-poster" src="' + puEscAttr(posterSrc) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+                    : '<div class="pu-search-poster" style="display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--color-text-muted);">Kein Poster</div>') +
+                '<div class="pu-search-info">' +
+                '<div class="pu-search-title" title="' + puEscAttr(title) + '">' + puEscHtml(title) + '</div>' +
+                '<div class="pu-search-year">' + (year || '?') + '</div>' +
+                '<div class="pu-search-actions">' +
+                (exists
+                    ? '<span class="pu-badge-exists">Bereits vorhanden</span>'
+                    : '<button class="btn btn-primary btn-sm" data-pu-add="' + i + '">Hinzufügen</button>') +
+                '</div></div></div>';
+        }).join('') + '</div>';
+    }
+
+    async function puAddFromSearch(idx) {
+        var r = puLastSearchResults[idx];
+        if (!r) { puToast('Eintrag nicht gefunden', 'error'); return; }
+        var title = (r.title || '').trim();
+        var year = r.year != null ? String(r.year).trim() : '';
+        if (!title) { puToast('Filmtitel fehlt', 'error'); return; }
+        if (!year || !/^\d{4}$/.test(year)) { puToast('Erscheinungsjahr fehlt oder ungültig', 'error'); return; }
+        try {
+            await puApiFetch('/api/poster-updater/films', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: title, year: year }),
+            });
+            puToast('"' + title + ' (' + year + ')" hinzugefuegt');
+            await puLoadFilms();
+            puRenderSearchResults();
+        } catch (err) {
+            puToast(err.message, 'error');
+        }
+    }
+
+    // ============================================================
+    // Download Runner
+    // ============================================================
+    function puRenderRunnerStats() {
+        var el = document.getElementById('pu-runnerStats');
+        if (!el) return;
+        var total = puRunnerCounts.success + puRunnerCounts.skipped + puRunnerCounts.error;
+        if (!total) { el.innerHTML = ''; return; }
+        el.innerHTML =
+            '<button class="pu-filter-btn ' + (puActiveRunnerFilter === 'all' ? 'active' : '') + '" data-filter="all" data-pu-runner-filter><span class="dot dot-total"></span> ' + total + ' gesamt</button>' +
+            '<button class="pu-filter-btn ' + (puActiveRunnerFilter === 'success' ? 'active' : '') + '" data-filter="success" data-pu-runner-filter><span class="dot dot-green"></span> ' + puRunnerCounts.success + ' erfolgreich</button>' +
+            '<button class="pu-filter-btn ' + (puActiveRunnerFilter === 'skipped' ? 'active' : '') + '" data-filter="skipped" data-pu-runner-filter><span class="dot dot-orange"></span> ' + puRunnerCounts.skipped + ' übersprungen</button>' +
+            '<button class="pu-filter-btn ' + (puActiveRunnerFilter === 'error' ? 'active' : '') + '" data-filter="error" data-pu-runner-filter><span class="dot" style="background:var(--color-error)"></span> ' + puRunnerCounts.error + ' Fehler</button>';
+    }
+
+    function puClassifyLine(text) {
+        var t = text.trimStart();
+        if (/^✅/.test(t)) return 'line-success';
+        if (/^⏭/.test(t)) return 'line-skipped';
+        if (/^❌/.test(t)) return 'line-error';
+        return 'line-info';
+    }
+
+    function puCountLine(text) {
+        var t = text.trimStart();
+        if (/^✅/.test(t)) puRunnerCounts.success++;
+        else if (/^⏭/.test(t)) puRunnerCounts.skipped++;
+        else if (/^❌/.test(t)) puRunnerCounts.error++;
+        else return;
+        puRenderRunnerStats();
+    }
+
+    function puSetRunnerState(state) {
+        var el = document.getElementById('pu-runnerStatus');
+        if (!el) return;
+        el.className = 'pu-runner-status ' + state;
+        if (state === 'idle') el.textContent = 'Bereit';
+        else if (state === 'running') el.textContent = 'Läuft...';
+        else if (state === 'done') el.textContent = 'Fertig';
+        else if (state === 'error') el.textContent = 'Fehler';
+        var startBtn = document.getElementById('pu-runStartBtn');
+        var stopBtn = document.getElementById('pu-runStopBtn');
+        if (startBtn) startBtn.disabled = state === 'running';
+        if (stopBtn) stopBtn.disabled = state !== 'running';
+    }
+
+    function puAppendTerminal(text, cls) {
+        var termEl = document.getElementById('pu-terminal');
+        if (!termEl) return;
+        if (cls) {
+            var span = document.createElement('span');
+            span.className = cls;
+            span.textContent = text;
+            termEl.appendChild(span);
+            termEl.scrollTop = termEl.scrollHeight;
+            return;
+        }
+        puStdoutBuffer += text;
+        var lines = puStdoutBuffer.split('\n');
+        puStdoutBuffer = lines.pop();
+        for (var i = 0; i < lines.length; i++) {
+            var s = document.createElement('span');
+            s.className = puClassifyLine(lines[i]);
+            s.textContent = lines[i] + '\n';
+            termEl.appendChild(s);
+            puCountLine(lines[i]);
+        }
+        termEl.scrollTop = termEl.scrollHeight;
+    }
+
+    function puConnectSSE() {
+        if (puEvtSource) puEvtSource.close();
+        puEvtSource = new EventSource('/api/poster-updater/run/status');
+        puEvtSource.onmessage = function (e) {
+            try {
+                var data = JSON.parse(e.data);
+                var termEl = document.getElementById('pu-terminal');
+                if (data.type === 'connected') {
+                    if (data.running) puSetRunnerState('running');
+                } else if (data.type === 'started') {
+                    if (termEl) { termEl.textContent = ''; termEl.className = 'pu-terminal'; }
+                    puStdoutBuffer = '';
+                    puRunnerCounts = { success: 0, skipped: 0, error: 0 };
+                    puActiveRunnerFilter = 'all';
+                    puRenderRunnerStats();
+                    puSetRunnerState('running');
+                } else if (data.type === 'stdout') {
+                    puAppendTerminal(data.text);
+                } else if (data.type === 'stderr') {
+                    puAppendTerminal(data.text, 'stderr');
+                } else if (data.type === 'done') {
+                    puSetRunnerState(data.code === 0 ? 'done' : 'error');
+                    puAppendTerminal('\n--- Beendet (Exit Code: ' + data.code + ') ---\n');
+                    puLoadFilms();
+                } else if (data.type === 'error') {
+                    puSetRunnerState('error');
+                    puAppendTerminal('\n--- Fehler: ' + data.message + ' ---\n', 'stderr');
+                }
+            } catch (_) { /* ignore parse errors */ }
+        };
+        puEvtSource.onerror = function () {
+            puEvtSource.close();
+            setTimeout(puConnectSSE, 3000);
+        };
+    }
+
+    function puDisconnectSSE() {
+        if (puEvtSource) {
+            puEvtSource.close();
+            puEvtSource = null;
+        }
+        if (puTrailerEvtSource) {
+            puTrailerEvtSource.close();
+            puTrailerEvtSource = null;
+        }
+    }
+
+    // ============================================================
+    // Trailer Download Runner
+    // ============================================================
+    var puTrailerEvtSource = null;
+
+    function puSetTrailerState(state) {
+        var el = document.getElementById('pu-trailerStatus');
+        if (!el) return;
+        el.className = 'pu-runner-status ' + state;
+        if (state === 'idle') el.textContent = 'Bereit';
+        else if (state === 'running') el.textContent = 'Läuft...';
+        else if (state === 'done') el.textContent = 'Fertig';
+        else if (state === 'error') el.textContent = 'Fehler';
+        var startBtn = document.getElementById('pu-trailerStartBtn');
+        var stopBtn = document.getElementById('pu-trailerStopBtn');
+        if (startBtn) startBtn.disabled = state === 'running';
+        if (stopBtn) stopBtn.disabled = state !== 'running';
+    }
+
+    function puAppendTrailerTerminal(text) {
+        var termEl = document.getElementById('pu-trailerTerminal');
+        if (!termEl) return;
+        var span = document.createElement('span');
+        span.textContent = text;
+        termEl.appendChild(span);
+        termEl.scrollTop = termEl.scrollHeight;
+    }
+
+    function puConnectTrailerSSE() {
+        if (puTrailerEvtSource) puTrailerEvtSource.close();
+        puTrailerEvtSource = new EventSource('/api/poster-updater/trailers/run/status');
+        puTrailerEvtSource.onmessage = function (e) {
+            try {
+                var data = JSON.parse(e.data);
+                var termEl = document.getElementById('pu-trailerTerminal');
+                if (data.type === 'connected') {
+                    if (data.running) puSetTrailerState('running');
+                } else if (data.type === 'started') {
+                    if (termEl) termEl.textContent = '';
+                    puSetTrailerState('running');
+                } else if (data.type === 'stdout') {
+                    puAppendTrailerTerminal(data.text);
+                } else if (data.type === 'stderr') {
+                    puAppendTrailerTerminal(data.text);
+                } else if (data.type === 'done') {
+                    puSetTrailerState(data.code === 0 ? 'done' : 'error');
+                    puAppendTrailerTerminal('\n--- Beendet (Exit Code: ' + data.code + ') ---\n');
+                } else if (data.type === 'error') {
+                    puSetTrailerState('error');
+                    puAppendTrailerTerminal('\n--- Fehler: ' + data.message + ' ---\n');
+                }
+            } catch (_) {}
+        };
+        puTrailerEvtSource.onerror = function () {
+            puTrailerEvtSource.close();
+            setTimeout(puConnectTrailerSSE, 3000);
+        };
+    }
+
+    // ============================================================
+    // Init & lifecycle
+    // ============================================================
+    function initPosterUpdater() {
+        if (puInited) return;
+        puInited = true;
+
+        initPuTabs();
+
+        // Film list events
+        var filmFilterEl = document.getElementById('pu-filmFilter');
+        if (filmFilterEl) filmFilterEl.addEventListener('input', puRenderFilmList);
+
+        var filmStatsEl = document.getElementById('pu-filmStats');
+        if (filmStatsEl) filmStatsEl.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-filter]');
+            if (!btn) return;
+            puActiveStatusFilter = btn.dataset.filter;
+            puRenderFilmStats({ total: puFilmData.length, withZip: puFilmData.filter(function (f) { return f.hasZip; }).length, pending: puFilmData.filter(function (f) { return !f.hasZip; }).length });
+            puRenderFilmList();
+        });
+
+        var filmListEl = document.getElementById('pu-filmList');
+        if (filmListEl) filmListEl.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-pu-delete]');
+            if (btn) puOpenDeleteModal(btn.dataset.puDelete);
+        });
+
+        // Delete modal
+        var cancelBtn = document.getElementById('pu-deleteCancelBtn');
+        if (cancelBtn) cancelBtn.addEventListener('click', puCloseDeleteModal);
+        var confirmBtn = document.getElementById('pu-deleteConfirmBtn');
+        if (confirmBtn) confirmBtn.addEventListener('click', async function () {
+            if (!puDeleteTarget) return;
+            var name = puDeleteTarget;
+            puCloseDeleteModal();
+            try {
+                await puApiFetch('/api/poster-updater/films/' + encodeURIComponent(name), { method: 'DELETE' });
+                puToast('"' + name + '" entfernt');
+                await puLoadFilms();
+                if (document.getElementById('pu-searchResults')?.querySelector('.pu-search-card')) puRenderSearchResults();
+            } catch (err) {
+                puToast(err.message, 'error');
+            }
+        });
+
+        // TMDB Search
+        var tmdbSearchEl = document.getElementById('pu-tmdbSearch');
+        var tmdbSearchBtn = document.getElementById('pu-tmdbSearchBtn');
+        if (tmdbSearchEl) {
+            tmdbSearchEl.addEventListener('input', function () {
+                var q = tmdbSearchEl.value.trim();
+                if (tmdbSearchBtn) tmdbSearchBtn.disabled = q.length < 2;
+                clearTimeout(puSearchTimer);
+                if (q.length >= 2) {
+                    puSearchTimer = setTimeout(function () { puDoSearch(q); }, 300);
+                } else {
+                    var sr = document.getElementById('pu-searchResults');
+                    if (sr) sr.innerHTML = '';
+                }
+            });
+            tmdbSearchEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && tmdbSearchEl.value.trim().length >= 2) {
+                    clearTimeout(puSearchTimer);
+                    puDoSearch(tmdbSearchEl.value.trim());
+                }
+            });
+        }
+        if (tmdbSearchBtn) tmdbSearchBtn.addEventListener('click', function () {
+            if (tmdbSearchEl && tmdbSearchEl.value.trim().length >= 2) puDoSearch(tmdbSearchEl.value.trim());
+        });
+
+        // Search result add buttons
+        var searchResultsEl = document.getElementById('pu-searchResults');
+        if (searchResultsEl) searchResultsEl.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-pu-add]');
+            if (btn) puAddFromSearch(parseInt(btn.dataset.puAdd, 10));
+        });
+
+        // Runner buttons
+        var runStartBtn = document.getElementById('pu-runStartBtn');
+        var runStopBtn = document.getElementById('pu-runStopBtn');
+        if (runStartBtn) runStartBtn.addEventListener('click', async function () {
+            try {
+                var termEl = document.getElementById('pu-terminal');
+                if (termEl) termEl.textContent = '';
+                await puApiFetch('/api/poster-updater/run', { method: 'POST' });
+            } catch (err) {
+                puToast(err.message, 'error');
+            }
+        });
+        if (runStopBtn) runStopBtn.addEventListener('click', async function () {
+            try {
+                await puApiFetch('/api/poster-updater/run/stop', { method: 'POST' });
+                puToast('Stop-Signal gesendet');
+            } catch (err) {
+                puToast(err.message, 'error');
+            }
+        });
+
+        // Runner filter buttons
+        var runnerStatsEl = document.getElementById('pu-runnerStats');
+        if (runnerStatsEl) runnerStatsEl.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-pu-runner-filter]');
+            if (!btn) return;
+            puActiveRunnerFilter = btn.dataset.filter;
+            var termEl = document.getElementById('pu-terminal');
+            if (termEl) termEl.className = 'pu-terminal' + (puActiveRunnerFilter !== 'all' ? ' filter-' + puActiveRunnerFilter : '');
+            puRenderRunnerStats();
+        });
+
+        // Trailer download buttons
+        var trailerStartBtn = document.getElementById('pu-trailerStartBtn');
+        var trailerStopBtn = document.getElementById('pu-trailerStopBtn');
+        if (trailerStartBtn) trailerStartBtn.addEventListener('click', async function () {
+            try {
+                var termEl = document.getElementById('pu-trailerTerminal');
+                if (termEl) termEl.textContent = '';
+                await puApiFetch('/api/poster-updater/trailers/run', { method: 'POST' });
+            } catch (err) {
+                puToast(err.message, 'error');
+            }
+        });
+        if (trailerStopBtn) trailerStopBtn.addEventListener('click', async function () {
+            try {
+                await puApiFetch('/api/poster-updater/trailers/run/stop', { method: 'POST' });
+                puToast('Stop-Signal gesendet');
+            } catch (err) {
+                puToast(err.message, 'error');
+            }
+        });
+
+        // Load data & connect SSE
+        puLoadFilms();
+        puConnectSSE();
+        puConnectTrailerSSE();
+    }
+
+    function puOpenDeleteModal(name) {
+        puDeleteTarget = name;
+        var textEl = document.getElementById('pu-deleteModalText');
+        if (textEl) textEl.textContent = '"' + name + '" wirklich aus der Filmliste entfernen?';
+        var modal = document.getElementById('pu-deleteModal');
+        if (modal) modal.classList.add('open');
+    }
+
+    function puCloseDeleteModal() {
+        var modal = document.getElementById('pu-deleteModal');
+        if (modal) modal.classList.remove('open');
+        puDeleteTarget = null;
+    }
+
+    // Hook into showSection lifecycle
+    var origShowSection = window.__posterramaShowSection;
+
+    // Patch showSection to manage Poster Updater lifecycle
+    (function patchShowSection() {
+        // Wait for showSection to be available, then wrap it
+        var checkInterval = setInterval(function () {
+            // showSection is called within the admin IIFE via nav clicks;
+            // we hook via a MutationObserver on section-operations visibility instead
+            clearInterval(checkInterval);
+
+            var puSection = document.getElementById('section-poster-updater');
+            if (!puSection) return;
+
+            // Use MutationObserver to detect when poster-updater section becomes visible/hidden
+            var observer = new MutationObserver(function () {
+                if (!puSection.hidden && puSection.classList.contains('active')) {
+                    initPosterUpdater();
+                } else {
+                    puDisconnectSSE();
+                }
+            });
+            observer.observe(puSection, { attributes: true, attributeFilter: ['hidden', 'class'] });
+
+            // Also init if poster-updater is already visible on page load
+            if (!puSection.hidden) {
+                initPosterUpdater();
+            }
+        }, 200);
+    })();
+})();
+
+/* =========================================================
+   Poster Selector – own section in sidebar
+   ========================================================= */
+(function () {
+    'use strict';
+
+    var psInited = false;
+    var psAllFilms = [];       // [{name, source}]
+    var psPlaylistTitles = []; // [string]
+    var psEnabled = false;
+    var psPlaylistSet = new Set(); // lowercase lookup
+
+    function psEscHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function psEscAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;'); }
+
+    function psToast(msg, type) {
+        if (window.notify) {
+            if (type === 'error') window.notify.error(msg);
+            else window.notify.success(msg);
+        }
+    }
+
+    async function psFetch(url, opts) {
+        var res = await fetch(url, { credentials: 'same-origin', ...opts });
+        var data = await res.json();
+        if (!res.ok && !data.success) throw new Error(data.error || 'HTTP ' + res.status);
+        return data;
+    }
+
+    // ============================================================
+    // Load data
+    // ============================================================
+    async function psLoadFilms() {
+        try {
+            var data = await psFetch('/api/poster-selector/films');
+            psAllFilms = data.films || [];
+            psRenderAvailable();
+        } catch (err) {
+            var el = document.getElementById('ps-availableList');
+            if (el) el.innerHTML = '<div class="ps-film-empty">Fehler: ' + psEscHtml(err.message) + '</div>';
+        }
+    }
+
+    async function psLoadPlaylist() {
+        try {
+            var data = await psFetch('/api/poster-selector/playlist');
+            psPlaylistTitles = data.titles || [];
+            psEnabled = !!data.enabled;
+            psPlaylistSet = new Set(psPlaylistTitles.map(function (t) { return t.toLowerCase(); }));
+            psRenderPlaylist();
+            psUpdateToggle();
+            // re-render available to update "in-playlist" markers
+            psRenderAvailable();
+        } catch (err) {
+            var el = document.getElementById('ps-playlistList');
+            if (el) el.innerHTML = '<div class="ps-film-empty">Fehler: ' + psEscHtml(err.message) + '</div>';
+        }
+    }
+
+    // ============================================================
+    // Save playlist
+    // ============================================================
+    async function psSavePlaylist() {
+        try {
+            await psFetch('/api/poster-selector/playlist', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: psEnabled, titles: psPlaylistTitles }),
+            });
+            // Notify display tabs to reload playlist immediately
+            try {
+                var ch = new BroadcastChannel('posterrama-config');
+                ch.postMessage({ type: 'playlist-updated', enabled: psEnabled });
+                ch.close();
+            } catch (_) { /* BroadcastChannel not supported */ }
+        } catch (err) {
+            psToast('Fehler beim Speichern: ' + err.message, 'error');
+        }
+    }
+
+    // ============================================================
+    // Render available films (left column)
+    // ============================================================
+    function psRenderAvailable() {
+        var el = document.getElementById('ps-availableList');
+        var countEl = document.getElementById('ps-availableCount');
+        if (!el) return;
+
+        var filterEl = document.getElementById('ps-filter');
+        var filter = filterEl ? filterEl.value.toLowerCase() : '';
+        var filtered = psAllFilms;
+        if (filter) filtered = filtered.filter(function (f) { return f.name.toLowerCase().includes(filter); });
+
+        if (countEl) countEl.textContent = psAllFilms.length;
+
+        if (!filtered.length) {
+            el.innerHTML = '<div class="ps-film-empty">' + (filter ? 'Keine Treffer' : 'Keine Filme gefunden') + '</div>';
+            return;
+        }
+
+        el.innerHTML = filtered.map(function (f) {
+            var inPlaylist = psPlaylistSet.has(f.name.toLowerCase());
+            return '<div class="ps-film-row' + (inPlaylist ? ' in-playlist' : '') + '">' +
+                '<span class="ps-film-name" title="' + psEscAttr(f.name) + '">' + psEscHtml(f.name) + '</span>' +
+                '<span class="ps-film-source">' + psEscHtml(f.source) + '</span>' +
+                '<button class="ps-btn-add" data-ps-add="' + psEscAttr(f.name) + '" title="Zur Playlist hinzufügen"><i class="fas fa-plus"></i></button>' +
+                '</div>';
+        }).join('');
+    }
+
+    // ============================================================
+    // Render playlist (right column)
+    // ============================================================
+    var psDragIdx = null; // index being dragged
+
+    function psRenderPlaylist() {
+        var el = document.getElementById('ps-playlistList');
+        var countEl = document.getElementById('ps-playlistCount');
+        if (!el) return;
+
+        if (countEl) countEl.textContent = psPlaylistTitles.length;
+
+        if (!psPlaylistTitles.length) {
+            el.innerHTML = '<div class="ps-film-empty">Playlist ist leer</div>';
+            return;
+        }
+
+        var len = psPlaylistTitles.length;
+        el.innerHTML = psPlaylistTitles.map(function (title, i) {
+            return '<div class="ps-film-row ps-draggable" data-ps-idx="' + i + '">' +
+                '<span class="ps-drag-handle" draggable="true" title="Ziehen zum Verschieben"><i class="fas fa-grip-vertical"></i></span>' +
+                '<span class="ps-num">' + (i + 1) + '.</span>' +
+                '<span class="ps-film-name" title="' + psEscAttr(title) + '">' + psEscHtml(title) + '</span>' +
+                '<div class="ps-move-group">' +
+                '<button class="ps-btn-move" data-ps-move-up="' + i + '" title="Nach oben"' + (i === 0 ? ' disabled' : '') + '><i class="fas fa-chevron-up"></i></button>' +
+                '<button class="ps-btn-move" data-ps-move-down="' + i + '" title="Nach unten"' + (i === len - 1 ? ' disabled' : '') + '><i class="fas fa-chevron-down"></i></button>' +
+                '</div>' +
+                '<button class="ps-btn-remove" data-ps-remove="' + i + '" title="Entfernen"><i class="fas fa-times"></i></button>' +
+                '</div>';
+        }).join('');
+    }
+
+    function psInitDragDrop() {
+        var listEl = document.getElementById('ps-playlistList');
+        if (!listEl) return;
+
+        listEl.addEventListener('dragstart', function (e) {
+            var handle = e.target.closest('.ps-drag-handle');
+            if (!handle) return;
+            var row = handle.closest('[data-ps-idx]');
+            if (!row) return;
+            psDragIdx = parseInt(row.dataset.psIdx, 10);
+            row.classList.add('ps-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', String(psDragIdx));
+            // Use row as drag image for better visual feedback
+            try { e.dataTransfer.setDragImage(row, 0, row.offsetHeight / 2); } catch (_) {}
+        });
+
+        listEl.addEventListener('dragend', function (e) {
+            psDragIdx = null;
+            listEl.querySelectorAll('.ps-dragging, .ps-drop-above, .ps-drop-below').forEach(function (el) {
+                el.classList.remove('ps-dragging', 'ps-drop-above', 'ps-drop-below');
+            });
+        });
+
+        listEl.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            var row = e.target.closest('[data-ps-idx]');
+            if (!row || psDragIdx === null) return;
+            var targetIdx = parseInt(row.dataset.psIdx, 10);
+            if (targetIdx === psDragIdx) return; // skip self
+            // Show drop indicator
+            listEl.querySelectorAll('.ps-drop-above, .ps-drop-below').forEach(function (el) {
+                el.classList.remove('ps-drop-above', 'ps-drop-below');
+            });
+            var rect = row.getBoundingClientRect();
+            var mid = rect.top + rect.height / 2;
+            if (e.clientY < mid) {
+                row.classList.add('ps-drop-above');
+            } else {
+                row.classList.add('ps-drop-below');
+            }
+        });
+
+        listEl.addEventListener('dragleave', function (e) {
+            var row = e.target.closest('[data-ps-idx]');
+            if (row) row.classList.remove('ps-drop-above', 'ps-drop-below');
+        });
+
+        listEl.addEventListener('drop', function (e) {
+            e.preventDefault();
+            var row = e.target.closest('[data-ps-idx]');
+            if (!row || psDragIdx === null) return;
+            var targetIdx = parseInt(row.dataset.psIdx, 10);
+            if (targetIdx === psDragIdx) return; // dropped on self
+            var rect = row.getBoundingClientRect();
+            var mid = rect.top + rect.height / 2;
+            var dropAbove = e.clientY < mid;
+
+            // Calculate final position directly
+            var finalIdx;
+            if (psDragIdx < targetIdx) {
+                // Dragging downward
+                finalIdx = dropAbove ? targetIdx - 1 : targetIdx;
+            } else {
+                // Dragging upward
+                finalIdx = dropAbove ? targetIdx : targetIdx + 1;
+            }
+            if (finalIdx === psDragIdx) return; // no change
+
+            // Move the item
+            var item = psPlaylistTitles.splice(psDragIdx, 1)[0];
+            if (finalIdx > psDragIdx) finalIdx--; // adjust for removal
+            psPlaylistTitles.splice(finalIdx, 0, item);
+
+            psDragIdx = null;
+            psRenderPlaylist();
+            psSavePlaylist();
+        });
+    }
+
+    // ============================================================
+    // Toggle
+    // ============================================================
+    function psUpdateToggle() {
+        var toggle = document.getElementById('ps-enabledToggle');
+        var statusEl = document.getElementById('ps-toggleStatus');
+        if (toggle) toggle.checked = psEnabled;
+        if (statusEl) {
+            statusEl.textContent = psEnabled ? 'An' : 'Aus';
+            statusEl.className = 'ps-toggle-status ' + (psEnabled ? 'active' : 'inactive');
+        }
+    }
+
+    // ============================================================
+    // Actions
+    // ============================================================
+    function psAddFilm(name) {
+        if (psPlaylistSet.has(name.toLowerCase())) return;
+        psPlaylistTitles.push(name);
+        psPlaylistSet.add(name.toLowerCase());
+        psRenderPlaylist();
+        psRenderAvailable();
+        psSavePlaylist();
+    }
+
+    function psRemoveFilm(idx) {
+        var removed = psPlaylistTitles.splice(idx, 1);
+        if (removed.length) psPlaylistSet.delete(removed[0].toLowerCase());
+        psRenderPlaylist();
+        psRenderAvailable();
+        psSavePlaylist();
+    }
+
+    function psMoveFilm(idx, direction) {
+        var newIdx = idx + direction;
+        if (newIdx < 0 || newIdx >= psPlaylistTitles.length) return;
+        var tmp = psPlaylistTitles[idx];
+        psPlaylistTitles[idx] = psPlaylistTitles[newIdx];
+        psPlaylistTitles[newIdx] = tmp;
+        psRenderPlaylist();
+        psSavePlaylist();
+    }
+
+    // ============================================================
+    // Sorting
+    // ============================================================
+    function psExtractYear(title) {
+        // First try: year in parentheses at end of title
+        var m = title.match(/\((\d{4})\)\s*$/);
+        if (m) return parseInt(m[1], 10);
+        // Second try: find matching film in available list by title prefix
+        var tLower = title.toLowerCase();
+        for (var i = 0; i < psAllFilms.length; i++) {
+            var fn = psAllFilms[i].name;
+            // ZIP name is like "Film Title (2024)" — check if it starts with the playlist title
+            if (fn.toLowerCase().startsWith(tLower)) {
+                var ym = fn.match(/\((\d{4})\)\s*$/);
+                if (ym) return parseInt(ym[1], 10);
+            }
+        }
+        return null;
+    }
+
+    function psSortPlaylist(mode) {
+        if (psPlaylistTitles.length < 2) return;
+        // Pre-compute years for performance
+        var yearCache = {};
+        psPlaylistTitles.forEach(function (t) { yearCache[t] = psExtractYear(t); });
+        psPlaylistTitles.sort(function (a, b) {
+            if (mode === 'az') return a.localeCompare(b, 'de');
+            if (mode === 'za') return b.localeCompare(a, 'de');
+            // year sorting
+            var ya = yearCache[a];
+            var yb = yearCache[b];
+            // no year → sort to beginning alphabetically
+            if (ya === null && yb === null) return a.localeCompare(b, 'de');
+            if (ya === null) return -1;
+            if (yb === null) return 1;
+            var diff = mode === 'year-asc' ? ya - yb : yb - ya;
+            return diff !== 0 ? diff : a.localeCompare(b, 'de');
+        });
+        psRenderPlaylist();
+        psSavePlaylist();
+    }
+
+    // ============================================================
+    // Init
+    // ============================================================
+    function initPosterSelector() {
+        if (psInited) return;
+        psInited = true;
+
+        // Filter input
+        var filterEl = document.getElementById('ps-filter');
+        if (filterEl) filterEl.addEventListener('input', psRenderAvailable);
+
+        // Available list — add button delegation
+        var availList = document.getElementById('ps-availableList');
+        if (availList) availList.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-ps-add]');
+            if (btn) psAddFilm(btn.dataset.psAdd);
+        });
+
+        // Playlist — remove + move delegation
+        var playlistList = document.getElementById('ps-playlistList');
+        if (playlistList) playlistList.addEventListener('click', function (e) {
+            var removeBtn = e.target.closest('[data-ps-remove]');
+            if (removeBtn) { psRemoveFilm(parseInt(removeBtn.dataset.psRemove, 10)); return; }
+            var upBtn = e.target.closest('[data-ps-move-up]');
+            if (upBtn) { psMoveFilm(parseInt(upBtn.dataset.psMoveUp, 10), -1); return; }
+            var downBtn = e.target.closest('[data-ps-move-down]');
+            if (downBtn) { psMoveFilm(parseInt(downBtn.dataset.psMoveDown, 10), 1); return; }
+        });
+
+        // Toggle
+        var toggleEl = document.getElementById('ps-enabledToggle');
+        if (toggleEl) toggleEl.addEventListener('change', async function () {
+            psEnabled = toggleEl.checked;
+            psUpdateToggle();
+            try {
+                await psFetch('/api/poster-selector/playlist/toggle', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: psEnabled }),
+                });
+                // Notify display tabs to reload playlist immediately
+                try {
+                    var ch = new BroadcastChannel('posterrama-config');
+                    ch.postMessage({ type: 'playlist-updated', enabled: psEnabled });
+                    ch.close();
+                } catch (_) { /* BroadcastChannel not supported */ }
+                psToast(psEnabled ? 'Playlist aktiviert' : 'Playlist deaktiviert — zufällige Wiedergabe');
+            } catch (err) {
+                psToast('Fehler: ' + err.message, 'error');
+            }
+        });
+
+        // Sort buttons
+        var sortAZ = document.getElementById('ps-sortAZ');
+        var sortZA = document.getElementById('ps-sortZA');
+        var sortYearAsc = document.getElementById('ps-sortYearAsc');
+        var sortYearDesc = document.getElementById('ps-sortYearDesc');
+        if (sortAZ) sortAZ.addEventListener('click', function () { psSortPlaylist('az'); });
+        if (sortZA) sortZA.addEventListener('click', function () { psSortPlaylist('za'); });
+        if (sortYearAsc) sortYearAsc.addEventListener('click', function () { psSortPlaylist('year-asc'); });
+        if (sortYearDesc) sortYearDesc.addEventListener('click', function () { psSortPlaylist('year-desc'); });
+
+        // Drag & drop
+        psInitDragDrop();
+
+        // Load data
+        psLoadFilms();
+        psLoadPlaylist();
+    }
+
+    // Lifecycle: MutationObserver
+    (function patchShowSection() {
+        var checkInterval = setInterval(function () {
+            clearInterval(checkInterval);
+
+            var psSection = document.getElementById('section-poster-selector');
+            if (!psSection) return;
+
+            var observer = new MutationObserver(function () {
+                if (!psSection.hidden && psSection.classList.contains('active')) {
+                    initPosterSelector();
+                }
+            });
+            observer.observe(psSection, { attributes: true, attributeFilter: ['hidden', 'class'] });
+
+            if (!psSection.hidden) {
+                initPosterSelector();
+            }
+        }, 200);
+    })();
 })();

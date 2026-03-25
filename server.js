@@ -3986,6 +3986,23 @@ const localDirectoryRouter = createLocalDirectoryRouter({
 });
 app.use('/', localDirectoryRouter);
 
+// === POSTER UPDATER ROUTES ===
+const createPosterUpdaterRouter = require('./routes/poster-updater');
+app.use('/api/poster-updater', isAuthenticated, createPosterUpdaterRouter({ logger }));
+app.get('/poster-updater', isAuthenticated, (req, res) => {
+    res.redirect('/admin#operations');
+});
+
+// === LOCAL TRAILER FILES ===
+app.use('/trailers', express.static(path.join(__dirname, 'media', 'trailers'), {
+    maxAge: '7d',
+    acceptRanges: true,
+}));
+
+// === POSTER SELECTOR ROUTES ===
+const createPosterSelectorRouter = require('./routes/poster-selector');
+app.use('/api/poster-selector', isAuthenticated, createPosterSelectorRouter({ logger, wsHub }));
+
 // --- Device bypass status endpoint (public) ---
 // Lightweight probe so clients can quickly decide to skip device management boot sequence.
 

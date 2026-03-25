@@ -228,6 +228,8 @@
         <span>Device Management</span>
       </a>
       <a href="#" class="nav-item" data-nav="operations"><i class="fas fa-screwdriver-wrench"></i><span>Operations</span></a>
+      <a href="#" class="nav-item" data-nav="poster-updater"><i class="fas fa-film"></i><span>Poster Updater</span></a>
+      <a href="#" class="nav-item" data-nav="poster-selector"><i class="fas fa-th-list"></i><span>Poster Selector</span></a>
     </nav>
   <div class="sidebar-footer"></div>
   </aside>
@@ -4056,6 +4058,7 @@
               </div>
             </section>
 
+
             
 
       
@@ -4067,12 +4070,159 @@
       </section>
     </section>
 
+    <!-- Poster Updater Section -->
+    <section id="section-poster-updater" class="app-section" hidden>
+      <section class="panel operations-panel" style="border: none; background: transparent; box-shadow: none;">
+        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; display: flex; align-items: center;">
+            <span style="display: inline-flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--color-text-primary); padding: 6px 16px; border-radius: 20px; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.3px;">
+              <i class="fas fa-film" style="opacity: 0.8;"></i>
+              Poster Updater
+            </span>
+          </h2>
+        </div>
+        <div class="panel-content" style="padding: 0;">
+          <div class="content-grid" style="gap: 12px;">
+
+            <!-- Film List Card -->
+            <div class="ops-col">
+              <section class="perf-card" aria-label="Filmliste">
+                <h3><i class="fas fa-list"></i> Filmliste</h3>
+                <div class="pu-stats" id="pu-filmStats" style="margin-top: 12px;"></div>
+                <div style="margin: 10px 0;">
+                  <input type="text" class="pu-input" id="pu-filmFilter" placeholder="Liste filtern...">
+                </div>
+                <div class="pu-film-list" id="pu-filmList">
+                  <div class="pu-film-empty">Lade Filmliste...</div>
+                </div>
+              </section>
+
+            </div>
+
+            <!-- Right column -->
+            <div class="ops-col">
+              <!-- TMDB Search Card -->
+              <section class="perf-card" aria-label="TMDB Filmsuche">
+                <h3><i class="fas fa-search"></i> TMDB Filmsuche</h3>
+                <div style="display: flex; gap: 8px; margin-top: 12px;">
+                  <input type="text" class="pu-input" id="pu-tmdbSearch" placeholder="Film suchen... (min. 2 Zeichen)" style="flex: 1;">
+                  <button class="btn btn-secondary btn-sm" id="pu-tmdbSearchBtn" disabled>Suchen</button>
+                </div>
+                <div id="pu-searchResults"></div>
+              </section>
+
+              <!-- Download Runner Card -->
+              <section class="perf-card" aria-label="Posterpack Download">
+                <h3><i class="fas fa-download"></i> Posterpack Download</h3>
+                <div class="pu-runner-controls" style="margin-top: 12px;">
+                  <button class="btn btn-success btn-sm" id="pu-runStartBtn">Download starten</button>
+                  <button class="btn btn-danger btn-sm" id="pu-runStopBtn" disabled>Stopp</button>
+                  <span class="pu-runner-status idle" id="pu-runnerStatus">Bereit</span>
+                </div>
+                <div class="pu-stats" id="pu-runnerStats"></div>
+                <div class="pu-terminal" id="pu-terminal">Warte auf Start...</div>
+              </section>
+
+              <!-- Trailer Download Card -->
+              <section class="perf-card" aria-label="Trailer Download">
+                <h3><i class="fas fa-video"></i> Trailer Download</h3>
+                <div class="pu-runner-controls" style="margin-top: 12px;">
+                  <button class="btn btn-success btn-sm" id="pu-trailerStartBtn">Trailer herunterladen</button>
+                  <button class="btn btn-danger btn-sm" id="pu-trailerStopBtn" disabled>Stopp</button>
+                  <span class="pu-runner-status idle" id="pu-trailerStatus">Bereit</span>
+                </div>
+                <div class="pu-terminal" id="pu-trailerTerminal">Warte auf Start...</div>
+              </section>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </section>
+
+    <!-- Poster Selector Section -->
+    <section id="section-poster-selector" class="app-section" hidden>
+      <section class="panel operations-panel" style="border: none; background: transparent; box-shadow: none;">
+        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; display: flex; align-items: center;">
+            <span style="display: inline-flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--color-text-primary); padding: 6px 16px; border-radius: 20px; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.3px;">
+              <i class="fas fa-th-list" style="opacity: 0.8;"></i>
+              Poster Selector
+            </span>
+          </h2>
+        </div>
+        <div class="panel-content" style="padding: 0;">
+          <div class="content-grid" style="gap: 12px;">
+
+            <!-- Left: Available Films -->
+            <div class="ops-col">
+              <section class="perf-card" aria-label="Verfügbare Filme">
+                <h3 style="display: flex; align-items: center; gap: 8px;">
+                  <i class="fas fa-archive"></i> Verfügbare Filme
+                  <span class="ps-badge" id="ps-availableCount">0</span>
+                </h3>
+                <div style="margin: 12px 0 10px;">
+                  <input type="text" class="ps-input" id="ps-filter" placeholder="Filme filtern...">
+                </div>
+                <div class="ps-available-list" id="ps-availableList">
+                  <div class="ps-film-empty">Lade Filme...</div>
+                </div>
+              </section>
+            </div>
+
+            <!-- Right: Playlist -->
+            <div class="ops-col">
+              <section class="perf-card" aria-label="Playlist">
+                <h3 style="display: flex; align-items: center; gap: 8px;">
+                  <i class="fas fa-list-ol"></i> Playlist
+                  <span class="ps-badge" id="ps-playlistCount">0</span>
+                </h3>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin: 12px 0;">
+                  <div class="ps-toggle-wrap">
+                    <label class="ps-toggle">
+                      <input type="checkbox" id="ps-enabledToggle">
+                      <span class="ps-toggle-slider"></span>
+                    </label>
+                    <span class="ps-toggle-label">Playlist aktiv</span>
+                    <span class="ps-toggle-status inactive" id="ps-toggleStatus">Aus</span>
+                  </div>
+                </div>
+                <div class="ps-sort-bar" style="display: flex; gap: 6px; margin-bottom: 10px;">
+                  <button class="ps-sort-btn" id="ps-sortAZ" title="A → Z"><i class="fas fa-sort-alpha-down"></i> A–Z</button>
+                  <button class="ps-sort-btn" id="ps-sortZA" title="Z → A"><i class="fas fa-sort-alpha-up"></i> Z–A</button>
+                  <button class="ps-sort-btn" id="ps-sortYearAsc" title="Jahr aufsteigend"><i class="fas fa-sort-numeric-down"></i> Jahr ↑</button>
+                  <button class="ps-sort-btn" id="ps-sortYearDesc" title="Jahr absteigend"><i class="fas fa-sort-numeric-up"></i> Jahr ↓</button>
+                </div>
+                <div class="ps-playlist" id="ps-playlistList">
+                  <div class="ps-film-empty">Playlist ist leer</div>
+                </div>
+              </section>
+            </div>
+
+          </div>
+        </div>
+      </section>
+    </section>
+
     <!-- Logs Viewer Section -->
     <section id="section-logs" class="app-section" hidden>
       <div id="logs-viewer-container"></div>
     </section>
 
   </main>
+
+  <!-- Poster Updater Delete Modal -->
+  <div class="pu-modal-overlay" id="pu-deleteModal">
+    <div class="pu-modal">
+      <h3>Film entfernen</h3>
+      <p id="pu-deleteModalText"></p>
+      <div class="pu-modal-actions">
+        <button class="btn btn-secondary btn-sm" id="pu-deleteCancelBtn">Abbrechen</button>
+        <button class="btn btn-danger btn-sm" id="pu-deleteConfirmBtn">Entfernen</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Change Password Modal -->
   <div class="modal-overlay" id="modal-change-password">
