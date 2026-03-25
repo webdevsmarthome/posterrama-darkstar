@@ -1,7 +1,7 @@
 # Performance Baseline
 
 **Version:** 3.0.0
-**Last Updated:** 2025-12-14
+**Last Updated:** 2026-03-25
 
 This document defines how to capture and track performance baselines for Posterrama.
 
@@ -61,12 +61,32 @@ du -sh public/
 
 ---
 
+## Server Startup Performance
+
+### ZIP Posterpack Quick-Start (2026-03)
+
+Posterrama includes ~1100 ZIP posterpacks on SD card. Two bottlenecks were identified and fixed:
+
+| Bottleneck | Location | Before | After |
+| --- | --- | --- | --- |
+| `scanZipPosterpacks()` full scan (stat + AdmZip for each ZIP) | `sources/local.js` | ~60s | <1s (in-memory cache) |
+| `normalizeLocalItem()` opening every ZIP with `new AdmZip()` | `lib/media-aggregator.js` | ~198s | <1s (zipHas/zipMetadata passthrough) |
+
+**Total initial playlist fetch**: 198s → ~1.5s (Raspberry Pi 4, SD card)
+
+**How it works**: Constructor pre-loads `cache/zip-scan-cache.json` into memory. During startup phase (`_zipScanQuickStartPhase = true`), all ZIP scans, metadata lookups, and media normalization use cached data with zero disk I/O. A background rescan runs 30s after the server starts listening.
+
+**Key files**: `sources/local.js` (quick-start phase flag, boot cache), `lib/media-aggregator.js` (normalizeLocalItem fast path), `server.js` (background rescan timer)
+
+---
+
 ## When To Update Baselines
 
 - After changing caching behavior
 - After changing source adapters (Plex/Jellyfin / Emby/TMDB/local)
 - After adding metrics, middleware, or request validation
 - After large frontend changes (admin / display modes)
+- After modifying startup quick-start logic or ZIP scan cache format
 
 ---
 

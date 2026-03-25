@@ -60,6 +60,12 @@ npm run config:validate
 
 **Real-time**: WebSocket hub (`utils/wsHub.js`) + SSE for device-to-server communication. MQTT bridge (`utils/mqttBridge.js`) for Home Assistant integration.
 
+**Startup optimization (fast boot)**: ZIP posterpacks (~1100 files on SD card) use a two-phase startup:
+1. **Quick-start phase** (`_zipScanQuickStartPhase = true`): Constructor in `sources/local.js` pre-loads `cache/zip-scan-cache.json` into memory. During startup, `scanZipPosterpacks()` and `loadOrCreateMetadata()` return data from the in-memory cache with zero disk I/O. In `lib/media-aggregator.js`, `normalizeLocalItem()` uses the item's `zipHas`/`zipMetadata` properties (passed through from `createMediaItem()`) instead of opening each ZIP with AdmZip.
+2. **Background rescan** (30s after `app.listen()`): `server.js` sets `_zipScanQuickStartPhase = false` and calls `refreshPlaylistCache()` to do a full stat-based scan with real AdmZip reads for cache misses.
+
+**YouTube trailer autoplay** (`public/cinema/cinema-display.js`): Trailers create the `<iframe>` element manually with `allow="autoplay; encrypted-media; picture-in-picture"` set **before** assigning `src`. This is required for both Chromium and Safari autoplay policy compliance. The YT.Player instance receives the pre-built iframe element directly.
+
 ## Testing
 
 - Jest with Node environment, tests in `__tests__/` organized by domain (api, middleware, sources, utils, lib, routes, devices, etc.)

@@ -221,6 +221,22 @@ Total Blocking Time 120ms 150ms 180ms
 - Wallart: -35% FCP
 - Cinema: -40% FCP
 
+### Server-Side Startup Performance (2026-03)
+
+The server-side initial playlist fetch (which blocks first media delivery to display modes) was the main bottleneck on SD card:
+
+```
+Phase                           Before    After
+ZIP scan (scanZipPosterpacks)   ~60s      <1s
+Normalization (normalizeLocal)  ~198s     <1s
+Total initial fetch             ~198s     ~1.5s
+Server listen (app.listen)      ~210s     ~3s after process start
+```
+
+**Root cause**: `lib/media-aggregator.js` `normalizeLocalItem()` was opening every ZIP with synchronous `new AdmZip()` (2172 calls) to read metadata.json and detect file presence. Each `AdmZip()` reads the ZIP central directory via `fs.readFileSync`, blocking Node.js completely.
+
+**Fix**: Items from `sources/local.js` now carry `zipHas` and `zipMetadata` properties through `createMediaItem()`. `normalizeLocalItem()` uses these cached values (fast path) instead of opening the ZIP. Combined with the constructor-preloaded `cache/zip-scan-cache.json`, the entire startup requires zero ZIP I/O.
+
 ### Memory Usage (Measured via Puppeteer)
 
 ```
@@ -455,5 +471,5 @@ npm test
 **Document History:**
 
 - **Created:** November 15, 2025
-- **Last Updated:** December 14, 2025
+- **Last Updated:** March 25, 2026
 - **Status:** Active - Single source of truth for frontend analysis

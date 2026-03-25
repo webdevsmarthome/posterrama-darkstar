@@ -1,7 +1,7 @@
 # Posterrama Architecture Diagrams
 
 **Version**: 3.0.0
-**Last Updated**: 2025-12-14
+**Last Updated**: 2026-03-25
 **Server Size**: 7,666 lines (Refactored from ~20k lines)
 
 ---
@@ -172,6 +172,9 @@ sequenceDiagram
  end
 
  JellyfinHelper-->>Aggregator: Jellyfin items
+
+ Aggregator->>Aggregator: fetchFromLocalDirectory (poster, background, motion)
+ Note over Aggregator: normalizeLocalItem: uses zipHas/zipMetadata<br/>from scan cache (fast path, no AdmZip I/O)
 
  Aggregator->>Aggregator: Merge, deduplicate, shuffle
  Aggregator->>Logger: Log aggregation metrics
@@ -719,6 +722,49 @@ graph LR
 
 ---
 
+## Startup Flow: ZIP Quick-Start
+
+Shows the two-phase startup that avoids opening 1100+ ZIP files on SD card:
+
+```mermaid
+sequenceDiagram
+ participant PM2 as PM2 Process Manager
+ participant Server as server.js
+ participant Local as sources/local.js
+ participant Cache as cache/zip-scan-cache.json
+ participant Aggregator as lib/media-aggregator.js
+ participant Client as Display Device
+
+ PM2->>Server: Start process
+ Server->>Local: new LocalDirectorySource(config)
+ Local->>Cache: readFileSync (3.3MB, one-time)
+ Cache-->>Local: _zipScanBootCache (in-memory)
+ Note over Local: _zipScanQuickStartPhase = true
+
+ Server->>Aggregator: refreshPlaylistCache()
+ Aggregator->>Local: fetchMedia('poster', 2000)
+ Local->>Local: scanZipPosterpacks() → returns from _zipScanBootCache
+ Local-->>Aggregator: 1114 poster items (zipHas + zipMetadata included)
+ Aggregator->>Aggregator: normalizeLocalItem() → uses item.zipHas (no AdmZip)
+ Note over Aggregator: Fast path: zero ZIP I/O
+
+ Aggregator->>Local: fetchMedia('background', 50)
+ Local->>Local: scanZipPosterpacks() → returns from _zipScanBootCache
+ Local-->>Aggregator: 1058 background items
+ Aggregator-->>Server: 2228 total items (~1.5s)
+
+ Server->>Server: app.listen(4000)
+ Server-->>Client: HTTP ready (~3s after boot)
+
+ Note over Server: 30 seconds later...
+ Server->>Local: _zipScanQuickStartPhase = false
+ Server->>Aggregator: refreshPlaylistCache() (background)
+ Aggregator->>Local: fetchMedia() (full scan with stat + AdmZip for cache misses)
+ Note over Local: Runs in background, does not block HTTP
+```
+
+---
+
 ## Ongoing Refactors (Tracked Here)
 
 - **Shrink `server.js`:** continue moving route wiring and special-cases into route factories (`routes/`) and services (`services/`) to reduce regression risk.
@@ -757,5 +803,5 @@ graph LR
 ---
 
 **Document Version**: 1.0.0
-**Last Review**: 2025-12-15
+**Last Review**: 2026-03-25
 **Next Review**: When changing major architecture

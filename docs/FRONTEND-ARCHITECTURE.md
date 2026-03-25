@@ -1,7 +1,7 @@
 # Posterrama Frontend Architecture
 
 **Version:** 3.0.0
-**Last Updated:** December 14, 2025
+**Last Updated:** March 25, 2026
 
 ---
 
@@ -217,6 +217,19 @@ function calculateLayout(density, viewport) {
 5. Render poster + metadata
 6. Start auto-rotation timer
 ```
+
+**YouTube Trailer Autoplay:**
+
+Cinema mode supports YouTube trailer playback with autoplay. Due to browser autoplay policies (Chromium and Safari), the `<iframe>` element must be created manually with `allow="autoplay; encrypted-media; picture-in-picture"` set **before** `src` is assigned. Safari evaluates the `allow` attribute only at iframe creation time — setting it after `src` loads has no effect.
+
+Implementation in `cinema-display.js`:
+1. Create `<iframe>` via `document.createElement('iframe')`
+2. Set `iframe.allow = 'autoplay; encrypted-media; picture-in-picture'`
+3. Set `iframe.src = ytEmbedUrl` (with `autoplay=1&mute=1`)
+4. Append to DOM
+5. Pass the iframe element to `new YT.Player(iframeEl, { events: {...} })`
+
+This pattern is used in two locations: direct YouTube URL path and TMDB-fetched trailer path.
 
 **Remote Control:**
 
