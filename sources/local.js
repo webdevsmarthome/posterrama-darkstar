@@ -50,8 +50,9 @@ class LocalDirectorySource {
         this.indexCache = new Map();
         this.lastScanTime = null;
 
-        // Quick-start flag: first ZIP scan after startup uses cache directly (no stat/readdir I/O)
-        this._zipScanQuickStartUsed = false;
+        // Quick-start phase: ALL ZIP scans during startup use cache directly (no stat/readdir I/O).
+        // Server.js sets this to false before triggering the background rescan.
+        this._zipScanQuickStartPhase = true;
 
         // Metrics tracking
         this.metrics = {
@@ -689,11 +690,10 @@ class LocalDirectorySource {
         // PATCH8: ZIP scan disk cache — load from disk to skip AdmZip on unchanged files
         const _zipCacheFile = require('path').join(this.rootPaths[0] || '.', '..', 'cache', 'zip-scan-cache.json');
 
-        // Quick-start: on first call after startup, serve directly from cache if fresh (< 24h)
+        // Quick-start: during startup phase, serve directly from cache if fresh (< 24h)
         // This avoids 1000+ stat() calls on the SD card that block startup for several minutes.
-        // A background rescan is triggered by server.js after the server is listening.
-        if (!this._zipScanQuickStartUsed) {
-            this._zipScanQuickStartUsed = true;
+        // Server.js ends the phase and triggers a background rescan after the server is listening.
+        if (this._zipScanQuickStartPhase) {
             try {
                 const _cacheStat = require('fs').statSync(_zipCacheFile);
                 const _cacheAgeMs = Date.now() - _cacheStat.mtimeMs;

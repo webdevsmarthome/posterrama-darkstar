@@ -7444,10 +7444,13 @@ if (require.main === module) {
 
             logger.info('Server startup complete - media cache is ready');
 
-            // Background rescan: trigger a full playlist refresh 30s after startup.
+            // Background rescan: end quick-start phase and trigger a full playlist refresh 30s after startup.
             // This runs the real ZIP stat-scan (which may take minutes on SD card)
             // without blocking the server or the display.
             setTimeout(() => {
+                if (localDirectorySource) {
+                    localDirectorySource._zipScanQuickStartPhase = false;
+                }
                 logger.info('Starting background ZIP rescan after startup...');
                 refreshPlaylistCache().catch(err =>
                     logger.warn('Background rescan failed:', err?.message)
