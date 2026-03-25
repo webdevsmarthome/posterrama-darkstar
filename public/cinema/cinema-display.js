@@ -1463,31 +1463,18 @@
                 trailerEl = document.createElement('div');
                 trailerEl.className = 'cinema-trailer-overlay';
                 currentTrailerKey = 'direct-' + ytMatch[1];
-                const playerId = 'yt-trailer-player-' + Date.now();
-                const playerDiv = document.createElement('div');
-                playerDiv.id = playerId;
-                trailerEl.appendChild(playerDiv);
+                // Create iframe with allow="autoplay" set BEFORE src loads — required by Safari and Chromium
+                const _ytEmbedUrl1 = `https://www.youtube.com/embed/${ytMatch[1]}?enablejsapi=1&autoplay=1&mute=1&controls=0&disablekb=1&fs=0&iv_load_policy=3&modestbranding=1&rel=0&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`;
+                const _ytIframe1 = document.createElement('iframe');
+                _ytIframe1.allow = 'autoplay; encrypted-media; picture-in-picture';
+                _ytIframe1.setAttribute('allowfullscreen', '');
+                _ytIframe1.style.cssText = 'width:100%;height:100%;border:0;';
+                _ytIframe1.src = _ytEmbedUrl1;
+                trailerEl.appendChild(_ytIframe1);
                 document.body.appendChild(trailerEl);
                 // PATCH18: Overlay erst einblenden wenn Video wirklich läuft (kein Ladekreisel)
-                // Fix Chromium autoplay block: set allow="autoplay" on the iframe as soon as it's created
-                const _autoplayObserver1 = new MutationObserver((mutations) => {
-                    for (const mutation of mutations) {
-                        for (const node of mutation.addedNodes) {
-                            if (node.nodeName === 'IFRAME') {
-                                node.allow = 'autoplay; encrypted-media; picture-in-picture';
-                                _autoplayObserver1.disconnect();
-                            }
-                        }
-                    }
-                });
-                _autoplayObserver1.observe(playerDiv, { childList: true, subtree: true });
-                ytPlayer = new window.YT.Player(playerId, {
-                    videoId: ytMatch[1],
-                    playerVars: { autoplay:1, mute:1, controls:0, disablekb:1, fs:0,
-                                  iv_load_policy:3, modestbranding:1, rel:0, playsinline:1,
-                                  vq:'hd1080', origin: window.location.origin },
+                ytPlayer = new window.YT.Player(_ytIframe1, {
                     events: { onReady: e => {
-                                  if (e.target.getPlayerState() === window.YT.PlayerState.CUED) { e.target.loadVideoById(ytMatch[1]); }
                                   e.target.playVideo(); if (!trailerConfig.muted) e.target.unMute(); try { e.target.setPlaybackQualityRange('hd1080','highres'); } catch(_){} setTimeout(() => { if (trailerEl) trailerEl.classList.add('visible'); }, 1100); },
                               onStateChange: e => { if (e.data === window.YT.PlayerState.ENDED) { handleTrailerLoopEnd(trailerConfig); setTimeout(() => { showNextPoster(); startRotation(); }, 7000); } } } // PATCH-TIMING: 7s Pause
                 });
@@ -1596,17 +1583,31 @@
                 trailerEl.style.setProperty('width', trailerWidth + 'px', 'important');
             }
 
-            // Create player container div with unique ID (required by YouTube API)
-            const playerId = `yt-trailer-player-${Date.now()}`;
-            const playerDiv = document.createElement('div');
-            playerDiv.id = playerId;
-            trailerEl.appendChild(playerDiv);
+            // Get loop setting and muted setting
+            const shouldLoop = trailerConfig.loop === true; // PATCH4b: default no-loop
+            // Always mute trailers in admin preview mode (regardless of setting)
+            // Check multiple ways: URL param, iframe detection, or Core.isPreviewMode()
+            const urlParams = new URLSearchParams(window.location.search);
+            const isPreview =
+                urlParams.get('preview') === '1' ||
+                window.self !== window.top ||
+                window.Core?.isPreviewMode?.() ||
+                false;
+            const shouldMute = isPreview ? true : trailerConfig.muted === true; // PATCH4b: default unmuted
+            const quality = trailerConfig.quality || 'hd1080'; // PATCH-HD: Full-HD default
+
+            // Create iframe with allow="autoplay" set BEFORE src loads — required by Safari and Chromium
+            const _ytEmbedParams2 = `enablejsapi=1&autoplay=1&mute=1&controls=0&disablekb=1&fs=0&iv_load_policy=3&modestbranding=1&rel=0&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`;
+            const _ytIframe2 = document.createElement('iframe');
+            _ytIframe2.allow = 'autoplay; encrypted-media; picture-in-picture';
+            _ytIframe2.setAttribute('allowfullscreen', '');
+            _ytIframe2.style.cssText = 'width:100%;height:100%;border:0;';
+            _ytIframe2.src = `https://www.youtube.com/embed/${data.trailer.key}?${_ytEmbedParams2}`;
+            trailerEl.appendChild(_ytIframe2);
             document.body.appendChild(trailerEl);
 
             debug('Trailer appended to DOM', {
-                playerId,
                 trailerElsInDom: document.querySelectorAll('.cinema-trailer-overlay').length,
-                ytPlayerDivsInDom: document.querySelectorAll('[id^="yt-trailer-player"]').length,
             });
 
             // Re-apply width after DOM insertion to ensure it sticks
@@ -1621,49 +1622,8 @@
                 }
             }
 
-            // Get loop setting and muted setting
-            const shouldLoop = trailerConfig.loop === true; // PATCH4b: default no-loop
-            // Always mute trailers in admin preview mode (regardless of setting)
-            // Check multiple ways: URL param, iframe detection, or Core.isPreviewMode()
-            const urlParams = new URLSearchParams(window.location.search);
-            const isPreview =
-                urlParams.get('preview') === '1' ||
-                window.self !== window.top ||
-                window.Core?.isPreviewMode?.() ||
-                false;
-            const shouldMute = isPreview ? true : trailerConfig.muted === true; // PATCH4b: default unmuted
-            const quality = trailerConfig.quality || 'hd1080'; // PATCH-HD: Full-HD default
-
-            // Create YouTube player using the API with unique player ID
-            // Note: Autoplay with sound requires browser flag: chrome://flags/#autoplay-policy → "No user gesture is required"
-            // Fix Chromium autoplay block: set allow="autoplay" on the iframe as soon as it's created
-            const _autoplayObserver2 = new MutationObserver((mutations) => {
-                for (const mutation of mutations) {
-                    for (const node of mutation.addedNodes) {
-                        if (node.nodeName === 'IFRAME') {
-                            node.allow = 'autoplay; encrypted-media; picture-in-picture';
-                            _autoplayObserver2.disconnect();
-                        }
-                    }
-                }
-            });
-            _autoplayObserver2.observe(playerDiv, { childList: true, subtree: true });
-            debug('Trailer creating YouTube player', { playerId });
-            ytPlayer = new window.YT.Player(playerId, {
-                videoId: data.trailer.key,
-                playerVars: {
-                    autoplay: 1,
-                    mute: 1, // PATCH4b: always start muted → autoplay works; unMute() in onReady
-                    controls: 0,
-                    disablekb: 1,
-                    fs: 0,
-                    iv_load_policy: 3, // Hide annotations
-                    modestbranding: 1,
-                    rel: 0,
-                    showinfo: 0,
-                    playsinline: 1,
-                    origin: window.location.origin,
-                },
+            debug('Trailer creating YouTube player');
+            ytPlayer = new window.YT.Player(_ytIframe2, {
                 events: {
                     onReady: event => {
                         debug('Trailer YouTube onReady', {
@@ -1675,10 +1635,6 @@
                                 document.querySelectorAll('.cinema-trailer-overlay').length,
                         });
                         log('YouTube player ready');
-                        // If video is in CUED state (autoplay was blocked), reload to trigger autoplay
-                        if (event.target.getPlayerState?.() === window.YT.PlayerState.CUED) {
-                            event.target.loadVideoById(data.trailer.key);
-                        }
                         // Set playback quality if specified
                         if (quality && quality !== 'default') {
                             try {
