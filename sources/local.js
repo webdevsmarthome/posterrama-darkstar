@@ -54,6 +54,20 @@ class LocalDirectorySource {
         // Server.js sets this to false before triggering the background rescan.
         this._zipScanQuickStartPhase = true;
 
+        // Pre-load ZIP scan cache into memory NOW (constructor runs 8s before first fetch,
+        // SD card is still idle). This avoids any cache file I/O during the fetch phase.
+        this._zipScanBootCache = null;
+        try {
+            const _bootCacheFile = path.join(this.rootPaths[0] || '.', '..', 'cache', 'zip-scan-cache.json');
+            const _bootStat = require('fs').statSync(_bootCacheFile);
+            if (Date.now() - _bootStat.mtimeMs < 24 * 60 * 60 * 1000) {
+                this._zipScanBootCache = JSON.parse(require('fs').readFileSync(_bootCacheFile, 'utf8'));
+                logger.info('LocalDirectorySource: ZIP cache pre-loaded into memory for fast startup');
+            }
+        } catch (e) {
+            logger.debug('LocalDirectorySource: Could not pre-load ZIP cache:', e?.message);
+        }
+
         // Metrics tracking
         this.metrics = {
             totalFiles: 0,
@@ -690,41 +704,32 @@ class LocalDirectorySource {
         // PATCH8: ZIP scan disk cache — load from disk to skip AdmZip on unchanged files
         const _zipCacheFile = require('path').join(this.rootPaths[0] || '.', '..', 'cache', 'zip-scan-cache.json');
 
-        // Quick-start: during startup phase, serve directly from cache if fresh (< 24h)
-        // This avoids 1000+ stat() calls on the SD card that block startup for several minutes.
+        // Quick-start: during startup phase, serve directly from the pre-loaded in-memory cache.
+        // No file I/O at all — the cache was read in the constructor while the SD card was idle.
         // Server.js ends the phase and triggers a background rescan after the server is listening.
-        if (this._zipScanQuickStartPhase) {
-            try {
-                const _cacheStat = require('fs').statSync(_zipCacheFile);
-                const _cacheAgeMs = Date.now() - _cacheStat.mtimeMs;
-                if (_cacheAgeMs < 24 * 60 * 60 * 1000) {
-                    const _cacheData = JSON.parse(require('fs').readFileSync(_zipCacheFile, 'utf8'));
-                    for (const base of this.rootPaths) {
-                        const completeRoot = path.join(base, this.directories.complete);
-                        for (const sub of subdirs) {
-                            const dir = path.join(completeRoot, sub);
-                            for (const [zipFull, ce] of Object.entries(_cacheData)) {
-                                if (!zipFull.startsWith(dir + path.sep)) continue;
-                                const name = path.basename(zipFull);
-                                const baseName = name.replace(/\.zip$/i, '');
-                                if (seen.has(baseName)) continue;
-                                if (!ce.h || !ce.h[want]) continue;
-                                results.push({
-                                    name, path: zipFull, size: ce.s,
-                                    modified: new Date(ce.m), extension: 'zip',
-                                    directory: want === 'background' ? 'backgrounds' : want === 'motion' ? 'motion' : 'posters',
-                                    type: want, zipHas: ce.h, zipMetadata: ce.z,
-                                });
-                                seen.add(baseName);
-                            }
-                        }
+        if (this._zipScanQuickStartPhase && this._zipScanBootCache) {
+            for (const base of this.rootPaths) {
+                const completeRoot = path.join(base, this.directories.complete);
+                for (const sub of subdirs) {
+                    const dir = path.join(completeRoot, sub);
+                    for (const [zipFull, ce] of Object.entries(this._zipScanBootCache)) {
+                        if (!zipFull.startsWith(dir + path.sep)) continue;
+                        const name = path.basename(zipFull);
+                        const baseName = name.replace(/\.zip$/i, '');
+                        if (seen.has(baseName)) continue;
+                        if (!ce.h || !ce.h[want]) continue;
+                        results.push({
+                            name, path: zipFull, size: ce.s,
+                            modified: new Date(ce.m), extension: 'zip',
+                            directory: want === 'background' ? 'backgrounds' : want === 'motion' ? 'motion' : 'posters',
+                            type: want, zipHas: ce.h, zipMetadata: ce.z,
+                        });
+                        seen.add(baseName);
                     }
-                    logger.info(`LocalDirectorySource: Quick-start — ${results.length} ${want} items from cache (background scan pending)`);
-                    return results;
                 }
-            } catch (e) {
-                logger.debug('LocalDirectorySource: Quick-start cache read failed, doing full scan:', e?.message);
             }
+            logger.info(`LocalDirectorySource: Quick-start — ${results.length} ${want} items from memory cache (background scan pending)`);
+            return results;
         }
         let _zipScanCache = {};
         let _zipCacheChanged = false;
