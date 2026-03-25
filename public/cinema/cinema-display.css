@@ -2844,8 +2844,8 @@ body.cinema-metadata-overlay .cinema-metadata-panel {
     bottom: calc(var(--poster-bottom, 0px) + var(--cinema-frame-width, 8px) + 10px);
     /* Width will be set by JavaScript for floating/fullBleed styles */
     width: calc(var(--poster-width, 400px) * 0.85);
-    /* 16:9 aspect ratio for video */
-    aspect-ratio: 16 / 9;
+    /* 21:9 cinematic aspect ratio for video (PATCH-21-9) */
+    aspect-ratio: 21 / 9;
     /* No max-height - let aspect-ratio control the height based on width */
     z-index: 50;
     overflow: hidden;
@@ -2876,7 +2876,8 @@ body.cinema-poster-fullBleed .cinema-trailer-overlay {
     position: absolute;
     top: 50%;
     left: 0;
-    transform: translateY(-50%);
+    transform: translateY(-50%); /* PATCH9: kein scale mehr */
+    clip-path: none; /* PATCH-21-9: overflow:hidden des Containers schneidet 16:9→21:9 */
     /* Full width, height scales to maintain video aspect ratio */
     width: 100%;
     /* YouTube embeds are 16:9, so height = width / 16 * 9 */

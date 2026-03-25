@@ -15955,6 +15955,11 @@ window.COLOR_PRESETS = COLOR_PRESETS;
 
             // Expose globally
             window.createNewProfile = createNewProfile;
+            // Wire up profile create buttons
+            document.getElementById('btn-create-profile')
+                ?.addEventListener('click', createNewProfile);
+            document.getElementById('btn-create-profile-empty')
+                ?.addEventListener('click', createNewProfile);
 
             async function loadProfiles() {
                 try {

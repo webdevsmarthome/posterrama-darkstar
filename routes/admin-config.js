@@ -299,6 +299,13 @@ module.exports = function createAdminConfigRouter({
             const existingConfig = await readConfig();
             const mergedConfig = deepMerge({}, existingConfig, newConfig);
 
+            // deepMerge can't handle array->object type changes (isObject([]) = false).
+            // If the admin UI sent streamingSources as an object, deepMerge leaves the
+            // existing array intact and the object is silently dropped. Override manually.
+            if (newConfig?.streamingSources && !Array.isArray(newConfig.streamingSources)) {
+                mergedConfig.streamingSources = newConfig.streamingSources;
+            }
+
             // Detect MQTT changes so we can reconnect the in-process bridge (no full restart required)
             let mqttChanged = false;
             try {

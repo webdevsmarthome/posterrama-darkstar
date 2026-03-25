@@ -126,10 +126,21 @@
                 if (!el) return;
 
                 // Just set/clear the src - visibility is controlled by ensureVisibility()
+                // Reset previous onerror handler
+                el.onerror = null;
+
                 if (url) {
+                    // If clearlogo URL fails (404 etc.) → hide element, no broken-image box
+                    el.onerror = () => {
+                        el.onerror = null;
+                        el.removeAttribute('src');
+                        el.style.opacity = '0';
+                    };
                     el.src = url;
                     el.style.opacity = '1';
                 } else {
+                    // No clearlogo URL → hide (original behaviour)
+                    el.removeAttribute('src');
                     el.removeAttribute('src');
                     el.style.opacity = '0';
                 }

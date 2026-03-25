@@ -1426,6 +1426,11 @@
     }
 
     async function startTrailerPlayback(media, trailerConfig) {
+        stopRotation(); // PATCH-TIMING: Rotations-Timer stoppen solange Trailer läuft
+
+        // PATCH17: directTrailerUrl VOR tmdbId prüfen – lokale Trailer brauchen keine TMDB-ID
+        const directTrailerUrl = media.trailerUrl || null;
+
         // Get TMDB ID from media (can be in different fields or in guids array)
         let tmdbId = media.tmdbId || media.tmdb_id;
 
@@ -1437,14 +1442,59 @@
             }
         }
 
-        if (!tmdbId) {
-            log('Trailer skipped - no TMDB ID', { title: media.title });
+        if (!tmdbId && !directTrailerUrl) {
+            log('Trailer skipped - no TMDB ID and no direct trailerUrl', { title: media.title });
             removeTrailerOverlay();
             return;
         }
 
         // Determine media type (movie or tv)
         const type = media.type === 'show' || media.type === 'episode' ? 'tv' : 'movie';
+
+        // PATCH4: Check for direct trailerUrl (from ZIP metadata.json or trailer.mp4)
+        if (directTrailerUrl) {
+            const ytMatch = directTrailerUrl.match(
+                /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+            );
+            if (ytMatch) {
+                // YouTube-URL direkt verwenden (überspringt TMDB-Fetch)
+                await loadYouTubeAPI();
+                removeTrailerOverlaySync();
+                trailerEl = document.createElement('div');
+                trailerEl.className = 'cinema-trailer-overlay';
+                currentTrailerKey = 'direct-' + ytMatch[1];
+                const playerId = 'yt-trailer-player-' + Date.now();
+                const playerDiv = document.createElement('div');
+                playerDiv.id = playerId;
+                trailerEl.appendChild(playerDiv);
+                document.body.appendChild(trailerEl);
+                // PATCH18: Overlay erst einblenden wenn Video wirklich läuft (kein Ladekreisel)
+                ytPlayer = new window.YT.Player(playerId, {
+                    videoId: ytMatch[1],
+                    playerVars: { autoplay:1, mute:1, controls:0, disablekb:1, fs:0,
+                                  iv_load_policy:3, modestbranding:1, rel:0, playsinline:1,
+                                  vq:'hd1080', origin: window.location.origin },
+                    events: { onReady: e => { e.target.playVideo(); if (!trailerConfig.muted) e.target.unMute(); try { e.target.setPlaybackQualityRange('hd1080','highres'); } catch(_){} setTimeout(() => { if (trailerEl) trailerEl.classList.add('visible'); }, 1100); },
+                              onStateChange: e => { if (e.data === window.YT.PlayerState.ENDED) { handleTrailerLoopEnd(trailerConfig); setTimeout(() => { showNextPoster(); startRotation(); }, 7000); } } } // PATCH-TIMING: 7s Pause
+                });
+                setupAutohideTimer(trailerConfig);
+                return;
+            } else if (directTrailerUrl.startsWith('/local-posterpack?') ||
+                       directTrailerUrl.match(/\.(mp4|webm|mkv)$/i)) {
+                // Lokales Video via HTML5
+                const existing = document.getElementById('trailer-video-local');
+                if (existing) existing.remove();
+                const video = document.createElement('video');
+                video.id = 'trailer-video-local';
+                video.src = directTrailerUrl;
+                video.autoplay = true; video.controls = false; video.muted = false;
+                video.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:9999;background:#000';
+                video.onended = () => { video.remove(); removeTrailerOverlay(); setTimeout(() => { showNextPoster(); startRotation(); }, 7000); }; // PATCH-TIMING
+                video.onerror = () => { video.remove(); removeTrailerOverlay(); };
+                document.body.appendChild(video);
+                return;
+            }
+        }
 
         // Check if we already have this trailer loaded
         const trailerKey = `${tmdbId}-${type}`;
@@ -1558,7 +1608,7 @@
             }
 
             // Get loop setting and muted setting
-            const shouldLoop = trailerConfig.loop !== false;
+            const shouldLoop = trailerConfig.loop === true; // PATCH4b: default no-loop
             // Always mute trailers in admin preview mode (regardless of setting)
             // Check multiple ways: URL param, iframe detection, or Core.isPreviewMode()
             const urlParams = new URLSearchParams(window.location.search);
@@ -1567,8 +1617,8 @@
                 window.self !== window.top ||
                 window.Core?.isPreviewMode?.() ||
                 false;
-            const shouldMute = isPreview ? true : trailerConfig.muted !== false;
-            const quality = trailerConfig.quality || 'default';
+            const shouldMute = isPreview ? true : trailerConfig.muted === true; // PATCH4b: default unmuted
+            const quality = trailerConfig.quality || 'hd1080'; // PATCH-HD: Full-HD default
 
             // Create YouTube player using the API with unique player ID
             // Note: Autoplay with sound requires browser flag: chrome://flags/#autoplay-policy → "No user gesture is required"
@@ -1577,7 +1627,7 @@
                 videoId: data.trailer.key,
                 playerVars: {
                     autoplay: 1,
-                    mute: shouldMute ? 1 : 0, // Respect muted setting
+                    mute: 1, // PATCH4b: always start muted → autoplay works; unMute() in onReady
                     controls: 0,
                     disablekb: 1,
                     fs: 0,
@@ -1609,17 +1659,19 @@
                             }
                         }
                         event.target.playVideo();
+                        if (!shouldMute) event.target.unMute(); // PATCH4b: unmute for audio
+                        try { event.target.setPlaybackQualityRange('hd1080', 'highres'); } catch(_) {} // PATCH-HD
                         // Fade in the trailer overlay smoothly
                         if (trailerEl) {
-                            // Small delay to ensure video frame is rendered
+                            // PATCH18: 1s Delay – Overlay erst einblenden wenn Video wirklich läuft (kein Lade-Spinner)
                             setTimeout(() => {
                                 debug('Trailer adding visible class', {
                                     trailerElExists: !!trailerEl,
                                     trailerElsInDom:
                                         document.querySelectorAll('.cinema-trailer-overlay').length,
                                 });
-                                trailerEl.classList.add('visible');
-                            }, 100);
+                                if (trailerEl) trailerEl.classList.add('visible'); // PATCH18: 1s Delay, kein Lade-Spinner
+                            }, 1100);
                         } else {
                             warn('Trailer trailerEl is NULL in onReady callback');
                         }
@@ -1666,6 +1718,8 @@
                             if (shouldLoop && !trailerHidden) {
                                 event.target.seekTo(0);
                                 event.target.playVideo();
+                            } else {
+                                setTimeout(() => { showNextPoster(); startRotation(); }, 7000); // PATCH-TIMING: 7s Pause
                             }
                         }
                     },
@@ -4086,7 +4140,7 @@
             const isGamesOnly = wallartMode.gamesOnly === true;
 
             // Build URL with appropriate parameter
-            let url = `/get-media?count=50&type=${encodeURIComponent(type)}&mode=cinema`;
+            let url = `/get-media?count=300&type=${encodeURIComponent(type)}&mode=cinema`; // PATCH16: 300 statt 50
             if (isGamesOnly) {
                 url += '&gamesOnly=true';
             } else {
@@ -4119,8 +4173,33 @@
 
             debug('Media fetch result', { count: items.length });
 
-            // Shuffle the queue for random order on each page load
-            // Fisher-Yates shuffle algorithm
+            // PATCH16: Playlist-Modus – /cinema-playlist.json prüfen
+            try {
+                const plRes = await fetch('/cinema-playlist.json', { cache: 'no-cache' });
+                if (plRes.ok) {
+                    const pl = await plRes.json();
+                    if (pl && pl.enabled === true && Array.isArray(pl.titles) && pl.titles.length > 0) {
+                        // Nur gelistete Titel, in definierter Reihenfolge
+                        const normalize = t => String(t || '').toLowerCase().trim().replace(/[''`]/g, '').replace(/[-–—]/g, ' ').replace(/\s+/g, ' '); // PATCH16b: Apostroph+Bindestrich-tolerant
+                        const plNorm = pl.titles.map(normalize);
+                        const ordered = [];
+                        for (const t of plNorm) {
+                            const match = items.find(it => normalize(it.title) === t);
+                            if (match) ordered.push(match);
+                        }
+                        if (ordered.length > 0) {
+                            log('Fetched media queue (Playlist-Modus)', {
+                                count: ordered.length,
+                                playlist: true,
+                                firstTitle: ordered[0]?.title,
+                            });
+                            return ordered;
+                        }
+                    }
+                }
+            } catch (_) { /* Playlist-Datei nicht vorhanden → Zufall */ }
+
+            // Zufallsmodus: Fisher-Yates shuffle
             for (let i = items.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [items[i], items[j]] = [items[j], items[i]];
@@ -4606,7 +4685,7 @@
                 // Apply fallback behavior if:
                 // 1. Was previously showing Now Playing and sessions ended, OR
                 // 2. This is the first check and there are no sessions (initial fallback)
-                if ((wasActive || isFirstCheck) && nowPlayingConfig.fallbackToRotation !== false) {
+                if ((wasActive || isFirstCheck || mediaQueue.length === 0) && nowPlayingConfig.fallbackToRotation !== false) {
                     log('FALLBACK TO ROTATION', {
                         source: 'checkNowPlaying fallback',
                         wasActive,

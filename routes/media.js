@@ -2721,33 +2721,29 @@ module.exports = function createMediaRouter({
 
             try {
                 const mediaType = type === 'tv' ? 'tv' : 'movie';
-                const url = `https://api.themoviedb.org/3/${mediaType}/${tmdbId}/videos?api_key=${encodeURIComponent(
-                    tmdbApiKey
-                )}`;
-
-                const response = await fetch(url);
-                if (!response.ok) {
-                    logger.warn(`[get-trailer] TMDB API error: ${response.status}`);
-                    // Return 200 so clients can handle gracefully without console noise.
-                    return res.status(200).json({
-                        success: false,
-                        error: `TMDB API returned ${response.status}`,
-                        upstreamStatus: response.status,
-                        trailer: null,
-                    });
+                // PATCH12: Deutsch bevorzugen, Fallback auf Englisch
+                const pickBestTrailer = (vids) =>
+                    vids.find(v => v.site === 'YouTube' && v.type === 'Trailer' && v.official === true) ||
+                    vids.find(v => v.site === 'YouTube' && v.type === 'Trailer') ||
+                    vids.find(v => v.site === 'YouTube' && v.type === 'Teaser') ||
+                    vids.find(v => v.site === 'YouTube');
+                const fetchLangVideos = async (lang) => {
+                    const langUrl = 'https://api.themoviedb.org/3/' + mediaType + '/' + tmdbId +
+                        '/videos?api_key=' + encodeURIComponent(tmdbApiKey) + '&language=' + lang;
+                    const lr = await fetch(langUrl);
+                    if (!lr.ok) return null;
+                    return (await lr.json()).results || [];
+                };
+                const deVideos = await fetchLangVideos('de-DE');
+                if (deVideos === null) {
+                    logger.warn('[get-trailer] TMDB API error (de-DE)');
+                    return res.status(200).json({ success: false, error: 'TMDB API error', trailer: null });
                 }
+                const enVideos = (await fetchLangVideos('en-US')) || [];
+                const videos = deVideos.length > 0 ? deVideos : enVideos;
 
-                const data = await response.json();
-                const videos = data.results || [];
-
-                // Find the best trailer (prefer official YouTube trailers)
-                const trailer =
-                    videos.find(
-                        v => v.site === 'YouTube' && v.type === 'Trailer' && v.official === true
-                    ) ||
-                    videos.find(v => v.site === 'YouTube' && v.type === 'Trailer') ||
-                    videos.find(v => v.site === 'YouTube' && v.type === 'Teaser') ||
-                    videos.find(v => v.site === 'YouTube');
+                // Find best trailer – de first, then en fallback
+                const trailer = pickBestTrailer(videos) || (deVideos.length > 0 ? pickBestTrailer(enVideos) : null);
 
                 if (!trailer) {
                     // Return 200 so clients can silently skip.

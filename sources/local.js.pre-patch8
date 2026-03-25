@@ -520,7 +520,7 @@ class LocalDirectorySource {
     readZipMetadata(zip) {
         try {
             const zipEntries = zip.getEntries();
-            const metaEntry = zipEntries.find(e => /(^|\/)metadata\.json$/i.test(e.entryName)); // PATCH15: auch in Unterordnern suchen
+            const metaEntry = zipEntries.find(e => /^metadata\.json$/i.test(e.entryName));
             if (!metaEntry) return null;
             const content = zip.readAsText(metaEntry);
             return JSON.parse(content);
@@ -683,11 +683,6 @@ class LocalDirectorySource {
             'romm-export',
         ];
         const seen = new Set(); // de-dup by basename (without .zip)
-        // PATCH8: ZIP scan disk cache — load from disk to skip AdmZip on unchanged files
-        const _zipCacheFile = require('path').join(this.rootPaths[0] || '.', '..', 'cache', 'zip-scan-cache.json');
-        let _zipScanCache = {};
-        let _zipCacheChanged = false;
-        try { _zipScanCache = JSON.parse(require('fs').readFileSync(_zipCacheFile, 'utf8')); } catch (e) {}
         for (const base of this.rootPaths) {
             const completeRoot = path.join(base, this.directories.complete);
             for (const sub of subdirs) {
@@ -709,64 +704,96 @@ class LocalDirectorySource {
                     if (seen.has(baseName)) continue; // keep higher-priority one
                     const zipFull = path.join(dir, ent.name);
                     try {
-                        const _st = await fs.stat(zipFull);
-                        const _ce = _zipScanCache[zipFull];
-                        let has, zipMeta;
-                        if (_ce && _ce.m === _st.mtimeMs && _ce.s === _st.size) {
-                            // PATCH8: ZIP scan disk cache — cache hit, skip AdmZip read
-                            has = _ce.h;
-                            zipMeta = _ce.z;
-                        } else {
-                            const zip = new AdmZip(zipFull);
-                            const zipEntries = zip.getEntries();
-                            has = { poster: false, background: false, thumbnail: false,
-                                     clearlogo: false, trailer: false, theme: false, motion: false };
-                            for (const ext of exts) {
-                                const rePoster = new RegExp(`(^|/)poster\\.${ext}$`, 'i');
-                                const reBg = new RegExp(`(^|/)background\\.${ext}$`, 'i');
-                                const reThumb = new RegExp(`(^|/)(thumb|thumbnail)\\.${ext}$`, 'i');
-                                const reClearLogo = new RegExp(`(^|/)clearlogo\\.${ext}$`, 'i');
-                                if (zipEntries.some(e => rePoster.test(e.entryName))) has.poster = true;
-                                if (zipEntries.some(e => reBg.test(e.entryName))) has.background = true;
-                                if (zipEntries.some(e => reThumb.test(e.entryName))) has.thumbnail = true;
-                                if (zipEntries.some(e => reClearLogo.test(e.entryName))) has.clearlogo = true;
-                            }
-                            const videoExts = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'm4v'];
-                            for (const ext of videoExts) {
-                                if (zipEntries.some(e => new RegExp(`(^|/)trailer\\.${ext}$`, 'i').test(e.entryName))) { has.trailer = true; break; }
-                            }
-                            for (const ext of videoExts) {
-                                if (zipEntries.some(e => new RegExp(`(^|/)motion\\.${ext}$`, 'i').test(e.entryName))) { has.motion = true; break; }
-                            }
-                            const audioExts = ['mp3', 'flac', 'wav', 'ogg', 'm4a', 'aac'];
-                            for (const ext of audioExts) {
-                                if (zipEntries.some(e => new RegExp(`(^|/)theme\\.${ext}$`, 'i').test(e.entryName))) { has.theme = true; break; }
-                            }
-                            zipMeta = this.readZipMetadata(zip);
-                            _zipScanCache[zipFull] = { m: _st.mtimeMs, s: _st.size, h: has, z: zipMeta };
-                            _zipCacheChanged = true;
-                        }
-                        const st = _st;
+                        const zip = new AdmZip(zipFull);
+                        const zipEntries = zip.getEntries();
                         let found = false;
+                        const has = {
+                            poster: false,
+                            background: false,
+                            thumbnail: false,
+                            clearlogo: false,
+                            trailer: false,
+                            theme: false,
+                            motion: false,
+                        };
+                        for (const ext of exts) {
+                            const rePoster = new RegExp(`(^|/)poster\\.${ext}$`, 'i');
+                            const reBg = new RegExp(`(^|/)background\\.${ext}$`, 'i');
+                            const reThumb = new RegExp(`(^|/)(thumb|thumbnail)\\.${ext}$`, 'i');
+                            const reClearLogo = new RegExp(`(^|/)clearlogo\\.${ext}$`, 'i');
+                            if (zipEntries.some(e => rePoster.test(e.entryName))) has.poster = true;
+                            if (zipEntries.some(e => reBg.test(e.entryName))) has.background = true;
+                            if (zipEntries.some(e => reThumb.test(e.entryName)))
+                                has.thumbnail = true;
+                            if (zipEntries.some(e => reClearLogo.test(e.entryName)))
+                                has.clearlogo = true;
+                        }
+                        // Check for trailer (video files)
+                        const videoExts = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'm4v'];
+                        for (const ext of videoExts) {
+                            const reTrailer = new RegExp(`(^|/)trailer\\.${ext}$`, 'i');
+                            if (zipEntries.some(e => reTrailer.test(e.entryName))) {
+                                has.trailer = true;
+                                break;
+                            }
+                        }
+                        // Check for motion poster video
+                        for (const ext of videoExts) {
+                            const reMotion = new RegExp(`(^|/)motion\\.${ext}$`, 'i');
+                            if (zipEntries.some(e => reMotion.test(e.entryName))) {
+                                has.motion = true;
+                                break;
+                            }
+                        }
+                        // Check for theme music (audio files)
+                        const audioExts = ['mp3', 'flac', 'wav', 'ogg', 'm4a', 'aac'];
+                        for (const ext of audioExts) {
+                            const reTheme = new RegExp(`(^|/)theme\\.${ext}$`, 'i');
+                            if (zipEntries.some(e => reTheme.test(e.entryName))) {
+                                has.theme = true;
+                                break;
+                            }
+                        }
+                        const st = await fs.stat(zipFull);
+                        // Read metadata from ZIP if available
+                        const zipMeta = this.readZipMetadata(zip);
+
+                        // Selection criteria
                         if (want === 'motion') {
-                            found = Boolean(has.poster && has.motion && this.isMotionZipMetadata(zipMeta));
-                        } else { found = has[want]; }
+                            // Motion movie posterpack must include poster + motion and must be explicitly flagged by metadata.
+                            found = Boolean(
+                                has.poster && has.motion && this.isMotionZipMetadata(zipMeta)
+                            );
+                        } else {
+                            found = has[want];
+                        }
+
                         if (!found) continue;
-                        results.push({ name: ent.name, path: zipFull, size: st.size, modified: st.mtime,
+
+                        results.push({
+                            name: ent.name,
+                            path: zipFull,
+                            size: st.size,
+                            modified: st.mtime,
                             extension: 'zip',
-                            directory: want === 'background' ? 'backgrounds' : want === 'motion' ? 'motion' : 'posters',
-                            type: want, zipHas: has, zipMetadata: zipMeta });
+                            directory:
+                                want === 'background'
+                                    ? 'backgrounds'
+                                    : want === 'motion'
+                                      ? 'motion'
+                                      : 'posters',
+                            type: want,
+                            zipHas: has,
+                            zipMetadata: zipMeta, // Store metadata for use in createMediaItem
+                        });
                         seen.add(baseName);
                     } catch (e) {
-                        logger.debug(`LocalDirectorySource: Failed to inspect ZIP ${zipFull}: ${e?.message}`);
+                        logger.debug(
+                            `LocalDirectorySource: Failed to inspect ZIP ${zipFull}: ${e?.message}`
+                        );
                     }
                 }
             }
-        }
-        // PATCH8: ZIP scan disk cache — persist to disk if updated
-        if (_zipCacheChanged) {
-            try { require('fs').writeFileSync(_zipCacheFile, JSON.stringify(_zipScanCache)); }
-            catch (e) { logger.debug('LocalDirectorySource: Failed to save ZIP scan cache:', e?.message); }
         }
         if (results.length) {
             logger.debug(
@@ -1495,7 +1522,7 @@ class LocalDirectorySource {
             clearLogoUrl: clearlogoPath || metadata.clearlogoPath || null,
             thumbnailUrl: thumbnailUrl,
             bannerUrl: bannerUrl,
-            trailerUrl: trailerUrl || (typeof enrichedMeta.trailer === 'string' ? enrichedMeta.trailer : enrichedMeta.trailer?.thumb) || null, // PATCH12
+            trailerUrl: trailerUrl || enrichedMeta.trailer?.thumb || null,
             themeUrl: themeUrl || enrichedMeta.themeMusic || enrichedMeta.themeUrl || null,
             metadata: {
                 genre: enrichedMeta.genres || metadata.genre || [],
@@ -1562,8 +1589,6 @@ class LocalDirectorySource {
             extras: enrichedMeta.extras || null,
             related: enrichedMeta.related || null,
             source: 'local',
-            tmdbId: enrichedMeta.tmdbId || null,
-            imdbId: enrichedMeta.imdbId || null,
             sourceId: enrichedMeta.sourceId || metadata.cleanTitle,
             originalFilename: metadata.originalFilename,
             fileSize: metadata.fileSize,

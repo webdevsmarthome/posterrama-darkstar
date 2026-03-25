@@ -18,7 +18,7 @@ function securityMiddleware() {
         contentSecurityPolicy: {
             directives: {
                 defaultSrc: ["'self'"],
-                styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+                styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
                 fontSrc: ["'self'", 'https://fonts.gstatic.com'],
                 imgSrc: ["'self'", 'data:', 'https:', 'http:'],
                 scriptSrc: ["'self'", "'unsafe-inline'"],
@@ -26,6 +26,7 @@ function securityMiddleware() {
                 frameSrc: ["'none'"],
                 objectSrc: ["'none'"],
                 mediaSrc: ["'self'", 'https:', 'http:'],
+                upgradeInsecureRequests: null,
             },
         },
         crossOriginEmbedderPolicy: false,
