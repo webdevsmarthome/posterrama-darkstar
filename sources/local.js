@@ -1624,6 +1624,9 @@ class LocalDirectorySource {
             localPath: file.path,
             directory: file.directory,
             extension: file.extension,
+            // Pass through ZIP content index for fast normalization in media-aggregator (no re-open)
+            zipHas: file.zipHas || null,
+            zipMetadata: file.zipMetadata || null,
         };
     }
 
