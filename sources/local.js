@@ -1336,6 +1336,12 @@ class LocalDirectorySource {
     async loadOrCreateMetadata(file) {
         const metadataPath = this.getMetadataPath(file.path);
 
+        // Quick-start phase: skip all file I/O, derive metadata from filename only.
+        // Background rescan will load/create proper metadata files after startup.
+        if (this._zipScanQuickStartPhase) {
+            return this.parseFilename(file.name, file);
+        }
+
         // Fast-path: return cached metadata if available to avoid duplicate IO/logging
         try {
             if (this.indexCache.has(metadataPath)) {
