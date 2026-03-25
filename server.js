@@ -7444,6 +7444,16 @@ if (require.main === module) {
 
             logger.info('Server startup complete - media cache is ready');
 
+            // Background rescan: trigger a full playlist refresh 30s after startup.
+            // This runs the real ZIP stat-scan (which may take minutes on SD card)
+            // without blocking the server or the display.
+            setTimeout(() => {
+                logger.info('Starting background ZIP rescan after startup...');
+                refreshPlaylistCache().catch(err =>
+                    logger.warn('Background rescan failed:', err?.message)
+                );
+            }, 30 * 1000);
+
             // Ensure local media directory structure exists on startup
             // This is critical - we should ALWAYS have these directories, even if local source is disabled
             // Create a temporary instance just for directory creation if needed
