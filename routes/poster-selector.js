@@ -148,7 +148,23 @@ module.exports = function createPosterSelectorRouter({ logger, wsHub }) {
 
     function trailerFileExists(name) {
         const trailerPath = path.join(TRAILER_DIR, `${name}-trailer.mp4`);
-        return fs.existsSync(trailerPath);
+        if (fs.existsSync(trailerPath)) return true;
+        // NFD/NFC fallback (macOS copies files in NFD form)
+        try {
+            const nameNFC = `${name}-trailer.mp4`.normalize('NFC');
+            const entries = fs.readdirSync(TRAILER_DIR);
+            return entries.some(e => e.normalize('NFC') === nameNFC);
+        } catch { return false; }
+    }
+
+    function trailerInfoLookup(trailerInfo, name) {
+        if (trailerInfo[name]) return trailerInfo[name];
+        // NFD/NFC fallback
+        const nameNFC = name.normalize('NFC');
+        for (const [k, v] of Object.entries(trailerInfo)) {
+            if (k.normalize('NFC') === nameNFC) return v;
+        }
+        return null;
     }
 
     // ============================================================
@@ -162,7 +178,7 @@ module.exports = function createPosterSelectorRouter({ logger, wsHub }) {
             for (const film of films) {
                 const hasTrailer = trailerFileExists(film.name);
                 film.hasTrailer = hasTrailer;
-                film.trailerType = hasTrailer ? (trailerInfo[film.name] || 'unbekannt') : null;
+                film.trailerType = hasTrailer ? (trailerInfoLookup(trailerInfo, film.name) || 'unbekannt') : null;
             }
 
             films.sort((a, b) => a.name.localeCompare(b.name, 'de'));

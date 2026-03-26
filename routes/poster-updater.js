@@ -159,6 +159,38 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
                     logger.warn(`poster-updater: Failed to delete trailer: ${err.message}`);
                 }
             }
+            // Remove from all playlists (cinema-playlists.json + live cinema-playlist.json)
+            try {
+                const playlistsPath = path.join(__dirname, '..', 'public', 'cinema-playlists.json');
+                const livePath = path.join(__dirname, '..', 'public', 'cinema-playlist.json');
+                const raw = await fsp.readFile(playlistsPath, 'utf8');
+                const collection = JSON.parse(raw);
+                const nameNFC = name.normalize('NFC');
+                let changed = false;
+                for (const pl of Object.values(collection.playlists || {})) {
+                    const before = pl.titles.length;
+                    pl.titles = pl.titles.filter(t => t.normalize('NFC') !== nameNFC);
+                    if (pl.titles.length < before) changed = true;
+                }
+                if (changed) {
+                    await fsp.writeFile(playlistsPath, JSON.stringify(collection, null, 2) + '\n', 'utf8');
+                    // Also update live playlist if active playlist was affected
+                    const activeId = collection.activePlaylistId;
+                    if (activeId && collection.playlists[activeId]) {
+                        try {
+                            const liveRaw = await fsp.readFile(livePath, 'utf8');
+                            const live = JSON.parse(liveRaw);
+                            live.titles = collection.playlists[activeId].titles;
+                            await fsp.writeFile(livePath, JSON.stringify(live, null, 2) + '\n', 'utf8');
+                        } catch (_) { /* best effort */ }
+                    }
+                    logger.info(`poster-updater: Removed "${name}" from playlists`);
+                }
+            } catch (err) {
+                if (err.code !== 'ENOENT') {
+                    logger.warn(`poster-updater: Failed to clean playlists: ${err.message}`);
+                }
+            }
             res.json({ success: true });
         } catch (err) {
             logger.error('poster-updater: Failed to delete film:', err.message);

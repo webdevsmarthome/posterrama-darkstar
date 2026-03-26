@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-03-26 (basierend auf Version 3.0.1b)
+**Stand:** 2026-03-26 (basierend auf Version 3.0.1c)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 
 ---
@@ -23,7 +23,10 @@
 | 12 | Multi-Playlist-System | routes/poster-selector.js, admin.html, admin.js, admin.css | Benannte Playlisten erstellen, wechseln, aktivieren, duplizieren, loeschen |
 | 13 | Trailer sofort stoppen | cinema-display.js | Trailer wird sofort gestoppt wenn Poster manuell gewechselt wird |
 | 14 | Lokaler Trailer Prioritaet | sources/local.js | Trailer in /media/trailers/ hat immer Vorrang vor ZIP- und metadata.json-Trailern |
-| 15 | Unicode-Normalisierung | sources/local.js | NFD/NFC-Fallback fuer Umlaute in Trailer-Dateinamen (macOS-Kompatibilitaet) |
+| 15 | Unicode-Normalisierung | sources/local.js, routes/poster-selector.js | NFD/NFC-Fallback fuer Umlaute in Trailer-Dateinamen und Trailer-Info-Lookup (macOS-Kompatibilitaet) |
+| 16 | Zufall-Sortierung | admin.html, admin.js | Zufall-Button (Fisher-Yates Shuffle) in der Playlist-Sortierung |
+| 17 | Film-Loeschung Playlist-Sync | routes/poster-updater.js | Beim Loeschen eines Films wird dieser automatisch aus allen Playlisten entfernt |
+| 18 | YouTube Trailer Downloader | poster-updater/download-trailers-youtube.py | Direkte YouTube-Suche fuer Trailer ohne TMDB (yt-dlp ytsearch) |
 
 ---
 
@@ -43,6 +46,7 @@ Poster-Updater Backend — Film-Verwaltung, Posterpack-Download, **Trailer-Downl
 **Achtung:** Diese Datei existiert moeglicherweise im Original, wurde aber erweitert:
 - ZIP-Loeschung beim Film-Entfernen (DELETE /films/:name)
 - Trailer-Download Endpoints (/trailers/run, /trailers/run/status, /trailers/run/stop)
+- Playlist-Sync: Geloeschte Filme werden automatisch aus allen Playlisten entfernt (inkl. Live-Playlist)
 
 ### `poster-updater/download-trailers.py`
 Python-Script fuer YouTube-Trailer-Download via yt-dlp.
@@ -54,6 +58,11 @@ Benoetigt: `pip3 install --break-system-packages yt-dlp`
 Einmal-Script: Ermittelt Trailer-Typen (DE-offiziell, DE, EN-offiziell, EN) fuer alle vorhandenen Trailer per TMDB API.
 Ergebnis: `media/trailers/trailer-info.json`
 Ausfuehren: `cd poster-updater && python3 scan-trailer-types.py`
+
+### `poster-updater/download-trailers-youtube.py`
+YouTube Trailer Downloader — Sucht Trailer direkt auf YouTube (ohne TMDB) fuer Filme ohne Trailer.
+Nutzt `yt-dlp ytsearch` mit Prioritaet: Deutsch > Englisch.
+Speichert Trailer-Typ in `trailer-info.json`. Ausfuehren: `cd poster-updater && python3 download-trailers-youtube.py`
 
 ### `public/cinema-playlists.json`
 Sammlung aller benannten Playlisten. Wird automatisch beim ersten Aufruf aus `cinema-playlist.json` migriert.
@@ -238,7 +247,7 @@ language=de-DE statt language=en-US
 
 ### 11. `package.json`
 
-**Version:** `3.0.1b` (statt `3.0.1`)
+**Version:** `3.0.1c` (statt `3.0.1`)
 
 ---
 

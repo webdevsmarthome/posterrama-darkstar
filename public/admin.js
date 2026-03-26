@@ -33250,6 +33250,12 @@ if (!document.__niwDelegatedFallback) {
         if (!selectEl) return;
 
         var ids = Object.keys(psPlaylists);
+        // Sort: "Standard" first, then alphabetically by name
+        ids.sort(function (a, b) {
+            if (a === 'standard') return -1;
+            if (b === 'standard') return 1;
+            return psPlaylists[a].name.localeCompare(psPlaylists[b].name, 'de');
+        });
         if (ids.length === 0) {
             selectEl.innerHTML = '<option value="">Keine Playlists</option>';
         } else {
@@ -33614,22 +33620,29 @@ if (!document.__niwDelegatedFallback) {
 
     function psSortPlaylist(mode) {
         if (psPlaylistTitles.length < 2) return;
-        // Pre-compute years for performance
-        var yearCache = {};
-        psPlaylistTitles.forEach(function (t) { yearCache[t] = psExtractYear(t); });
-        psPlaylistTitles.sort(function (a, b) {
-            if (mode === 'az') return a.localeCompare(b, 'de');
-            if (mode === 'za') return b.localeCompare(a, 'de');
-            // year sorting
-            var ya = yearCache[a];
-            var yb = yearCache[b];
-            // no year → sort to beginning alphabetically
-            if (ya === null && yb === null) return a.localeCompare(b, 'de');
-            if (ya === null) return -1;
-            if (yb === null) return 1;
-            var diff = mode === 'year-asc' ? ya - yb : yb - ya;
-            return diff !== 0 ? diff : a.localeCompare(b, 'de');
-        });
+        if (mode === 'random') {
+            // Fisher-Yates shuffle
+            for (var i = psPlaylistTitles.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var tmp = psPlaylistTitles[i];
+                psPlaylistTitles[i] = psPlaylistTitles[j];
+                psPlaylistTitles[j] = tmp;
+            }
+        } else {
+            var yearCache = {};
+            psPlaylistTitles.forEach(function (t) { yearCache[t] = psExtractYear(t); });
+            psPlaylistTitles.sort(function (a, b) {
+                if (mode === 'az') return a.localeCompare(b, 'de');
+                if (mode === 'za') return b.localeCompare(a, 'de');
+                var ya = yearCache[a];
+                var yb = yearCache[b];
+                if (ya === null && yb === null) return a.localeCompare(b, 'de');
+                if (ya === null) return -1;
+                if (yb === null) return 1;
+                var diff = mode === 'year-asc' ? ya - yb : yb - ya;
+                return diff !== 0 ? diff : a.localeCompare(b, 'de');
+            });
+        }
         psRenderPlaylist();
         psSavePlaylist();
     }
@@ -33725,6 +33738,8 @@ if (!document.__niwDelegatedFallback) {
         if (sortZA) sortZA.addEventListener('click', function () { psSortPlaylist('za'); });
         if (sortYearAsc) sortYearAsc.addEventListener('click', function () { psSortPlaylist('year-asc'); });
         if (sortYearDesc) sortYearDesc.addEventListener('click', function () { psSortPlaylist('year-desc'); });
+        var sortRandom = document.getElementById('ps-sortRandom');
+        if (sortRandom) sortRandom.addEventListener('click', function () { psSortPlaylist('random'); });
 
         // Drag & drop
         psInitDragDrop();
