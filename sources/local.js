@@ -1487,9 +1487,21 @@ class LocalDirectorySource {
         if (!title || !year) return null;
         try {
             const filename = `${title} (${year})-trailer.mp4`;
-            const trailerPath = path.join(__dirname, '..', 'media', 'trailers', filename);
+            const trailerDir = path.join(__dirname, '..', 'media', 'trailers');
+            const trailerPath = path.join(trailerDir, filename);
+            // Direct match (NFC)
             if (fs.existsSync(trailerPath)) {
                 return `/trailers/${encodeURIComponent(filename)}`;
+            }
+            // Fallback: NFD/NFC normalization mismatch (macOS copies files in NFD form)
+            const filenameNFC = filename.normalize('NFC');
+            const filenameNFD = filename.normalize('NFD');
+            const entries = fs.readdirSync(trailerDir);
+            const match = entries.find(e =>
+                e.normalize('NFC') === filenameNFC || e.normalize('NFD') === filenameNFD
+            );
+            if (match) {
+                return `/trailers/${encodeURIComponent(match)}`;
             }
         } catch (_) { /* ignore */ }
         return null;
@@ -1564,7 +1576,7 @@ class LocalDirectorySource {
             clearLogoUrl: clearlogoPath || metadata.clearlogoPath || null,
             thumbnailUrl: thumbnailUrl,
             bannerUrl: bannerUrl,
-            trailerUrl: trailerUrl || this._findLocalTrailer(metadata.title, enrichedMeta.year || metadata.year) || (typeof enrichedMeta.trailer === 'string' ? enrichedMeta.trailer : enrichedMeta.trailer?.thumb) || null, // PATCH12 + LOCAL-TRAILER
+            trailerUrl: this._findLocalTrailer(metadata.title, enrichedMeta.year || metadata.year) || trailerUrl || (typeof enrichedMeta.trailer === 'string' ? enrichedMeta.trailer : enrichedMeta.trailer?.thumb) || null, // LOCAL-TRAILER hat höchste Priorität
             themeUrl: themeUrl || enrichedMeta.themeMusic || enrichedMeta.themeUrl || null,
             metadata: {
                 genre: enrichedMeta.genres || metadata.genre || [],

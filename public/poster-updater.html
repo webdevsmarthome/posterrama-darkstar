@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poster Updater - Posterrama</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+:root {
+    --color-bg-primary: #1f2028;
+    --color-bg-secondary: #2a2b38;
+    --color-bg-tertiary: #303240;
+    --color-bg-card: #242530;
+    --color-bg-dark: #16161e;
+    --color-text-primary: #c0caf5;
+    --color-text-secondary: #a9b1d6;
+    --color-text-muted: #565f89;
+    --color-primary: #ff79c6;
+    --color-secondary: #7aa2f7;
+    --color-success: #9ece6a;
+    --color-warning: #e0af68;
+    --color-error: #f7768e;
+    --color-teal: #73daca;
+    --color-border: rgba(255,255,255,0.06);
+    --color-border-light: rgba(255,255,255,0.1);
+    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    --radius: 8px;
+    --radius-lg: 12px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: var(--font-family);
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* === Navbar === */
+.navbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 64px; z-index: 100;
+    background: var(--color-bg-dark);
+    border-bottom: 1px solid var(--color-border);
+    display: flex; align-items: center; padding: 0 24px; gap: 16px;
+}
+.navbar-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.navbar-logo img { width: 32px; height: 32px; }
+.navbar-logo span { font-size: 18px; font-weight: 700; color: var(--color-text-primary); }
+.navbar-title { font-size: 15px; color: var(--color-text-muted); margin-left: 8px; }
+.navbar-spacer { flex: 1; }
+.navbar-link {
+    color: var(--color-text-secondary); text-decoration: none; font-size: 13px;
+    padding: 6px 14px; border-radius: var(--radius); transition: all 0.2s;
+    border: 1px solid var(--color-border-light);
+}
+.navbar-link:hover { color: var(--color-text-primary); background: var(--color-bg-tertiary); }
+
+/* === Main Content === */
+.main { max-width: 1400px; margin: 88px auto 40px; padding: 0 24px; }
+
+/* === Panels === */
+.panel {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 24px;
+    overflow: hidden;
+}
+.panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+}
+.panel-header h2 { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.panel-content { padding: 20px 24px; }
+.panel-stats {
+    display: flex; gap: 8px; font-size: 13px;
+}
+.filter-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; border-radius: 20px; border: 1px solid var(--color-border-light);
+    background: transparent; color: var(--color-text-muted); cursor: pointer;
+    font-size: 13px; font-family: inherit; transition: all 0.2s;
+}
+.filter-btn:hover { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
+.filter-btn.active { border-color: transparent; color: #fff; }
+.filter-btn.active[data-filter="all"] { background: var(--color-secondary); }
+.filter-btn.active[data-filter="zip"] { background: var(--color-success); color: #1a1b26; }
+.filter-btn.active[data-filter="pending"] { background: var(--color-warning); color: #1a1b26; }
+.filter-btn .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.filter-btn .dot-total { background: var(--color-secondary); }
+.filter-btn .dot-green { background: var(--color-success); }
+.filter-btn .dot-orange { background: var(--color-warning); }
+.filter-btn.active .dot { background: currentColor; }
+
+/* === Buttons === */
+.btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border: none; border-radius: var(--radius);
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: all 0.2s; font-family: inherit;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--color-primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
+.btn-secondary { background: var(--color-bg-tertiary); color: var(--color-text-primary); border: 1px solid var(--color-border-light); }
+.btn-secondary:hover:not(:disabled) { background: var(--color-bg-secondary); }
+.btn-success { background: var(--color-success); color: #1a1b26; }
+.btn-success:hover:not(:disabled) { filter: brightness(1.1); }
+.btn-danger { background: var(--color-error); color: #fff; }
+.btn-danger:hover:not(:disabled) { filter: brightness(1.1); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-icon { padding: 4px 8px; background: none; border: none; color: var(--color-text-muted); cursor: pointer; border-radius: 4px; }
+.btn-icon:hover { color: var(--color-error); background: rgba(247,118,142,0.1); }
+
+/* === Form inputs === */
+.form-input {
+    width: 100%; padding: 10px 14px;
+    background: var(--color-bg-primary); color: var(--color-text-primary);
+    border: 1px solid var(--color-border-light); border-radius: var(--radius);
+    font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.2s;
+}
+.form-input:focus { border-color: var(--color-secondary); }
+.form-input::placeholder { color: var(--color-text-muted); }
+
+/* === Film List === */
+.film-list-container { max-height: 500px; overflow-y: auto; }
+.film-list-container::-webkit-scrollbar { width: 6px; }
+.film-list-container::-webkit-scrollbar-track { background: transparent; }
+.film-list-container::-webkit-scrollbar-thumb { background: var(--color-bg-tertiary); border-radius: 3px; }
+
+.film-row {
+    display: flex; align-items: center; padding: 8px 12px; gap: 10px;
+    border-bottom: 1px solid var(--color-border);
+    transition: background 0.15s;
+}
+.film-row:hover { background: var(--color-bg-secondary); }
+.film-row:last-child { border-bottom: none; }
+.film-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.film-status.has-zip { background: var(--color-success); }
+.film-status.pending { background: var(--color-warning); }
+.film-name { flex: 1; font-size: 14px; }
+.film-empty { text-align: center; padding: 40px; color: var(--color-text-muted); }
+
+/* === Search Results === */
+.search-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
+.search-card {
+    display: flex; gap: 12px; padding: 12px;
+    background: var(--color-bg-secondary); border: 1px solid var(--color-border);
+    border-radius: var(--radius); transition: border-color 0.2s;
+}
+.search-card:hover { border-color: var(--color-border-light); }
+.search-poster {
+    width: 60px; height: 90px; border-radius: 4px; object-fit: cover;
+    background: var(--color-bg-tertiary); flex-shrink: 0;
+}
+.search-info { flex: 1; min-width: 0; }
+.search-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-year { font-size: 12px; color: var(--color-text-muted); }
+.search-overview { font-size: 12px; color: var(--color-text-secondary); margin: 4px 0 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.search-actions { display: flex; gap: 6px; align-items: center; }
+.badge-exists { font-size: 11px; color: var(--color-success); background: rgba(158,206,106,0.12); padding: 3px 8px; border-radius: 4px; }
+.search-empty { text-align: center; padding: 40px; color: var(--color-text-muted); }
+.search-loading { text-align: center; padding: 24px; color: var(--color-text-muted); }
+
+/* === Terminal === */
+.terminal {
+    background: #0d1117; color: #c9d1d9;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+    font-size: 13px; line-height: 1.5;
+    padding: 16px; border-radius: var(--radius);
+    max-height: 500px; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word;
+    min-height: 120px;
+}
+.terminal::-webkit-scrollbar { width: 6px; }
+.terminal::-webkit-scrollbar-track { background: transparent; }
+.terminal::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+.terminal .stderr { color: var(--color-error); }
+.terminal .line-success { color: var(--color-success); }
+.terminal .line-skipped { color: var(--color-warning); }
+.terminal .line-error { color: var(--color-error); }
+.terminal .line-info { color: var(--color-text-muted); }
+.terminal.filter-success .line-skipped, .terminal.filter-success .line-error, .terminal.filter-success .line-info { display: none; }
+.terminal.filter-skipped .line-success, .terminal.filter-skipped .line-error, .terminal.filter-skipped .line-info { display: none; }
+.terminal.filter-error .line-success, .terminal.filter-error .line-skipped, .terminal.filter-error .line-info { display: none; }
+.filter-btn.active[data-filter="success"] { background: var(--color-success); color: #1a1b26; }
+.filter-btn.active[data-filter="skipped"] { background: var(--color-warning); color: #1a1b26; }
+.filter-btn.active[data-filter="error"] { background: var(--color-error); color: #fff; }
+
+.runner-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.runner-status {
+    font-size: 13px; padding: 4px 12px; border-radius: 20px;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.runner-status.idle { color: var(--color-text-muted); background: var(--color-bg-primary); }
+.runner-status.running { color: var(--color-warning); background: rgba(224,175,104,0.12); }
+.runner-status.done { color: var(--color-success); background: rgba(158,206,106,0.12); }
+.runner-status.error { color: var(--color-error); background: rgba(247,118,142,0.12); }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.runner-status.running::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--color-warning); animation: pulse 1.5s infinite; }
+
+/* === Modal === */
+.modal-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+    background: var(--color-bg-card); border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-lg); padding: 24px; max-width: 420px; width: 90%;
+}
+.modal h3 { font-size: 16px; margin-bottom: 12px; }
+.modal p { font-size: 14px; color: var(--color-text-secondary); margin-bottom: 20px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* === Toast === */
+.toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+    padding: 12px 20px; border-radius: var(--radius); font-size: 13px;
+    color: #fff; animation: slideIn 0.3s; max-width: 380px;
+}
+.toast-success { background: var(--color-success); color: #1a1b26; }
+.toast-error { background: var(--color-error); }
+@keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+</style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+    <a class="navbar-logo" href="/poster-updater">
+        <img src="/logo.png" alt="Logo">
+        <span>posterrama</span>
+    </a>
+    <span class="navbar-title">Poster Updater</span>
+    <div class="navbar-spacer"></div>
+    <a href="/admin" class="navbar-link">Admin Dashboard</a>
+</nav>
+
+<!-- Main Content -->
+<div class="main">
+
+    <!-- Panel 1: Film List -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Filmliste</h2>
+            <div class="panel-stats" id="filmStats"></div>
+        </div>
+        <div class="panel-content">
+            <div style="margin-bottom: 12px;">
+                <input type="text" class="form-input" id="filmFilter" placeholder="Liste filtern...">
+            </div>
+            <div class="film-list-container" id="filmList">
+                <div class="film-empty">Lade Filmliste...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel 2: TMDB Search -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>TMDB Filmsuche</h2>
+        </div>
+        <div class="panel-content">
+            <div style="display:flex; gap:10px;">
+                <input type="text" class="form-input" id="tmdbSearch" placeholder="Film suchen... (min. 2 Zeichen)" style="flex:1;">
+                <button class="btn btn-secondary" id="tmdbSearchBtn" disabled>Suchen</button>
+            </div>
+            <div id="searchResults"></div>
+        </div>
+    </div>
+
+    <!-- Panel 3: Download Runner -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Posterpack Download</h2>
+        </div>
+        <div class="panel-content">
+            <div class="runner-controls">
+                <button class="btn btn-success" id="runStartBtn">Download starten</button>
+                <button class="btn btn-danger btn-sm" id="runStopBtn" disabled>Stopp</button>
+                <span class="runner-status idle" id="runnerStatus">Bereit</span>
+            </div>
+            <div class="panel-stats" id="runnerStats" style="margin-bottom:12px;"></div>
+            <div class="terminal" id="terminal">Warte auf Start...</div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal">
+        <h3>Film entfernen</h3>
+        <p id="deleteModalText"></p>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" id="deleteCancelBtn">Abbrechen</button>
+            <button class="btn btn-danger" id="deleteConfirmBtn">Entfernen</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+(function() {
+    'use strict';
+
+    // === State ===
+    let filmData = [];         // [{name, hasZip}]
+    let filmNamesLower = new Set(); // for quick duplicate check
+    let deleteTarget = null;
+    let searchDebounceTimer = null;
+    let activeStatusFilter = 'all'; // 'all' | 'zip' | 'pending'
+
+    // === DOM refs ===
+    const filmListEl = document.getElementById('filmList');
+    const filmStatsEl = document.getElementById('filmStats');
+    const filmFilterEl = document.getElementById('filmFilter');
+    const tmdbSearchEl = document.getElementById('tmdbSearch');
+    const tmdbSearchBtn = document.getElementById('tmdbSearchBtn');
+    const searchResultsEl = document.getElementById('searchResults');
+    const runStartBtn = document.getElementById('runStartBtn');
+    const runStopBtn = document.getElementById('runStopBtn');
+    const runnerStatusEl = document.getElementById('runnerStatus');
+    const terminalEl = document.getElementById('terminal');
+    const deleteModal = document.getElementById('deleteModal');
+    const deleteModalText = document.getElementById('deleteModalText');
+    const deleteConfirmBtn = document.getElementById('deleteConfirmBtn');
+
+    // === Toast ===
+    function showToast(msg, type = 'success') {
+        const el = document.createElement('div');
+        el.className = `toast toast-${type}`;
+        el.textContent = msg;
+        document.getElementById('toastContainer').appendChild(el);
+        setTimeout(() => el.remove(), 4000);
+    }
+
+    // === API helpers ===
+    async function apiFetch(url, opts = {}) {
+        const res = await fetch(url, { credentials: 'same-origin', ...opts });
+        const data = await res.json();
+        if (!res.ok && !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+        return data;
+    }
+
+    // ============================================================
+    // Film List
+    // ============================================================
+    async function loadFilms() {
+        try {
+            const data = await apiFetch('/api/poster-updater/films');
+            filmData = data.films || [];
+            filmNamesLower = new Set(filmData.map(f => f.name.toLowerCase()));
+            renderFilmList();
+            renderFilmStats(data);
+        } catch (err) {
+            filmListEl.innerHTML = `<div class="film-empty">Fehler: ${err.message}</div>`;
+        }
+    }
+
+    function renderFilmStats(data) {
+        filmStatsEl.innerHTML = `
+            <button class="filter-btn ${activeStatusFilter === 'all' ? 'active' : ''}" data-filter="all">
+                <span class="dot dot-total"></span> ${data.total} Filme
+            </button>
+            <button class="filter-btn ${activeStatusFilter === 'zip' ? 'active' : ''}" data-filter="zip">
+                <span class="dot dot-green"></span> ${data.withZip} mit ZIP
+            </button>
+            <button class="filter-btn ${activeStatusFilter === 'pending' ? 'active' : ''}" data-filter="pending">
+                <span class="dot dot-orange"></span> ${data.pending} ausstehend
+            </button>
+        `;
+    }
+
+    filmStatsEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-filter]');
+        if (!btn) return;
+        activeStatusFilter = btn.dataset.filter;
+        renderFilmStats({ total: filmData.length, withZip: filmData.filter(f => f.hasZip).length, pending: filmData.filter(f => !f.hasZip).length });
+        renderFilmList();
+    });
+
+    function renderFilmList() {
+        const filter = filmFilterEl.value.toLowerCase();
+        let filtered = filmData;
+        if (activeStatusFilter === 'zip') filtered = filtered.filter(f => f.hasZip);
+        else if (activeStatusFilter === 'pending') filtered = filtered.filter(f => !f.hasZip);
+        if (filter) filtered = filtered.filter(f => f.name.toLowerCase().includes(filter));
+
+        if (!filtered.length) {
+            filmListEl.innerHTML = `<div class="film-empty">${filter ? 'Keine Treffer' : 'Liste ist leer'}</div>`;
+            return;
+        }
+
+        filmListEl.innerHTML = filtered.map(f => `
+            <div class="film-row">
+                <span class="film-status ${f.hasZip ? 'has-zip' : 'pending'}" title="${f.hasZip ? 'ZIP vorhanden' : 'Ausstehend'}"></span>
+                <span class="film-name">${escHtml(f.name)}</span>
+                <button class="btn-icon" data-delete-film="${escAttr(f.name)}" title="Entfernen">&times;</button>
+            </div>
+        `).join('');
+    }
+
+    filmFilterEl.addEventListener('input', renderFilmList);
+
+    // Event delegation for delete buttons
+    filmListEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-delete-film]');
+        if (btn) openDeleteModal(btn.dataset.deleteFilm);
+    });
+
+    // --- Delete ---
+    function openDeleteModal(name) {
+        deleteTarget = name;
+        deleteModalText.textContent = `"${name}" wirklich aus der Filmliste entfernen?`;
+        deleteModal.classList.add('open');
+    }
+    function closeDeleteModal() {
+        deleteModal.classList.remove('open');
+        deleteTarget = null;
+    }
+    document.getElementById('deleteCancelBtn').addEventListener('click', closeDeleteModal);
+    deleteConfirmBtn.addEventListener('click', async () => {
+        if (!deleteTarget) return;
+        const name = deleteTarget;
+        closeDeleteModal();
+        try {
+            await apiFetch(`/api/poster-updater/films/${encodeURIComponent(name)}`, { method: 'DELETE' });
+            showToast(`"${name}" entfernt`);
+            await loadFilms();
+            // re-render search results to update badges
+            if (searchResultsEl.querySelector('.search-card')) rerenderSearchBadges();
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    });
+
+    // ============================================================
+    // TMDB Search
+    // ============================================================
+    tmdbSearchEl.addEventListener('input', () => {
+        const q = tmdbSearchEl.value.trim();
+        tmdbSearchBtn.disabled = q.length < 2;
+        clearTimeout(searchDebounceTimer);
+        if (q.length >= 2) {
+            searchDebounceTimer = setTimeout(() => doSearch(q), 300);
+        } else {
+            searchResultsEl.innerHTML = '';
+        }
+    });
+
+    tmdbSearchEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && tmdbSearchEl.value.trim().length >= 2) {
+            clearTimeout(searchDebounceTimer);
+            doSearch(tmdbSearchEl.value.trim());
+        }
+    });
+    tmdbSearchBtn.addEventListener('click', () => {
+        if (tmdbSearchEl.value.trim().length >= 2) doSearch(tmdbSearchEl.value.trim());
+    });
+
+    let lastSearchResults = [];
+
+    async function doSearch(query) {
+        searchResultsEl.innerHTML = '<div class="search-loading">Suche...</div>';
+        try {
+            const data = await apiFetch(`/api/admin/media/search?q=${encodeURIComponent(query)}&type=movie&source=tmdb&limit=25`);
+            lastSearchResults = data.results || [];
+            renderSearchResults();
+        } catch (err) {
+            searchResultsEl.innerHTML = `<div class="search-empty">Fehler: ${err.message}</div>`;
+        }
+    }
+
+    function renderSearchResults() {
+        if (!lastSearchResults.length) {
+            searchResultsEl.innerHTML = '<div class="search-empty">Keine Ergebnisse</div>';
+            return;
+        }
+        searchResultsEl.innerHTML = '<div class="search-results">' + lastSearchResults.map((r, i) => {
+            const title = r.title || 'Unbekannt';
+            const year = r.year || '';
+            const entry = year ? `${title} (${year})` : title;
+            const exists = filmNamesLower.has(entry.toLowerCase());
+            const posterSrc = r.posterUrl || '';
+
+            return `
+                <div class="search-card" data-entry="${escAttr(entry)}">
+                    ${posterSrc
+                        ? `<img class="search-poster" src="${escAttr(posterSrc)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+                        : `<div class="search-poster" style="display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--color-text-muted);">Kein Poster</div>`
+                    }
+                    <div class="search-info">
+                        <div class="search-title" title="${escAttr(title)}">${escHtml(title)}</div>
+                        <div class="search-year">${year || '?'}</div>
+                        <div class="search-actions">
+                            ${exists
+                                ? `<span class="badge-exists">Bereits vorhanden</span>`
+                                : `<button class="btn btn-primary btn-sm" data-add-idx="${i}">Hinzufuegen</button>`
+                            }
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('') + '</div>';
+    }
+
+    function rerenderSearchBadges() {
+        if (lastSearchResults.length) renderSearchResults();
+    }
+
+    // Event delegation for add buttons (more robust than inline onclick)
+    searchResultsEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-add-idx]');
+        if (btn) {
+            const idx = parseInt(btn.dataset.addIdx, 10);
+            addFromSearch(idx);
+        }
+    });
+
+    async function addFromSearch(idx) {
+        const r = lastSearchResults[idx];
+        if (!r) { showToast('Eintrag nicht gefunden', 'error'); return; }
+        const title = (r.title || '').trim();
+        // year can be a number, string, or null — handle all cases
+        const year = r.year != null ? String(r.year).trim() : '';
+        if (!title) { showToast('Filmtitel fehlt', 'error'); return; }
+        if (!year || !/^\d{4}$/.test(year)) { showToast('Erscheinungsjahr fehlt oder ungueltig', 'error'); return; }
+        try {
+            await apiFetch('/api/poster-updater/films', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, year }),
+            });
+            showToast(`"${title} (${year})" hinzugefuegt`);
+            await loadFilms();
+            renderSearchResults();
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    }
+
+    // ============================================================
+    // Download Runner
+    // ============================================================
+    let evtSource = null;
+    let runnerCounts = { success: 0, skipped: 0, error: 0 };
+    let activeRunnerFilter = 'all';
+    let stdoutBuffer = ''; // buffer partial lines
+
+    function renderRunnerStats() {
+        const statsEl = document.getElementById('runnerStats');
+        const total = runnerCounts.success + runnerCounts.skipped + runnerCounts.error;
+        if (!total) { statsEl.innerHTML = ''; return; }
+        statsEl.innerHTML = `
+            <button class="filter-btn ${activeRunnerFilter === 'all' ? 'active' : ''}" data-filter="all" data-runner-filter>
+                <span class="dot dot-total"></span> ${total} gesamt
+            </button>
+            <button class="filter-btn ${activeRunnerFilter === 'success' ? 'active' : ''}" data-filter="success" data-runner-filter>
+                <span class="dot dot-green"></span> ${runnerCounts.success} erfolgreich
+            </button>
+            <button class="filter-btn ${activeRunnerFilter === 'skipped' ? 'active' : ''}" data-filter="skipped" data-runner-filter>
+                <span class="dot dot-orange"></span> ${runnerCounts.skipped} uebersprungen
+            </button>
+            <button class="filter-btn ${activeRunnerFilter === 'error' ? 'active' : ''}" data-filter="error" data-runner-filter>
+                <span class="dot" style="background:var(--color-error)"></span> ${runnerCounts.error} Fehler
+            </button>
+        `;
+    }
+
+    document.getElementById('runnerStats').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-runner-filter]');
+        if (!btn) return;
+        activeRunnerFilter = btn.dataset.filter;
+        terminalEl.className = 'terminal' + (activeRunnerFilter !== 'all' ? ' filter-' + activeRunnerFilter : '');
+        renderRunnerStats();
+    });
+
+    function classifyLine(text) {
+        const t = text.trimStart();
+        // Only match actual result lines (indented status), not header banners (* ✅ ...)
+        if (/^✅/.test(t)) return 'line-success';
+        if (/^⏭/.test(t)) return 'line-skipped';
+        if (/^❌/.test(t)) return 'line-error';
+        return 'line-info';
+    }
+
+    function countLine(text) {
+        const t = text.trimStart();
+        if (/^✅/.test(t)) runnerCounts.success++;
+        else if (/^⏭/.test(t)) runnerCounts.skipped++;
+        else if (/^❌/.test(t)) runnerCounts.error++;
+        else return;
+        renderRunnerStats();
+    }
+
+    function setRunnerState(state) {
+        runnerStatusEl.className = 'runner-status ' + state;
+        if (state === 'idle') { runnerStatusEl.textContent = 'Bereit'; }
+        else if (state === 'running') { runnerStatusEl.textContent = 'Laeuft...'; }
+        else if (state === 'done') { runnerStatusEl.textContent = 'Fertig'; }
+        else if (state === 'error') { runnerStatusEl.textContent = 'Fehler'; }
+
+        runStartBtn.disabled = state === 'running';
+        runStopBtn.disabled = state !== 'running';
+    }
+
+    function appendTerminal(text, cls) {
+        if (cls) {
+            // stderr or system messages — append as-is
+            const span = document.createElement('span');
+            span.className = cls;
+            span.textContent = text;
+            terminalEl.appendChild(span);
+            terminalEl.scrollTop = terminalEl.scrollHeight;
+            return;
+        }
+        // Buffer stdout and split into complete lines for classification
+        stdoutBuffer += text;
+        const lines = stdoutBuffer.split('\n');
+        stdoutBuffer = lines.pop(); // keep incomplete last line in buffer
+        for (const line of lines) {
+            const span = document.createElement('span');
+            span.className = classifyLine(line);
+            span.textContent = line + '\n';
+            terminalEl.appendChild(span);
+            countLine(line);
+        }
+        // Render remaining buffer (incomplete line) as info
+        if (stdoutBuffer) {
+            // will be completed by next chunk — handled on next call
+        }
+        terminalEl.scrollTop = terminalEl.scrollHeight;
+    }
+
+    function connectSSE() {
+        if (evtSource) { evtSource.close(); }
+        evtSource = new EventSource('/api/poster-updater/run/status');
+
+        evtSource.onmessage = (e) => {
+            try {
+                const data = JSON.parse(e.data);
+                if (data.type === 'connected') {
+                    if (data.running) setRunnerState('running');
+                } else if (data.type === 'started') {
+                    terminalEl.textContent = '';
+                    terminalEl.className = 'terminal';
+                    stdoutBuffer = '';
+                    runnerCounts = { success: 0, skipped: 0, error: 0 };
+                    activeRunnerFilter = 'all';
+                    renderRunnerStats();
+                    setRunnerState('running');
+                } else if (data.type === 'stdout') {
+                    appendTerminal(data.text);
+                } else if (data.type === 'stderr') {
+                    appendTerminal(data.text, 'stderr');
+                } else if (data.type === 'done') {
+                    setRunnerState(data.code === 0 ? 'done' : 'error');
+                    appendTerminal(`\n--- Beendet (Exit Code: ${data.code}) ---\n`);
+                    // Refresh film list to update ZIP status
+                    loadFilms();
+                } else if (data.type === 'error') {
+                    setRunnerState('error');
+                    appendTerminal(`\n--- Fehler: ${data.message} ---\n`, 'stderr');
+                }
+            } catch { /* ignore parse errors */ }
+        };
+
+        evtSource.onerror = () => {
+            // Reconnect after 3s
+            evtSource.close();
+            setTimeout(connectSSE, 3000);
+        };
+    }
+
+    runStartBtn.addEventListener('click', async () => {
+        try {
+            terminalEl.textContent = '';
+            await apiFetch('/api/poster-updater/run', { method: 'POST' });
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    });
+
+    runStopBtn.addEventListener('click', async () => {
+        try {
+            await apiFetch('/api/poster-updater/run/stop', { method: 'POST' });
+            showToast('Stop-Signal gesendet');
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    });
+
+    // === Helpers ===
+    function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function escAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;'); }
+
+    // === Init ===
+    loadFilms();
+    connectSSE();
+})();
+</script>
+</body>
+</html>

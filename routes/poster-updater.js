@@ -149,6 +149,16 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
                     logger.warn(`poster-updater: Failed to delete ZIP file: ${err.message}`);
                 }
             }
+            // Also delete the corresponding trailer if it exists
+            try {
+                const trailerPath = path.join(__dirname, '..', 'media', 'trailers', name + '-trailer.mp4');
+                await fsp.unlink(trailerPath);
+                logger.info(`poster-updater: Deleted trailer: ${name}-trailer.mp4`);
+            } catch (err) {
+                if (err.code !== 'ENOENT') {
+                    logger.warn(`poster-updater: Failed to delete trailer: ${err.message}`);
+                }
+            }
             res.json({ success: true });
         } catch (err) {
             logger.error('poster-updater: Failed to delete film:', err.message);

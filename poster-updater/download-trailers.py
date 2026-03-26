@@ -21,17 +21,38 @@ print("""
 **************************************************************
 """)
 
-load_dotenv()
+import json
+
+PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
 
 TMDB_API_KEY = os.getenv('TMDB_API_KEY')
 FILMLISTE_PATH = os.getenv('FILMLISTE_PATH', 'filmliste.txt')
-TRAILER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'media', 'trailers')
+TRAILER_DIR = os.path.join(PROJECT_ROOT, 'media', 'trailers')
+TRAILER_INFO_PATH = os.path.join(TRAILER_DIR, 'trailer-info.json')
 
-if not TMDB_API_KEY:
-    print("❌ TMDB_API_KEY fehlt in .env!")
+# Fallback: TMDB API Key aus config.json lesen
+if not TMDB_API_KEY or TMDB_API_KEY == 'false':
+    try:
+        with open(os.path.join(PROJECT_ROOT, 'config.json'), 'r', encoding='utf-8') as _cf:
+            _cfg = json.load(_cf)
+            TMDB_API_KEY = (_cfg.get('tmdbSource', {}).get('apiKey')
+                           or _cfg.get('tmdb', {}).get('apiKey')
+                           or None)
+    except Exception:
+        pass
+
+if not TMDB_API_KEY or TMDB_API_KEY == 'false':
+    print("❌ TMDB_API_KEY fehlt in .env und config.json!")
     sys.exit(1)
 
 os.makedirs(TRAILER_DIR, exist_ok=True)
+trailer_info = {}
+try:
+    with open(TRAILER_INFO_PATH, 'r', encoding='utf-8') as _f:
+        trailer_info = json.load(_f)
+except (FileNotFoundError, json.JSONDecodeError):
+    pass
 
 BASE_URL = 'https://api.themoviedb.org/3'
 
@@ -188,12 +209,22 @@ for i, entry in enumerate(films, 1):
         size_mb = os.path.getsize(trailer_path) / (1024 * 1024)
         print(f" ✅ {size_mb:.1f} MB")
         erfolg += 1
+        # Trailer-Typ persistieren
+        trailer_info[entry] = lang
     else:
         print(f" ❌ Download fehlgeschlagen")
         # Aufraumen bei Fehler
         if os.path.exists(trailer_path):
             os.remove(trailer_path)
         fehler += 1
+
+# --- trailer-info.json speichern ---
+try:
+    with open(TRAILER_INFO_PATH, 'w', encoding='utf-8') as _f:
+        json.dump(trailer_info, _f, ensure_ascii=False, indent=2, sort_keys=True)
+    print(f"  💾 trailer-info.json gespeichert ({len(trailer_info)} Eintraege)")
+except Exception as e:
+    print(f"  ⚠️  trailer-info.json konnte nicht gespeichert werden: {e}")
 
 # --- Zusammenfassung ---
 print(f"""

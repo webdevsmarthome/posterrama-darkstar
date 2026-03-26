@@ -1287,9 +1287,11 @@
         trailerLoopCount = 0;
         trailerHidden = false;
 
+        // Always remove any currently playing trailer immediately when poster changes
+        removeTrailerOverlaySync();
+
         // Remove existing trailer if disabled or no media
         if (!trailerConfig.enabled || !media) {
-            removeTrailerOverlay();
             return;
         }
 
@@ -1461,9 +1463,9 @@
             video.onplay = () => {
                 // Overlay einblenden wenn Video laeuft
                 setTimeout(() => { if (trailerEl) trailerEl.classList.add('visible'); }, 500);
-                // Nach 2s Ton einschalten
+                // Nach 0.5s Ton einschalten
                 if (!trailerConfig.muted) {
-                    setTimeout(() => { try { video.muted = false; video.volume = 1.0; } catch(_){} }, 2000);
+                    setTimeout(() => { try { video.muted = false; video.volume = 1.0; } catch(_){} }, 500);
                 }
             };
 

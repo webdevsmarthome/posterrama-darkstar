@@ -1,0 +1,59 @@
+{
+  "activePlaylistId": "heimatfilme",
+  "playlists": {
+    "standard": {
+      "name": "Standard",
+      "titles": [
+        "Die neun Pforten (1999)",
+        "Dirty Harry (1971)"
+      ],
+      "createdAt": "2026-03-26T06:58:23.949Z",
+      "updatedAt": "2026-03-26T08:47:59.016Z"
+    },
+    "james-bond": {
+      "name": "James Bond",
+      "titles": [
+        "James Bond 007 - Casino Royale (2006)",
+        "James Bond 007 - Der Hauch des Todes (1987)",
+        "James Bond 007 - Der Mann mit dem goldenen Colt (1974)",
+        "James Bond 007 - Der Morgen stirbt nie (1997)",
+        "James Bond 007 - Der Spion der mich liebte (1977)",
+        "James Bond 007 - Diamantenfieber (1971)",
+        "James Bond 007 - Die Welt ist nicht genug (1999)",
+        "James Bond 007 - Ein Quantum Trost (2008)",
+        "James Bond 007 - Feuerball (1965)",
+        "James Bond 007 - GoldenEye (1995)",
+        "James Bond 007 - Goldfinger (1964)",
+        "James Bond 007 - Im Angesicht des Todes (1985)",
+        "James Bond 007 - Im Geheimdienst Ihrer Majestät (1969)",
+        "James Bond 007 - In tödlicher Mission (1981)",
+        "James Bond 007 - Keine Zeit zu sterben (2021)",
+        "James Bond 007 - Leben und sterben lassen (1973)",
+        "James Bond 007 - Liebesgrüße aus Moskau (1963)",
+        "James Bond 007 - Lizenz zum Töten (1989)",
+        "James Bond 007 - Man lebt nur zweimal (1967)",
+        "James Bond 007 - Moonraker - Streng geheim (1979)",
+        "James Bond 007 - Octopussy (1983)",
+        "James Bond 007 - Skyfall (2012)",
+        "James Bond 007 - Spectre (2015)",
+        "James Bond 007 - Stirb an einem anderen Tag (2002)",
+        "James Bond 007 jagt Dr No (1962)"
+      ],
+      "createdAt": "2026-03-26T06:58:58.426Z",
+      "updatedAt": "2026-03-26T06:59:33.247Z"
+    },
+    "heimatfilme": {
+      "name": "Heimatfilme",
+      "titles": [
+        "Ein Münchner im Himmel (2026)",
+        "Markus und der Tag im Sheriffs Office (2025)",
+        "Vom Winde verweht (1939)",
+        "Die Fischerin vom Bodensee (1956)",
+        "Die Mädels vom Immenhof (1955)",
+        "Die neun Pforten (1999)"
+      ],
+      "createdAt": "2026-03-26T07:02:59.319Z",
+      "updatedAt": "2026-03-26T09:00:23.108Z"
+    }
+  }
+}

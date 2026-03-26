@@ -33128,16 +33128,22 @@ if (!document.__niwDelegatedFallback) {
 })();
 
 /* =========================================================
-   Poster Selector – own section in sidebar
+   Playlist Editor – own section in sidebar
    ========================================================= */
 (function () {
     'use strict';
 
     var psInited = false;
-    var psAllFilms = [];       // [{name, source}]
+    var psAllFilms = [];       // [{name, source, hasTrailer, trailerType}]
     var psPlaylistTitles = []; // [string]
     var psEnabled = false;
     var psPlaylistSet = new Set(); // lowercase lookup
+    var psTrailerFilter = 'all'; // 'all', 'DE-offiziell', 'DE', 'EN-offiziell', 'EN', 'none'
+
+    // Multi-playlist state
+    var psPlaylists = {};           // {id: {name, titles, createdAt, updatedAt}}
+    var psActivePlaylistId = null;  // which playlist is deployed to displays
+    var psCurrentPlaylistId = null; // which playlist is currently being edited
 
     function psEscHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     function psEscAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;'); }
@@ -33172,13 +33178,35 @@ if (!document.__niwDelegatedFallback) {
 
     async function psLoadPlaylist() {
         try {
-            var data = await psFetch('/api/poster-selector/playlist');
-            psPlaylistTitles = data.titles || [];
-            psEnabled = !!data.enabled;
+            // Load playlists collection
+            var collectionData = await psFetch('/api/poster-selector/playlists');
+            psPlaylists = collectionData.playlists || {};
+            psActivePlaylistId = collectionData.activePlaylistId || null;
+
+            // Load live enabled state
+            var liveData = await psFetch('/api/poster-selector/playlist');
+            psEnabled = !!liveData.enabled;
+
+            // If no current playlist selected, default to active or first available
+            if (!psCurrentPlaylistId || !psPlaylists[psCurrentPlaylistId]) {
+                psCurrentPlaylistId = psActivePlaylistId;
+                if (!psCurrentPlaylistId || !psPlaylists[psCurrentPlaylistId]) {
+                    var keys = Object.keys(psPlaylists);
+                    psCurrentPlaylistId = keys.length > 0 ? keys[0] : null;
+                }
+            }
+
+            // Load titles from current playlist
+            if (psCurrentPlaylistId && psPlaylists[psCurrentPlaylistId]) {
+                psPlaylistTitles = psPlaylists[psCurrentPlaylistId].titles.slice();
+            } else {
+                psPlaylistTitles = [];
+            }
+
             psPlaylistSet = new Set(psPlaylistTitles.map(function (t) { return t.toLowerCase(); }));
+            psRenderPlaylistSelector();
             psRenderPlaylist();
             psUpdateToggle();
-            // re-render available to update "in-playlist" markers
             psRenderAvailable();
         } catch (err) {
             var el = document.getElementById('ps-playlistList');
@@ -33187,16 +33215,21 @@ if (!document.__niwDelegatedFallback) {
     }
 
     // ============================================================
-    // Save playlist
+    // Save playlist (to collection via new API)
     // ============================================================
     async function psSavePlaylist() {
+        if (!psCurrentPlaylistId) return;
         try {
-            await psFetch('/api/poster-selector/playlist', {
+            await psFetch('/api/poster-selector/playlists/' + encodeURIComponent(psCurrentPlaylistId), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: psEnabled, titles: psPlaylistTitles }),
+                body: JSON.stringify({ titles: psPlaylistTitles }),
             });
-            // Notify display tabs to reload playlist immediately
+            // Update local cache
+            if (psPlaylists[psCurrentPlaylistId]) {
+                psPlaylists[psCurrentPlaylistId].titles = psPlaylistTitles.slice();
+            }
+            // Notify display tabs
             try {
                 var ch = new BroadcastChannel('posterrama-config');
                 ch.postMessage({ type: 'playlist-updated', enabled: psEnabled });
@@ -33208,8 +33241,159 @@ if (!document.__niwDelegatedFallback) {
     }
 
     // ============================================================
+    // Playlist selector rendering & actions
+    // ============================================================
+    function psRenderPlaylistSelector() {
+        var selectEl = document.getElementById('ps-playlistSelect');
+        var activateBtn = document.getElementById('ps-activateBtn');
+        var indicatorEl = document.getElementById('ps-activeIndicator');
+        if (!selectEl) return;
+
+        var ids = Object.keys(psPlaylists);
+        if (ids.length === 0) {
+            selectEl.innerHTML = '<option value="">Keine Playlists</option>';
+        } else {
+            selectEl.innerHTML = ids.map(function (id) {
+                var pl = psPlaylists[id];
+                var label = psEscHtml(pl.name) + ' (' + pl.titles.length + ')';
+                if (id === psActivePlaylistId) label += ' ★';
+                return '<option value="' + psEscAttr(id) + '"' +
+                    (id === psCurrentPlaylistId ? ' selected' : '') +
+                    '>' + label + '</option>';
+            }).join('');
+        }
+
+        // Activate button highlight
+        if (activateBtn) {
+            activateBtn.classList.toggle('is-active', psCurrentPlaylistId === psActivePlaylistId && !!psCurrentPlaylistId);
+        }
+
+        // Active indicator
+        if (indicatorEl) {
+            indicatorEl.style.display = (psCurrentPlaylistId === psActivePlaylistId && psCurrentPlaylistId) ? '' : 'none';
+        }
+    }
+
+    function psSwitchPlaylist(id) {
+        if (!psPlaylists[id]) return;
+        psCurrentPlaylistId = id;
+        psPlaylistTitles = psPlaylists[id].titles.slice();
+        psPlaylistSet = new Set(psPlaylistTitles.map(function (t) { return t.toLowerCase(); }));
+        psRenderPlaylistSelector();
+        psRenderPlaylist();
+        psRenderAvailable();
+    }
+
+    async function psActivatePlaylist(id) {
+        if (!id || !psPlaylists[id]) return;
+        try {
+            await psFetch('/api/poster-selector/playlists/' + encodeURIComponent(id) + '/activate', {
+                method: 'PUT',
+            });
+            psActivePlaylistId = id;
+            psRenderPlaylistSelector();
+            psToast('Playlist "' + psPlaylists[id].name + '" aktiviert');
+        } catch (err) {
+            psToast('Fehler: ' + err.message, 'error');
+        }
+    }
+
+    async function psCreatePlaylist() {
+        var name = prompt('Name der neuen Playlist:');
+        if (!name || !name.trim()) return;
+        name = name.trim().substring(0, 50);
+        try {
+            var data = await psFetch('/api/poster-selector/playlists', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name }),
+            });
+            psPlaylists[data.id] = data.playlist;
+            psSwitchPlaylist(data.id);
+            psToast('Playlist "' + name + '" erstellt');
+        } catch (err) {
+            psToast('Fehler: ' + err.message, 'error');
+        }
+    }
+
+    async function psDuplicatePlaylist() {
+        if (!psCurrentPlaylistId || !psPlaylists[psCurrentPlaylistId]) return;
+        var srcName = psPlaylists[psCurrentPlaylistId].name;
+        var name = prompt('Name der Kopie:', srcName + ' (Kopie)');
+        if (!name || !name.trim()) return;
+        name = name.trim().substring(0, 50);
+        try {
+            var data = await psFetch('/api/poster-selector/playlists', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, titles: psPlaylistTitles }),
+            });
+            psPlaylists[data.id] = data.playlist;
+            psSwitchPlaylist(data.id);
+            psToast('Playlist "' + name + '" erstellt');
+        } catch (err) {
+            psToast('Fehler: ' + err.message, 'error');
+        }
+    }
+
+    async function psRenamePlaylist() {
+        if (!psCurrentPlaylistId || !psPlaylists[psCurrentPlaylistId]) return;
+        var oldName = psPlaylists[psCurrentPlaylistId].name;
+        var name = prompt('Neuer Name:', oldName);
+        if (!name || !name.trim() || name.trim() === oldName) return;
+        name = name.trim().substring(0, 50);
+        try {
+            var data = await psFetch('/api/poster-selector/playlists/' + encodeURIComponent(psCurrentPlaylistId), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name }),
+            });
+            psPlaylists[psCurrentPlaylistId] = data.playlist;
+            psRenderPlaylistSelector();
+            psToast('Playlist umbenannt zu "' + name + '"');
+        } catch (err) {
+            psToast('Fehler: ' + err.message, 'error');
+        }
+    }
+
+    async function psDeletePlaylist() {
+        if (!psCurrentPlaylistId || !psPlaylists[psCurrentPlaylistId]) return;
+        var name = psPlaylists[psCurrentPlaylistId].name;
+        if (!confirm('Playlist "' + name + '" wirklich löschen?')) return;
+        try {
+            await psFetch('/api/poster-selector/playlists/' + encodeURIComponent(psCurrentPlaylistId), {
+                method: 'DELETE',
+            });
+            delete psPlaylists[psCurrentPlaylistId];
+            if (psActivePlaylistId === psCurrentPlaylistId) psActivePlaylistId = null;
+            // Switch to first remaining or null
+            var keys = Object.keys(psPlaylists);
+            psCurrentPlaylistId = keys.length > 0 ? keys[0] : null;
+            if (psCurrentPlaylistId && psPlaylists[psCurrentPlaylistId]) {
+                psPlaylistTitles = psPlaylists[psCurrentPlaylistId].titles.slice();
+            } else {
+                psPlaylistTitles = [];
+            }
+            psPlaylistSet = new Set(psPlaylistTitles.map(function (t) { return t.toLowerCase(); }));
+            psRenderPlaylistSelector();
+            psRenderPlaylist();
+            psRenderAvailable();
+            psToast('Playlist "' + name + '" gelöscht');
+        } catch (err) {
+            psToast('Fehler: ' + err.message, 'error');
+        }
+    }
+
+    // ============================================================
     // Render available films (left column)
     // ============================================================
+    function psTrailerBadgeHtml(f) {
+        if (!f.hasTrailer) return '<span class="ps-trailer-pill ps-trailer-none">Kein Trailer</span>';
+        var type = f.trailerType || 'unbekannt';
+        var cls = 'ps-trailer-' + type.toLowerCase().replace(/[^a-z]/g, '');
+        return '<span class="ps-trailer-pill ' + cls + '">' + psEscHtml(type) + '</span>';
+    }
+
     function psRenderAvailable() {
         var el = document.getElementById('ps-availableList');
         var countEl = document.getElementById('ps-availableCount');
@@ -33220,10 +33404,19 @@ if (!document.__niwDelegatedFallback) {
         var filtered = psAllFilms;
         if (filter) filtered = filtered.filter(function (f) { return f.name.toLowerCase().includes(filter); });
 
-        if (countEl) countEl.textContent = psAllFilms.length;
+        // Apply trailer type filter
+        if (psTrailerFilter !== 'all') {
+            if (psTrailerFilter === 'none') {
+                filtered = filtered.filter(function (f) { return !f.hasTrailer; });
+            } else {
+                filtered = filtered.filter(function (f) { return f.trailerType === psTrailerFilter; });
+            }
+        }
+
+        if (countEl) countEl.textContent = filtered.length + ' / ' + psAllFilms.length;
 
         if (!filtered.length) {
-            el.innerHTML = '<div class="ps-film-empty">' + (filter ? 'Keine Treffer' : 'Keine Filme gefunden') + '</div>';
+            el.innerHTML = '<div class="ps-film-empty">' + (filter || psTrailerFilter !== 'all' ? 'Keine Treffer' : 'Keine Posterpacks gefunden') + '</div>';
             return;
         }
 
@@ -33231,6 +33424,7 @@ if (!document.__niwDelegatedFallback) {
             var inPlaylist = psPlaylistSet.has(f.name.toLowerCase());
             return '<div class="ps-film-row' + (inPlaylist ? ' in-playlist' : '') + '">' +
                 '<span class="ps-film-name" title="' + psEscAttr(f.name) + '">' + psEscHtml(f.name) + '</span>' +
+                psTrailerBadgeHtml(f) +
                 '<span class="ps-film-source">' + psEscHtml(f.source) + '</span>' +
                 '<button class="ps-btn-add" data-ps-add="' + psEscAttr(f.name) + '" title="Zur Playlist hinzufügen"><i class="fas fa-plus"></i></button>' +
                 '</div>';
@@ -33248,6 +33442,11 @@ if (!document.__niwDelegatedFallback) {
         if (!el) return;
 
         if (countEl) countEl.textContent = psPlaylistTitles.length;
+
+        if (!psCurrentPlaylistId) {
+            el.innerHTML = '<div class="ps-film-empty">Keine Playlists vorhanden — erstelle eine neue</div>';
+            return;
+        }
 
         if (!psPlaylistTitles.length) {
             el.innerHTML = '<div class="ps-film-empty">Playlist ist leer</div>';
@@ -33446,6 +33645,18 @@ if (!document.__niwDelegatedFallback) {
         var filterEl = document.getElementById('ps-filter');
         if (filterEl) filterEl.addEventListener('input', psRenderAvailable);
 
+        // Trailer type filter buttons
+        var trailerFilterWrap = document.querySelector('.ps-trailer-filters');
+        if (trailerFilterWrap) trailerFilterWrap.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-ps-trailer-filter]');
+            if (!btn) return;
+            psTrailerFilter = btn.dataset.psTrailerFilter;
+            trailerFilterWrap.querySelectorAll('.ps-trailer-filter-btn').forEach(function (b) {
+                b.classList.toggle('active', b.dataset.psTrailerFilter === psTrailerFilter);
+            });
+            psRenderAvailable();
+        });
+
         // Available list — add button delegation
         var availList = document.getElementById('ps-availableList');
         if (availList) availList.addEventListener('click', function (e) {
@@ -33486,6 +33697,24 @@ if (!document.__niwDelegatedFallback) {
                 psToast('Fehler: ' + err.message, 'error');
             }
         });
+
+        // Playlist selector
+        var playlistSelect = document.getElementById('ps-playlistSelect');
+        if (playlistSelect) playlistSelect.addEventListener('change', function () {
+            if (playlistSelect.value) psSwitchPlaylist(playlistSelect.value);
+        });
+
+        // Playlist action buttons
+        var activateBtn = document.getElementById('ps-activateBtn');
+        if (activateBtn) activateBtn.addEventListener('click', function () { psActivatePlaylist(psCurrentPlaylistId); });
+        var newBtn = document.getElementById('ps-newPlaylist');
+        if (newBtn) newBtn.addEventListener('click', psCreatePlaylist);
+        var dupBtn = document.getElementById('ps-duplicatePlaylist');
+        if (dupBtn) dupBtn.addEventListener('click', psDuplicatePlaylist);
+        var renBtn = document.getElementById('ps-renamePlaylist');
+        if (renBtn) renBtn.addEventListener('click', psRenamePlaylist);
+        var delBtn = document.getElementById('ps-deletePlaylist');
+        if (delBtn) delBtn.addEventListener('click', psDeletePlaylist);
 
         // Sort buttons
         var sortAZ = document.getElementById('ps-sortAZ');

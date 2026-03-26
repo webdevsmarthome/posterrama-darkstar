@@ -229,7 +229,7 @@
       </a>
       <a href="#" class="nav-item" data-nav="operations"><i class="fas fa-screwdriver-wrench"></i><span>Operations</span></a>
       <a href="#" class="nav-item" data-nav="poster-updater"><i class="fas fa-film"></i><span>Poster Updater</span></a>
-      <a href="#" class="nav-item" data-nav="poster-selector"><i class="fas fa-th-list"></i><span>Poster Selector</span></a>
+      <a href="#" class="nav-item" data-nav="poster-selector"><i class="fas fa-th-list"></i><span>Playlist Editor</span></a>
     </nav>
   <div class="sidebar-footer"></div>
   </aside>
@@ -4084,22 +4084,7 @@
         <div class="panel-content" style="padding: 0;">
           <div class="content-grid" style="gap: 12px;">
 
-            <!-- Film List Card -->
-            <div class="ops-col">
-              <section class="perf-card" aria-label="Filmliste">
-                <h3><i class="fas fa-list"></i> Filmliste</h3>
-                <div class="pu-stats" id="pu-filmStats" style="margin-top: 12px;"></div>
-                <div style="margin: 10px 0;">
-                  <input type="text" class="pu-input" id="pu-filmFilter" placeholder="Liste filtern...">
-                </div>
-                <div class="pu-film-list" id="pu-filmList">
-                  <div class="pu-film-empty">Lade Filmliste...</div>
-                </div>
-              </section>
-
-            </div>
-
-            <!-- Right column -->
+            <!-- Left column: TMDB Suche + Downloads -->
             <div class="ops-col">
               <!-- TMDB Search Card -->
               <section class="perf-card" aria-label="TMDB Filmsuche">
@@ -4135,20 +4120,34 @@
               </section>
             </div>
 
+            <!-- Right column: Filmliste -->
+            <div class="ops-col">
+              <section class="perf-card" aria-label="Filmliste">
+                <h3><i class="fas fa-list"></i> Filmliste</h3>
+                <div class="pu-stats" id="pu-filmStats" style="margin-top: 12px;"></div>
+                <div style="margin: 10px 0;">
+                  <input type="text" class="pu-input" id="pu-filmFilter" placeholder="Liste filtern...">
+                </div>
+                <div class="pu-film-list" id="pu-filmList">
+                  <div class="pu-film-empty">Lade Filmliste...</div>
+                </div>
+              </section>
+            </div>
+
           </div>
         </div>
       </section>
 
     </section>
 
-    <!-- Poster Selector Section -->
+    <!-- Playlist Editor Section -->
     <section id="section-poster-selector" class="app-section" hidden>
       <section class="panel operations-panel" style="border: none; background: transparent; box-shadow: none;">
         <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <h2 style="margin: 0; display: flex; align-items: center;">
             <span style="display: inline-flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--color-text-primary); padding: 6px 16px; border-radius: 20px; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.3px;">
               <i class="fas fa-th-list" style="opacity: 0.8;"></i>
-              Poster Selector
+              Playlist Editor
             </span>
           </h2>
         </div>
@@ -4157,16 +4156,24 @@
 
             <!-- Left: Available Films -->
             <div class="ops-col">
-              <section class="perf-card" aria-label="Verfügbare Filme">
+              <section class="perf-card" aria-label="Verfügbare Posterpacks">
                 <h3 style="display: flex; align-items: center; gap: 8px;">
-                  <i class="fas fa-archive"></i> Verfügbare Filme
+                  <i class="fas fa-archive"></i> Verfügbare Posterpacks
                   <span class="ps-badge" id="ps-availableCount">0</span>
                 </h3>
                 <div style="margin: 12px 0 10px;">
-                  <input type="text" class="ps-input" id="ps-filter" placeholder="Filme filtern...">
+                  <input type="text" class="ps-input" id="ps-filter" placeholder="Posterpacks filtern...">
+                </div>
+                <div class="ps-trailer-filters" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;">
+                  <button class="ps-trailer-filter-btn active" data-ps-trailer-filter="all" title="Alle anzeigen">Alle</button>
+                  <button class="ps-trailer-filter-btn" data-ps-trailer-filter="DE-offiziell" title="Deutsch offiziell">DE-off.</button>
+                  <button class="ps-trailer-filter-btn" data-ps-trailer-filter="DE" title="Deutsch">DE</button>
+                  <button class="ps-trailer-filter-btn" data-ps-trailer-filter="EN-offiziell" title="Englisch offiziell">EN-off.</button>
+                  <button class="ps-trailer-filter-btn" data-ps-trailer-filter="EN" title="Englisch">EN</button>
+                  <button class="ps-trailer-filter-btn" data-ps-trailer-filter="none" title="Kein Trailer">Kein Trailer</button>
                 </div>
                 <div class="ps-available-list" id="ps-availableList">
-                  <div class="ps-film-empty">Lade Filme...</div>
+                  <div class="ps-film-empty">Lade Posterpacks...</div>
                 </div>
               </section>
             </div>
@@ -4177,7 +4184,24 @@
                 <h3 style="display: flex; align-items: center; gap: 8px;">
                   <i class="fas fa-list-ol"></i> Playlist
                   <span class="ps-badge" id="ps-playlistCount">0</span>
+                  <span class="ps-active-indicator" id="ps-activeIndicator" style="display:none;" title="Diese Playlist ist auf Displays aktiv">
+                    <i class="fas fa-broadcast-tower"></i> Aktiv
+                  </span>
                 </h3>
+                <div class="ps-playlist-bar">
+                  <div class="ps-playlist-select-row">
+                    <select class="ps-input ps-playlist-select" id="ps-playlistSelect" title="Playlist auswählen"></select>
+                    <button class="ps-btn-icon" id="ps-activateBtn" title="Diese Playlist für Displays aktivieren">
+                      <i class="fas fa-broadcast-tower"></i>
+                    </button>
+                  </div>
+                  <div class="ps-playlist-actions">
+                    <button class="ps-sort-btn" id="ps-newPlaylist" title="Neue Playlist erstellen"><i class="fas fa-plus"></i> Neu</button>
+                    <button class="ps-sort-btn" id="ps-duplicatePlaylist" title="Playlist duplizieren"><i class="fas fa-copy"></i></button>
+                    <button class="ps-sort-btn" id="ps-renamePlaylist" title="Playlist umbenennen"><i class="fas fa-pen"></i></button>
+                    <button class="ps-sort-btn ps-btn-danger" id="ps-deletePlaylist" title="Playlist löschen"><i class="fas fa-trash"></i></button>
+                  </div>
+                </div>
                 <div style="display: flex; align-items: center; justify-content: space-between; margin: 12px 0;">
                   <div class="ps-toggle-wrap">
                     <label class="ps-toggle">
