@@ -227,7 +227,13 @@
                 // Rotten Tomatoes badge/icon
                 try {
                     const allowRt = !window.IS_PREVIEW && window.appConfig?.showRottenTomatoes;
-                    const badge = ensureRtBadgeAttached();
+                    // Don't create badge element at all if RT is disabled
+                    if (!allowRt) {
+                        if (_rtBadge && _rtBadge.isConnected) {
+                            _rtBadge.remove();
+                        }
+                    }
+                    const badge = allowRt ? ensureRtBadgeAttached() : _rtBadge;
                     if (
                         allowRt &&
                         item?.rottenTomatoes &&
@@ -293,6 +299,180 @@
                 /* noop */
             }
         };
+
+        // === Trailer Playback System ===
+        // All poster timing is managed here. The normal startCycler interval is
+        // stopped as soon as showNextBackground fires. createTrailerOverlay then
+        // sets a one-shot timer for the next advance (5s+trailer+7s or 2min).
+        let trailerEl = null;
+        let trailerDelayTimer = null;
+        let trailerNextTimer = null;
+        let trailerVideoEl = null;
+        let currentTrailerKey = null;
+
+        function clearAllTrailerTimers() {
+            if (trailerDelayTimer) { clearTimeout(trailerDelayTimer); trailerDelayTimer = null; }
+            if (trailerNextTimer) { clearTimeout(trailerNextTimer); trailerNextTimer = null; }
+        }
+
+        function stopVideoElement() {
+            if (trailerVideoEl) {
+                try { trailerVideoEl.pause(); trailerVideoEl.removeAttribute('src'); trailerVideoEl.load(); } catch (_) {}
+                trailerVideoEl = null;
+            }
+        }
+
+        function removeTrailerOverlaySync() {
+            try {
+                clearAllTrailerTimers();
+                stopVideoElement();
+                if (trailerEl) {
+                    trailerEl.remove();
+                    trailerEl = null;
+                    currentTrailerKey = null;
+                }
+                document.querySelectorAll('.ss-trailer-overlay').forEach(el => el.remove());
+                try { document.body.classList.remove('ss-trailer-active'); } catch (_) {}
+            } catch (_) { /* noop */ }
+        }
+
+        function removeTrailerOverlayFade() {
+            // Fade out only — does NOT clear trailerNextTimer (caller manages that)
+            try {
+                try { document.body.classList.remove('ss-trailer-active'); } catch (_) {}
+                if (trailerVideoEl) { try { trailerVideoEl.pause(); } catch (_) {} }
+                if (trailerEl) {
+                    trailerEl.classList.remove('visible');
+                    const el = trailerEl;
+                    const vid = trailerVideoEl;
+                    trailerEl = null;
+                    trailerVideoEl = null;
+                    currentTrailerKey = null;
+                    setTimeout(() => {
+                        try { if (vid) { vid.removeAttribute('src'); vid.load(); } } catch (_) {}
+                        try { el.remove(); } catch (_) {}
+                    }, 800);
+                }
+            } catch (_) { /* noop */ }
+        }
+
+        function scheduleNextPoster(delayMs) {
+            // One-shot timer to advance to next poster
+            if (trailerNextTimer) { clearTimeout(trailerNextTimer); trailerNextTimer = null; }
+            trailerNextTimer = setTimeout(() => {
+                trailerNextTimer = null;
+                try {
+                    if (!_state.paused && !_state.isPinned) {
+                        api.showNextBackground({ forceNext: true });
+                    }
+                } catch (_) {}
+            }, delayMs);
+        }
+
+        function startTrailerPlayback(item) {
+            try {
+                const trailerUrl = item?.trailerUrl;
+                if (!trailerUrl) { scheduleNextPoster(120000); return; }
+
+                if (!trailerUrl.startsWith('/trailers/') &&
+                    !trailerUrl.startsWith('/local-posterpack?') &&
+                    !trailerUrl.match(/\.(mp4|webm|mkv)$/i)) {
+                    scheduleNextPoster(120000);
+                    return;
+                }
+
+                // Remove any existing trailer visuals (keep timers — we manage them)
+                removeTrailerOverlaySync();
+
+                // Create overlay container
+                trailerEl = document.createElement('div');
+                trailerEl.className = 'ss-trailer-overlay';
+                currentTrailerKey = 'local-' + (item.title || '');
+
+                const video = document.createElement('video');
+                video.autoplay = true;
+                video.controls = false;
+                video.muted = true;
+                video.playsInline = true;
+                video.preload = 'auto';
+                video.style.cssText = 'width:100%;height:100%;object-fit:cover;border:0;';
+                trailerVideoEl = video;
+
+                video.oncanplay = () => {
+                    try { video.play().catch(() => {}); } catch (_) {}
+                };
+
+                video.onplay = () => {
+                    try {
+                        // Hide poster, metadata, RT badge
+                        try { document.body.classList.add('ss-trailer-active'); } catch (_) {}
+                        setTimeout(() => { if (trailerEl) trailerEl.classList.add('visible'); }, 500);
+                        setTimeout(() => {
+                            try { video.muted = false; video.volume = 1.0; } catch (_) {}
+                        }, 500);
+                    } catch (_) {}
+                };
+
+                video.onended = () => {
+                    try {
+                        removeTrailerOverlayFade();
+                        scheduleNextPoster(7000);
+                    } catch (_) {}
+                };
+
+                video.onerror = () => {
+                    try {
+                        removeTrailerOverlayFade();
+                        scheduleNextPoster(120000);
+                    } catch (_) {}
+                };
+
+                trailerEl.appendChild(video);
+                document.body.appendChild(trailerEl);
+
+                // Set src AFTER element is in DOM (Safari compatibility)
+                video.src = trailerUrl;
+                video.load();
+            } catch (_) { /* noop */ }
+        }
+
+        function createTrailerOverlay(item) {
+            try {
+                // Clear everything from previous item
+                clearAllTrailerTimers();
+                removeTrailerOverlaySync();
+
+                // Stop normal cycle timer — we own all timing now
+                if (_state.cycleTimer) {
+                    clearInterval(_state.cycleTimer);
+                    _state.cycleTimer = null;
+                }
+
+                // Check if trailers are enabled in config
+                if (window.appConfig?.showTrailer === false) {
+                    scheduleNextPoster(120000);
+                    return;
+                }
+
+                const trailerUrl = item?.trailerUrl;
+                const hasLocalTrailer = trailerUrl && (
+                    trailerUrl.startsWith('/trailers/') ||
+                    trailerUrl.startsWith('/local-posterpack?') ||
+                    (trailerUrl.match && trailerUrl.match(/\.(mp4|webm|mkv)$/i))
+                );
+
+                if (hasLocalTrailer) {
+                    // Has trailer: 5s delay then play
+                    trailerDelayTimer = setTimeout(() => {
+                        trailerDelayTimer = null;
+                        startTrailerPlayback(item);
+                    }, 5000);
+                } else {
+                    // No trailer: 2 minutes then next
+                    scheduleNextPoster(120000);
+                }
+            } catch (_) { /* noop */ }
+        }
 
         // Global clock update function that can be called from anywhere
         let _clockUpdateFn = null;
@@ -656,18 +836,21 @@
                         window.__posterramaPlayback = {
                             next: () => {
                                 try {
+                                    removeTrailerOverlaySync();
                                     _state.paused = false;
                                     _state.isPinned = false;
                                     _state.pinnedMediaId = null;
                                     window.__posterramaPaused = false;
                                     hidePauseIndicator();
                                     api.showNextBackground({ forceNext: true });
+                                    api.startCycler();
                                 } catch (_) {
                                     /* noop */
                                 }
                             },
                             prev: () => {
                                 try {
+                                    removeTrailerOverlaySync();
                                     _state.paused = false;
                                     _state.isPinned = false;
                                     _state.pinnedMediaId = null;
@@ -680,6 +863,7 @@
                                         _state.idx = (_state.idx - 1 + items.length) % items.length;
                                     }
                                     api.showNextBackground({ keepIndex: true });
+                                    api.startCycler();
                                 } catch (_) {
                                     /* noop */
                                 }
@@ -699,6 +883,7 @@
                                 }
                             },
                             resume: () => {
+                                removeTrailerOverlaySync();
                                 _state.paused = false;
                                 _state.isPinned = false;
                                 _state.pinnedMediaId = null;
@@ -708,8 +893,8 @@
                                     /* noop */
                                 }
                                 hidePauseIndicator();
-                                // Note: triggerLiveBeat() removed - showNextBackground sends it
                                 api.showNextBackground({ forceNext: true });
+                                api.startCycler();
                             },
                             remoteKey: key => {
                                 try {
@@ -724,6 +909,12 @@
                                 } catch (_) {
                                     /* noop */
                                 }
+                            },
+                            refreshPlaylist: async () => {
+                                try {
+                                    // Simplest reliable approach: reload the page
+                                    window.location.reload();
+                                } catch (_) { /* noop */ }
                             },
                         };
                     } catch (_) {
@@ -853,6 +1044,12 @@
                     // Don't rotate if poster is pinned
                     if (_state.isPinned && !opts.forceNext) {
                         return;
+                    }
+
+                    // Stop the cycle timer — createTrailerOverlay will manage timing per item
+                    if (_state.cycleTimer) {
+                        clearInterval(_state.cycleTimer);
+                        _state.cycleTimer = null;
                     }
 
                     const la = document.getElementById('layer-a');
@@ -1036,6 +1233,7 @@
                                     /* noop */
                                 }
                                 updateInfo(nextItem);
+                                createTrailerOverlay(nextItem);
                                 try {
                                     api.ensureVisibility();
                                 } catch (_) {
@@ -1183,6 +1381,7 @@
                                 // Foreground: keep stable (ensure fully visible)
                                 setSceneVars({ ms: 320, xPx: 0, opacity: 1 });
                                 updateInfo(nextItem);
+                                createTrailerOverlay(nextItem);
                                 try {
                                     api.ensureVisibility();
                                 } catch (_) {

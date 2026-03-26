@@ -4075,6 +4075,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
         setIf('showMetadata', c.showMetadata !== false);
         setIf('showClearLogo', c.showClearLogo !== false);
         setIf('showRottenTomatoes', c.showRottenTomatoes === true);
+        setIf('showTrailer', c.showTrailer !== false);
         // Map 0–100 schema -> 0–10 UI (snap to .0 or .5). If value looks like 0–10 already, keep it.
         (function () {
             const raw = c.rottenTomatoesMinimumScore;
@@ -6281,6 +6282,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
             showMetadata: val('showMetadata'),
             showClearLogo: val('showClearLogo'),
             showRottenTomatoes: val('showRottenTomatoes'),
+            showTrailer: val('showTrailer'),
             // Map 0–10 UI -> 0–100 schema; snap to nearest 0.5 and clamp 0..10; tolerate already-100 scale
             rottenTomatoesMinimumScore: (function () {
                 const v = val('rottenTomatoesMinimumScore');
@@ -15689,6 +15691,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                     showMetadata: settings.showMetadata,
                     showClearLogo: settings.showClearLogo,
                     showRottenTomatoes: settings.showRottenTomatoes,
+                    showTrailer: settings.showTrailer,
                     rottenTomatoesMinimumScore: settings.rottenTomatoesMinimumScore,
                     transitionEffect: settings.transitionEffect,
                     effectPauseTime: settings.effectPauseTime,

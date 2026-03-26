@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-03-26 (basierend auf Version 3.0.1c)
+**Stand:** 2026-03-26 (basierend auf Version 3.0.1d)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 
 ---
@@ -27,6 +27,12 @@
 | 16 | Zufall-Sortierung | admin.html, admin.js | Zufall-Button (Fisher-Yates Shuffle) in der Playlist-Sortierung |
 | 17 | Film-Loeschung Playlist-Sync | routes/poster-updater.js | Beim Loeschen eines Films wird dieser automatisch aus allen Playlisten entfernt |
 | 18 | YouTube Trailer Downloader | poster-updater/download-trailers-youtube.py | Direkte YouTube-Suche fuer Trailer ohne TMDB (yt-dlp ytsearch) |
+| 19 | Screensaver Trailer | screensaver.js, screensaver.css, screensaver-bootstrap.js | Trailer-Wiedergabe im Screensaver-Modus (unten links, 21:9, 60% Breite) |
+| 20 | Screensaver Playlist | screensaver-bootstrap.js, screensaver.js | Aktive Playlist gilt auch fuer Screensaver-Modus |
+| 21 | showTrailer Toggle | config.json, admin.html, admin.js, cinema-display.js, screensaver.js | Globaler Schalter Trailer EIN/AUS in Admin Visual Elements |
+| 22 | Screensaver Layout | screensaver.css | Uhr (oben links), ClearLogo (oben rechts), Trailer (unten links) mit einheitlichem 3vh Abstand |
+| 23 | Cinema Trailer Scale | cinema-display.css | scale(1.20) statt scale(1.25) fuer gleichmaessigen 16:9→21:9 Crop |
+| 24 | RT-Badge Cleanup | screensaver.js | RT-Badge wird nicht ins DOM eingefuegt wenn Rotten Tomatoes deaktiviert |
 
 ---
 
@@ -247,7 +253,7 @@ language=de-DE statt language=en-US
 
 ### 11. `package.json`
 
-**Version:** `3.0.1c` (statt `3.0.1`)
+**Version:** `3.0.1d` (statt `3.0.1`)
 
 ---
 

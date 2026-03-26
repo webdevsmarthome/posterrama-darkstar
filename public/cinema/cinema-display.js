@@ -1291,7 +1291,10 @@
         removeTrailerOverlaySync();
 
         // Remove existing trailer if disabled or no media
-        if (!trailerConfig.enabled || !media) {
+        // Also respect global showTrailer config toggle
+        const globalTrailerOff = window.appConfig?.showTrailer === false ||
+            window.__serverConfig?.showTrailer === false;
+        if (!trailerConfig.enabled || !media || globalTrailerOff) {
             return;
         }
 

@@ -82,3 +82,64 @@ body[data-mode='screensaver'] .screensaver-layer {
     backface-visibility: hidden;
     transform: translate3d(0, 0, 0);
 }
+
+/* Nav-Controls komplett ausblenden */
+body[data-mode='screensaver'] #controls-container {
+    display: none !important;
+}
+
+/* Poster, Metadaten und RT-Badge ausblenden waehrend Trailer laeuft */
+body.ss-trailer-active #info-container {
+    opacity: 0 !important;
+    transition: opacity 0.5s ease-out;
+}
+
+/* Uhr oben links, gleicher Abstand wie Trailer unten */
+body[data-mode='screensaver'] #clock-widget-container {
+    top: 3vh !important;
+    left: 3vh !important;
+}
+
+/* ClearLogo oben rechts, gleicher Abstand */
+body[data-mode='screensaver'] #clearlogo-container {
+    top: 3vh !important;
+    right: 3vh !important;
+}
+
+/* === Trailer Overlay === */
+.ss-trailer-overlay {
+    position: fixed;
+    left: 3vh;
+    bottom: 3vh;
+    width: 60%;
+    aspect-ratio: 21 / 9;
+    z-index: 60;
+    overflow: hidden;
+    background: #000;
+    border: 0.25rem solid #000;
+    border-radius: 0.25rem;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.7),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+}
+.ss-trailer-overlay.visible {
+    opacity: 1;
+}
+.ss-trailer-overlay video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border: none;
+}
+.ss-trailer-overlay iframe {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%) scale(1.20);
+    width: 100%;
+    height: 56.25vw;
+    min-height: 100%;
+    border: none;
+    pointer-events: none;
+}

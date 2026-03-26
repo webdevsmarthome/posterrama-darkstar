@@ -2876,7 +2876,7 @@ body.cinema-poster-fullBleed .cinema-trailer-overlay {
     position: absolute;
     top: 50%;
     left: 0;
-    transform: translateY(-50%) scale(1.25); /* PATCH9b: 25% Zoom um schwarze Balken bei 21:9 abzuschneiden */
+    transform: translateY(-50%) scale(1.20); /* 16:9 zu 21:9: gleichmaessig 20% Zoom, ~10% seitlich abschneiden, keine Verzerrung */
     clip-path: none; /* PATCH-21-9: overflow:hidden des Containers schneidet 16:9→21:9 */
     /* Full width, height scales to maintain video aspect ratio */
     width: 100%;

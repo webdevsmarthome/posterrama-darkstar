@@ -167,9 +167,37 @@ async function ensureMediaQueue() {
         if (!res.ok) return false;
 
         const data = await res.json();
-        const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+        let items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
 
         if (!items.length) return false;
+
+        // Apply active playlist if enabled (same logic as cinema mode)
+        try {
+            const plRes = await fetch('/cinema-playlist.json', { cache: 'no-cache' });
+            if (plRes.ok) {
+                const pl = await plRes.json();
+                if (pl && pl.enabled === true && Array.isArray(pl.titles) && pl.titles.length > 0) {
+                    const normalize = t => String(t || '').toLowerCase().trim()
+                        .replace(/\s*\(\d{4}\)\s*$/, '')
+                        .replace(/[''`]/g, '')
+                        .replace(/[-–—]/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    const plNorm = pl.titles.map(normalize);
+                    const ordered = [];
+                    for (const t of plNorm) {
+                        const match = items.find(it =>
+                            normalize(it.title) === t || normalize(it.fileTitle) === t
+                        );
+                        if (match) ordered.push(match);
+                    }
+                    if (ordered.length > 0) {
+                        items = ordered;
+                        console.log('[Screensaver] Playlist-Modus aktiv:', ordered.length, 'Filme');
+                    }
+                }
+            }
+        } catch (_) { /* Playlist nicht vorhanden → alle Items */ }
 
         try {
             if (!Object.getOwnPropertyDescriptor(window, 'mediaQueue')) {
