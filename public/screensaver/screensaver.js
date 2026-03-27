@@ -395,7 +395,7 @@
                 video.muted = true;
                 video.playsInline = true;
                 video.preload = 'auto';
-                video.style.cssText = 'width:100%;height:100%;object-fit:cover;border:0;';
+                // No inline styles — CSS .ss-trailer-overlay video handles sizing + black border crop
                 trailerVideoEl = video;
 
                 var playAttempted = false;
@@ -729,27 +729,8 @@
                             } catch (_) {
                                 /* noop */
                             }
-                            if (e.key === 'ArrowRight') {
-                                e.preventDefault();
-                                if (typeof hidePauseIndicator === 'function') hidePauseIndicator();
-                                try {
-                                    window.__posterramaPlayback &&
-                                        window.__posterramaPlayback.next &&
-                                        window.__posterramaPlayback.next();
-                                } catch (_) {
-                                    /* noop */
-                                }
-                            } else if (e.key === 'ArrowLeft') {
-                                e.preventDefault();
-                                if (typeof hidePauseIndicator === 'function') hidePauseIndicator();
-                                try {
-                                    window.__posterramaPlayback &&
-                                        window.__posterramaPlayback.prev &&
-                                        window.__posterramaPlayback.prev();
-                                } catch (_) {
-                                    /* noop */
-                                }
-                            } else if (
+                            // Keyboard handling delegated to D-pad handler below
+                            if (
                                 e.key === ' ' ||
                                 e.key === 'Enter' ||
                                 e.key === 'MediaPlayPause'
@@ -870,7 +851,6 @@
                                     window.__posterramaPaused = false;
                                     hidePauseIndicator();
                                     api.showNextBackground({ forceNext: true });
-                                    api.startCycler();
                                 } catch (_) {
                                     /* noop */
                                 }
@@ -890,7 +870,6 @@
                                         _state.idx = (_state.idx - 1 + items.length) % items.length;
                                     }
                                     api.showNextBackground({ keepIndex: true });
-                                    api.startCycler();
                                 } catch (_) {
                                     /* noop */
                                 }
@@ -921,7 +900,6 @@
                                 }
                                 hidePauseIndicator();
                                 api.showNextBackground({ forceNext: true });
-                                api.startCycler();
                             },
                             remoteKey: key => {
                                 try {
@@ -981,6 +959,28 @@
                     } catch (_) {
                         /* noop */
                     }
+
+                    // === Playlist change polling (cross-device, no WebSocket needed) ===
+                    try {
+                        let _ssLastPlaylistHash = null;
+                        async function ssCheckPlaylistChange() {
+                            try {
+                                const res = await fetch('/cinema-playlist.json', { cache: 'no-cache' });
+                                if (!res.ok) return;
+                                const text = await res.text();
+                                const hash = text.length + '-' + text.substring(0, 100);
+                                if (_ssLastPlaylistHash === null) { _ssLastPlaylistHash = hash; return; }
+                                if (hash !== _ssLastPlaylistHash) {
+                                    _ssLastPlaylistHash = hash;
+                                    if (window.__posterramaPlayback && window.__posterramaPlayback.refreshPlaylist) {
+                                        window.__posterramaPlayback.refreshPlaylist();
+                                    }
+                                }
+                            } catch (_) {}
+                        }
+                        setInterval(ssCheckPlaylistChange, 5000);
+                        ssCheckPlaylistChange();
+                    } catch (_) { /* noop */ }
 
                     // === D-pad / Remote Control Keyboard Handler ===
                     try {
@@ -1328,6 +1328,7 @@
                                 setTimeout(() => {
                                     try {
                                         updateInfo(nextItem);
+                                        createTrailerOverlay(nextItem);
                                         api.ensureVisibility();
                                     } catch (_) {
                                         /* noop */
@@ -1367,6 +1368,7 @@
                                 setTimeout(() => {
                                     try {
                                         updateInfo(nextItem);
+                                        createTrailerOverlay(nextItem);
                                         api.ensureVisibility();
                                     } catch (_) {
                                         /* noop */

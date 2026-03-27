@@ -40,6 +40,9 @@ module.exports = function createPosterSelectorRouter({ logger, wsHub }) {
         try {
             if (wsHub && typeof wsHub.broadcast === 'function') {
                 wsHub.broadcast({ kind: 'command', type: 'playlist.refresh' });
+                logger.info('poster-selector: Broadcast playlist.refresh sent');
+            } else {
+                logger.warn('poster-selector: wsHub not available for broadcast');
             }
         } catch (err) {
             logger.warn('poster-selector: Failed to broadcast playlist refresh:', err.message);

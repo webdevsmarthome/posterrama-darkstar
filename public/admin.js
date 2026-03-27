@@ -33407,6 +33407,12 @@ if (!document.__niwDelegatedFallback) {
             psActivePlaylistId = id;
             psRenderPlaylistSelector();
             psToast('Playlist "' + psPlaylists[id].name + '" aktiviert');
+            // Notify display tabs in same browser via BroadcastChannel
+            try {
+                var ch = new BroadcastChannel('posterrama-config');
+                ch.postMessage({ type: 'playlist-updated', enabled: psEnabled });
+                ch.close();
+            } catch (_) { /* BroadcastChannel not supported */ }
         } catch (err) {
             psToast('Fehler: ' + err.message, 'error');
         }
@@ -33683,7 +33689,11 @@ if (!document.__niwDelegatedFallback) {
         if (psPlaylistSet.has(name.toLowerCase())) return;
         psPlaylistTitles.push(name);
         psPlaylistSet.add(name.toLowerCase());
+        if (psCurrentPlaylistId && psPlaylists[psCurrentPlaylistId]) {
+            psPlaylists[psCurrentPlaylistId].titles = psPlaylistTitles.slice();
+        }
         psRenderPlaylist();
+        psRenderPlaylistSelector();
         psRenderAvailable();
         psSavePlaylist();
     }
@@ -33691,7 +33701,11 @@ if (!document.__niwDelegatedFallback) {
     function psRemoveFilm(idx) {
         var removed = psPlaylistTitles.splice(idx, 1);
         if (removed.length) psPlaylistSet.delete(removed[0].toLowerCase());
+        if (psCurrentPlaylistId && psPlaylists[psCurrentPlaylistId]) {
+            psPlaylists[psCurrentPlaylistId].titles = psPlaylistTitles.slice();
+        }
         psRenderPlaylist();
+        psRenderPlaylistSelector();
         psRenderAvailable();
         psSavePlaylist();
     }

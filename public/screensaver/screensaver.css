@@ -94,10 +94,10 @@ body.ss-trailer-active #info-container {
     transition: opacity 0.5s ease-out;
 }
 
-/* Uhr oben links, gleicher Abstand wie Trailer unten */
+/* Uhr oben links */
 body[data-mode='screensaver'] #clock-widget-container {
     top: 3vh !important;
-    left: 3vh !important;
+    left: 5vh !important;
 }
 
 /* ClearLogo oben rechts, gleicher Abstand */
@@ -127,9 +127,10 @@ body[data-mode='screensaver'] #clearlogo-container {
     opacity: 1;
 }
 .ss-trailer-overlay video {
-    width: 100%;
-    height: 100%;
+    width: calc(100% + 16px);
+    height: calc(100% + 16px);
     object-fit: cover;
+    margin: -8px;
     border: none;
 }
 .ss-trailer-overlay iframe {

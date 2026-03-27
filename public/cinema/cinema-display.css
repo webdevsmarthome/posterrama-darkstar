@@ -2841,16 +2841,15 @@ body.cinema-metadata-overlay .cinema-metadata-panel {
     left: 50%;
     transform: translateX(-50%);
     /* Position at bottom of poster area */
-    bottom: calc(var(--poster-bottom, 0px) + var(--cinema-frame-width, 8px) + 10px);
+    bottom: calc(var(--poster-bottom, 0px) + var(--cinema-frame-width, 8px) + 20px);
     /* Width will be set by JavaScript for floating/fullBleed styles */
-    width: calc(var(--poster-width, 400px) * 0.85);
+    width: calc(var(--poster-width, 400px) * 0.90);
     /* 21:9 cinematic aspect ratio for video (PATCH-21-9) */
-    aspect-ratio: 21 / 9;
-    /* No max-height - let aspect-ratio control the height based on width */
+    aspect-ratio: 21 / 8.7;
+    /* Leicht flacher als 21:9 um schwarzen Rand unten am Video abzuschneiden */
     z-index: 50;
     overflow: hidden;
     background: #000;
-    /* Elegant frame matching cinema style */
     border: 0.25rem solid #000000;
     border-radius: 0.1875rem;
     box-shadow:
@@ -2876,7 +2875,7 @@ body.cinema-poster-fullBleed .cinema-trailer-overlay {
     position: absolute;
     top: 50%;
     left: 0;
-    transform: translateY(-50%) scale(1.20); /* 16:9 zu 21:9: gleichmaessig 20% Zoom, ~10% seitlich abschneiden, keine Verzerrung */
+    transform: translateY(-50%) scale(1.20);
     clip-path: none; /* PATCH-21-9: overflow:hidden des Containers schneidet 16:9→21:9 */
     /* Full width, height scales to maintain video aspect ratio */
     width: 100%;

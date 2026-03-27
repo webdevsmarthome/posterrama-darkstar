@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-03-27 (basierend auf Version 3.0.1g)
+**Stand:** 2026-03-27 (basierend auf Version 3.0.1h)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 
 ---
@@ -45,6 +45,15 @@
 | 34 | Filmliste Hoehe | admin.css | Filmliste max-height auf 562px angepasst |
 | 35 | TMDB Clearlogo Fetcher | poster-updater/fetch-clearlogos.py | Laedt fehlende Clearlogos von TMDB und fuegt sie in bestehende ZIPs ein |
 | 36 | TMDB Backdrop Fetcher | poster-updater/fetch-backdrops.py | Laedt fehlende Backgrounds von TMDB und fuegt sie in bestehende ZIPs ein |
+| 37 | Cinema Trailer Loop-Fix | cinema-display.js | 1-Loop Autohide prueft VOR Video-Neustart, nicht danach (kein doppeltes Abspielen) |
+| 38 | Cinema Trailer Crop | cinema-display.js, cinema-display.css | Video +16px/-8px Oversize um schwarze Raender abzuschneiden, Rahmen beibehalten |
+| 39 | Cinema Trailer Layout | cinema-display.css | Breite 0.90, Abstand 20px, aspect-ratio 21/8.7 |
+| 40 | Playlist Polling | cinema-display.js, screensaver.js | Playlist-Aenderung per 5s Polling statt WebSocket/BroadcastChannel (cross-device) |
+| 41 | Playlist Activate Broadcast | admin.js | BroadcastChannel-Notify bei Playlist-Aktivierung (same-browser Fallback) |
+| 42 | Playlist Count Update | admin.js | Dropdown-Zaehler aktualisiert bei Add/Remove Film |
+| 43 | Screensaver Trailer Fixes | screensaver.js, screensaver.css | Autoplay triple-fallback, Video-Crop, Duplicate-Keyhandler entfernt, alle 4 Transition-Pfade mit Trailer |
+| 44 | Screensaver startCycler Fix | screensaver.js | startCycler() aus next/prev/resume entfernt — createTrailerOverlay verwaltet Timer allein |
+| 45 | Broadcast Debug Logging | routes/poster-selector.js | Logging fuer playlist.refresh Broadcast (Diagnose) |
 
 ---
 
@@ -269,7 +278,7 @@ language=de-DE statt language=en-US
 
 ### 11. `package.json`
 
-**Version:** `3.0.1g` (statt `3.0.1`)
+**Version:** `3.0.1h` (statt `3.0.1`)
 
 ---
 

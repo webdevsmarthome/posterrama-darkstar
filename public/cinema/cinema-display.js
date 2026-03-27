@@ -1461,7 +1461,7 @@
             video.controls = false;
             video.muted = true; // PATCH-AUTOPLAY: stumm starten
             video.playsInline = true;
-            video.style.cssText = 'width:100%;height:100%;object-fit:cover;border:0;';
+            video.style.cssText = 'width:calc(100% + 16px);height:calc(100% + 16px);object-fit:cover;margin:-8px;border:0;';
 
             video.onplay = () => {
                 // Overlay einblenden wenn Video laeuft
@@ -1475,9 +1475,18 @@
             const shouldLoop = trailerConfig.loop === true;
             video.onended = () => {
                 if (shouldLoop && !trailerHidden) {
-                    video.currentTime = 0;
-                    video.play().catch(() => {});
-                    handleTrailerLoopEnd(trailerConfig);
+                    // Check BEFORE restarting if we should stop
+                    trailerLoopCount++;
+                    const autohide = trailerConfig.autohide || 'never';
+                    const loopMatch = autohide.match(/^(\d+)loops?$/);
+                    if (loopMatch && trailerLoopCount >= parseInt(loopMatch[1], 10)) {
+                        // Loop limit reached — don't restart, remove and advance
+                        removeTrailerOverlay();
+                        setTimeout(() => { showNextPoster(); startRotation(); }, 7000);
+                    } else {
+                        video.currentTime = 0;
+                        video.play().catch(() => {});
+                    }
                 } else {
                     removeTrailerOverlay();
                     setTimeout(() => { showNextPoster(); startRotation(); }, 7000); // PATCH-TIMING
@@ -4138,7 +4147,36 @@
         }
     }
 
-    // PATCH: Listen for playlist changes from admin Poster Selector
+    // PATCH: Listen for playlist changes — BroadcastChannel (same browser) + polling (cross-device)
+    let _lastPlaylistHash = null;
+    async function checkPlaylistChange() {
+        try {
+            const res = await fetch('/cinema-playlist.json', { cache: 'no-cache' });
+            if (!res.ok) return;
+            const text = await res.text();
+            const hash = text.length + '-' + text.substring(0, 100);
+            if (_lastPlaylistHash === null) {
+                _lastPlaylistHash = hash;
+                return;
+            }
+            if (hash !== _lastPlaylistHash) {
+                _lastPlaylistHash = hash;
+                log('Playlist change detected via polling');
+                mediaQueue = await fetchMediaQueue();
+                if (mediaQueue.length > 0) {
+                    currentMediaIndex = 0;
+                    isFirstPoster = false;
+                    updateCinemaDisplay(mediaQueue[0]);
+                    log('Playlist switched — showing first item', { title: mediaQueue[0]?.title });
+                }
+            }
+        } catch (_) {}
+    }
+    // Poll every 5 seconds for playlist changes
+    setInterval(checkPlaylistChange, 5000);
+    // Initial hash capture
+    checkPlaylistChange();
+
     try {
         if (typeof BroadcastChannel !== 'undefined') {
             const playlistChannel = new BroadcastChannel('posterrama-config');
@@ -4146,6 +4184,7 @@
                 try {
                     if (event.data && event.data.type === 'playlist-updated') {
                         log('Playlist update received via BroadcastChannel', { enabled: event.data.enabled });
+                        _lastPlaylistHash = null; // Reset so polling doesn't double-trigger
                         mediaQueue = await fetchMediaQueue();
                         if (mediaQueue.length > 0) {
                             currentMediaIndex = 0;
