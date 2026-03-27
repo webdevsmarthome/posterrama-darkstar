@@ -4003,6 +4003,10 @@ app.use('/trailers', express.static(path.join(__dirname, 'media', 'trailers'), {
 const createPosterSelectorRouter = require('./routes/poster-selector');
 app.use('/api/poster-selector', isAuthenticated, createPosterSelectorRouter({ logger, wsHub }));
 
+// === POSTERPACK CREATOR ROUTES ===
+const createPosterpackCreatorRouter = require('./routes/posterpack-creator');
+app.use('/api/posterpack-creator', isAuthenticated, createPosterpackCreatorRouter({ logger, refreshPlaylistCache }));
+
 // --- Device bypass status endpoint (public) ---
 // Lightweight probe so clients can quickly decide to skip device management boot sequence.
 

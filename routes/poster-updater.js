@@ -10,6 +10,8 @@ const FILMLISTE_PATH = path.join(__dirname, '..', 'poster-updater', 'filmliste.t
 const SCRIPT_PATH = path.join(__dirname, '..', 'poster-updater', 'tmdb-get-posters-direct.py');
 const SCRIPT_DIR = path.dirname(SCRIPT_PATH);
 const OUTPUT_DIR = path.join(__dirname, '..', 'media', 'complete', 'tmdb-export');
+const TRAILER_DIR = path.join(__dirname, '..', 'media', 'trailers');
+const TRAILER_INFO_PATH = path.join(TRAILER_DIR, 'trailer-info.json');
 
 module.exports = function createPosterUpdaterRouter({ logger }) {
     const router = express.Router();
@@ -68,18 +70,55 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
     }
 
     // ============================================================
-    // GET /films — list all films with ZIP status
+    // --- Trailer helpers ---
+    function trailerFileExists(name) {
+        const trailerPath = path.join(TRAILER_DIR, `${name}-trailer.mp4`);
+        if (fs.existsSync(trailerPath)) return true;
+        // NFD/NFC fallback
+        try {
+            const nameNFC = `${name}-trailer.mp4`.normalize('NFC');
+            return fs.readdirSync(TRAILER_DIR).some(e => e.normalize('NFC') === nameNFC);
+        } catch { return false; }
+    }
+
+    function readTrailerInfo() {
+        try {
+            return JSON.parse(fs.readFileSync(TRAILER_INFO_PATH, 'utf8'));
+        } catch { return {}; }
+    }
+
+    function trailerInfoLookup(info, name) {
+        if (info[name]) return info[name];
+        const nameNFC = name.normalize('NFC');
+        for (const [k, v] of Object.entries(info)) {
+            if (k.normalize('NFC') === nameNFC) return v;
+        }
+        return null;
+    }
+
+    // GET /films — list all films with ZIP and trailer status
     // ============================================================
     router.get('/films', async (req, res) => {
         try {
             const [films, zips] = await Promise.all([readFilmList(), getExistingZips()]);
-            const result = films.map(name => ({ name, hasZip: zips.has(name) }));
+            const trailerInfo = readTrailerInfo();
+            const result = films.map(name => {
+                const hasTrailer = trailerFileExists(name);
+                return {
+                    name,
+                    hasZip: zips.has(name),
+                    hasTrailer,
+                    trailerType: hasTrailer ? (trailerInfoLookup(trailerInfo, name) || 'unbekannt') : null,
+                };
+            });
             const withZip = result.filter(f => f.hasZip).length;
+            const withTrailer = result.filter(f => f.hasTrailer).length;
             res.json({
                 films: result,
                 total: result.length,
                 withZip,
                 pending: result.length - withZip,
+                withTrailer,
             });
         } catch (err) {
             logger.error('poster-updater: Failed to read film list:', err.message);

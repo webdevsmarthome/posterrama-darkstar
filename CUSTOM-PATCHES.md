@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-03-26 (basierend auf Version 3.0.1d)
+**Stand:** 2026-03-27 (basierend auf Version 3.0.1e)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 
 ---
@@ -33,6 +33,13 @@
 | 22 | Screensaver Layout | screensaver.css | Uhr (oben links), ClearLogo (oben rechts), Trailer (unten links) mit einheitlichem 3vh Abstand |
 | 23 | Cinema Trailer Scale | cinema-display.css | scale(1.20) statt scale(1.25) fuer gleichmaessigen 16:9→21:9 Crop |
 | 24 | RT-Badge Cleanup | screensaver.js | RT-Badge wird nicht ins DOM eingefuegt wenn Rotten Tomatoes deaktiviert |
+| 25 | Posterpack Creator | routes/posterpack-creator.js, admin.html, admin.js, admin.css, server.js | Eigener Menuepunkt: Formular fuer Titel/Jahr/Poster/Background/Trailer → ZIP erstellen |
+| 26 | Poster Updater Trailer-Status | routes/poster-updater.js, admin.js | Trailer-Badges + Filter im Poster Updater (wie Playlist Editor) |
+| 27 | Eigene Posterpacks Upload | admin.html, admin.js, admin.css | Drag & Drop ZIP-Upload im Poster Updater |
+| 28 | Konfig. Trailer-Timings | config.json, admin.html, admin.js, screensaver.js | trailerDelaySeconds, trailerPauseAfterSeconds, noTrailerDisplaySeconds konfigurierbar |
+| 29 | Screensaver Playlist nahtlos | screensaver.js | Playlist-Wechsel ohne Page-Reload (inline Media-Queue Refresh) |
+| 30 | dotenv-Bereinigung | download-trailers.py, scan-trailer-types.py, tmdb-get-posters-direct.py | Alle Python-Scripts lesen config.json statt .env |
+| 31 | .gitignore Erweiterung | .gitignore | filmliste.txt, .env, Patch/Backup-Artifacts ignoriert |
 
 ---
 
@@ -72,6 +79,10 @@ Speichert Trailer-Typ in `trailer-info.json`. Ausfuehren: `cd poster-updater && 
 
 ### `public/cinema-playlists.json`
 Sammlung aller benannten Playlisten. Wird automatisch beim ersten Aufruf aus `cinema-playlist.json` migriert.
+
+### `routes/posterpack-creator.js`
+Posterpack Creator Backend — Multipart-Upload (multer), ZIP-Erstellung (JSZip), Trailer-Handling.
+Endpoint: `POST /api/posterpack-creator/create`
 
 ---
 
@@ -253,7 +264,7 @@ language=de-DE statt language=en-US
 
 ### 11. `package.json`
 
-**Version:** `3.0.1d` (statt `3.0.1`)
+**Version:** `3.0.1e` (statt `3.0.1`)
 
 ---
 

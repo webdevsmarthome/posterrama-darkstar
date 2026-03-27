@@ -19953,6 +19953,61 @@ body.profile-edit-mode #section-display .section-header h2 span {
     background: var(--color-warning); animation: pulse 1.5s infinite;
 }
 
+/* --- Dropzone --- */
+.pu-dropzone {
+    margin-top: 12px; padding: 24px; border: 2px dashed var(--color-border-light);
+    border-radius: 8px; text-align: center; cursor: pointer;
+    transition: all 0.2s; background: var(--color-bg-primary);
+}
+.pu-dropzone:hover, .pu-dropzone.dragover {
+    border-color: var(--color-secondary); background: rgba(99, 102, 241, 0.06);
+}
+.pu-dropzone-content i {
+    font-size: 2rem; color: var(--color-text-muted); margin-bottom: 8px; display: block;
+}
+.pu-dropzone-content p { margin: 4px 0; font-size: 13px; color: var(--color-text-muted); }
+.pu-dropzone-hint { font-size: 11px !important; opacity: 0.6; }
+.pu-upload-status {
+    margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 12px;
+}
+.pu-upload-status.uploading { background: rgba(224,175,104,0.12); color: var(--color-warning); }
+.pu-upload-status.success { background: rgba(158,206,106,0.12); color: var(--color-success); }
+.pu-upload-status.error { background: rgba(247,118,142,0.12); color: var(--color-error); }
+
+/* ================================================
+   Posterpack Creator
+   ================================================ */
+.pc-form { display: flex; flex-direction: column; gap: 10px; }
+.pc-field { display: flex; flex-direction: column; gap: 4px; }
+.pc-field label { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); }
+.pc-mandatory { color: var(--color-error); }
+.pc-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pc-upload-field { display: flex; flex-direction: column; gap: 4px; }
+.pc-upload-field label { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); }
+.pc-file-btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+    background: var(--color-bg-primary); border: 1px solid var(--color-border-light);
+    border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.15s;
+    color: var(--color-text-muted);
+}
+.pc-file-btn:hover { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
+.pc-file-name { font-size: 11px; color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-upload-row { display: flex; gap: 12px; align-items: flex-start; }
+.pc-upload-row .pc-upload-field { flex: 1; }
+.pc-poster-preview {
+    width: 80px; height: 120px; border-radius: 4px; overflow: hidden;
+    background: var(--color-bg-primary); border: 1px solid var(--color-border-light);
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+}
+.pc-poster-preview img { width: 100%; height: 100%; object-fit: cover; }
+.pc-poster-preview:empty::after {
+    content: 'Vorschau'; font-size: 10px; color: var(--color-text-muted); opacity: 0.5;
+}
+.pc-status { padding: 8px 12px; border-radius: 6px; font-size: 12px; }
+.pc-status.creating { background: rgba(224,175,104,0.12); color: var(--color-warning); }
+.pc-status.success { background: rgba(158,206,106,0.12); color: var(--color-success); }
+.pc-status.error { background: rgba(247,118,142,0.12); color: var(--color-error); }
+
 /* --- Delete modal --- */
 .pu-modal-overlay {
     position: fixed; inset: 0; z-index: 200;

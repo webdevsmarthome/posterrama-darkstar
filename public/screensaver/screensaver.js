@@ -415,15 +415,17 @@
 
                 video.onended = () => {
                     try {
+                        const pauseMs = (Number((window.appConfig || {}).trailerPauseAfterSeconds) || 7) * 1000;
                         removeTrailerOverlayFade();
-                        scheduleNextPoster(7000);
+                        scheduleNextPoster(pauseMs);
                     } catch (_) {}
                 };
 
                 video.onerror = () => {
                     try {
+                        const noTrailerMs = (Number((window.appConfig || {}).noTrailerDisplaySeconds) || 120) * 1000;
                         removeTrailerOverlayFade();
-                        scheduleNextPoster(120000);
+                        scheduleNextPoster(noTrailerMs);
                     } catch (_) {}
                 };
 
@@ -448,9 +450,14 @@
                     _state.cycleTimer = null;
                 }
 
+                // Read configurable timings
+                const cfg = window.appConfig || {};
+                const delayMs = (Number(cfg.trailerDelaySeconds) || 5) * 1000;
+                const noTrailerMs = (Number(cfg.noTrailerDisplaySeconds) || 120) * 1000;
+
                 // Check if trailers are enabled in config
-                if (window.appConfig?.showTrailer === false) {
-                    scheduleNextPoster(120000);
+                if (cfg.showTrailer === false) {
+                    scheduleNextPoster(noTrailerMs);
                     return;
                 }
 
@@ -462,14 +469,12 @@
                 );
 
                 if (hasLocalTrailer) {
-                    // Has trailer: 5s delay then play
                     trailerDelayTimer = setTimeout(() => {
                         trailerDelayTimer = null;
                         startTrailerPlayback(item);
-                    }, 5000);
+                    }, delayMs);
                 } else {
-                    // No trailer: 2 minutes then next
-                    scheduleNextPoster(120000);
+                    scheduleNextPoster(noTrailerMs);
                 }
             } catch (_) { /* noop */ }
         }
@@ -912,8 +917,42 @@
                             },
                             refreshPlaylist: async () => {
                                 try {
-                                    // Simplest reliable approach: reload the page
-                                    window.location.reload();
+                                    // Fetch fresh media + apply playlist inline (no reload)
+                                    const type = (window.appConfig && window.appConfig.type) || 'movies';
+                                    const baseUrl = window.location.origin;
+                                    let url = `${baseUrl}/get-media?count=12&type=${encodeURIComponent(type)}&nocache=1&cb=${Date.now()}&excludeGames=1`;
+                                    const res = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+                                    if (!res.ok) return;
+                                    const data = await res.json();
+                                    let items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+                                    if (!items.length) return;
+                                    // Apply playlist
+                                    try {
+                                        const plRes = await fetch('/cinema-playlist.json', { cache: 'no-cache' });
+                                        if (plRes.ok) {
+                                            const pl = await plRes.json();
+                                            if (pl && pl.enabled === true && Array.isArray(pl.titles) && pl.titles.length > 0) {
+                                                const normalize = t => String(t || '').toLowerCase().trim()
+                                                    .replace(/\s*\(\d{4}\)\s*$/, '').replace(/[''`]/g, '')
+                                                    .replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+                                                const plNorm = pl.titles.map(normalize);
+                                                const ordered = [];
+                                                for (const t of plNorm) {
+                                                    const match = items.find(it =>
+                                                        normalize(it.title) === t || normalize(it.fileTitle) === t
+                                                    );
+                                                    if (match) ordered.push(match);
+                                                }
+                                                if (ordered.length > 0) items = ordered;
+                                            }
+                                        }
+                                    } catch (_) {}
+                                    // Update queue and restart display
+                                    window.mediaQueue = items;
+                                    _state.idx = -1;
+                                    _state.order = null;
+                                    removeTrailerOverlaySync();
+                                    api.showNextBackground({ forceNext: true });
                                 } catch (_) { /* noop */ }
                             },
                         };

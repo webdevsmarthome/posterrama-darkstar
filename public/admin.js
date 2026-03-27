@@ -3621,6 +3621,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                 'section-operations': 'operations',
                 'section-poster-updater': 'poster-updater',
                 'section-poster-selector': 'poster-selector',
+                'section-posterpack-creator': 'posterpack-creator',
             };
             const key = map[sectionId];
             const all = document.querySelectorAll('.sidebar-nav .nav-item');
@@ -3700,6 +3701,8 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                 pageHeader.style.display = 'none';
             } else if (id === 'section-poster-selector') {
                 // Hide the big page header for Poster Selector (compact panel)
+                pageHeader.style.display = 'none';
+            } else if (id === 'section-posterpack-creator') {
                 pageHeader.style.display = 'none';
             } else {
                 // Default (Dashboard and any other sections using the big header)
@@ -4076,6 +4079,9 @@ window.COLOR_PRESETS = COLOR_PRESETS;
         setIf('showClearLogo', c.showClearLogo !== false);
         setIf('showRottenTomatoes', c.showRottenTomatoes === true);
         setIf('showTrailer', c.showTrailer !== false);
+        setIf('trailerDelaySeconds', c.trailerDelaySeconds ?? 5);
+        setIf('trailerPauseAfterSeconds', c.trailerPauseAfterSeconds ?? 7);
+        setIf('noTrailerDisplaySeconds', c.noTrailerDisplaySeconds ?? 120);
         // Map 0–100 schema -> 0–10 UI (snap to .0 or .5). If value looks like 0–10 already, keep it.
         (function () {
             const raw = c.rottenTomatoesMinimumScore;
@@ -6283,6 +6289,9 @@ window.COLOR_PRESETS = COLOR_PRESETS;
             showClearLogo: val('showClearLogo'),
             showRottenTomatoes: val('showRottenTomatoes'),
             showTrailer: val('showTrailer'),
+            trailerDelaySeconds: Number(val('trailerDelaySeconds')) || 5,
+            trailerPauseAfterSeconds: Number(val('trailerPauseAfterSeconds')) || 7,
+            noTrailerDisplaySeconds: Number(val('noTrailerDisplaySeconds')) || 120,
             // Map 0–10 UI -> 0–100 schema; snap to nearest 0.5 and clamp 0..10; tolerate already-100 scale
             rottenTomatoesMinimumScore: (function () {
                 const v = val('rottenTomatoesMinimumScore');
@@ -11056,6 +11065,8 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                     showSection('section-poster-updater');
                 } else if (nav === 'poster-selector') {
                     showSection('section-poster-selector');
+                } else if (nav === 'posterpack-creator') {
+                    showSection('section-posterpack-creator');
                 } else if (nav === 'media-sources') {
                     // Always land on Plex tab by default
                     showSection('section-media-sources');
@@ -15692,6 +15703,9 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                     showClearLogo: settings.showClearLogo,
                     showRottenTomatoes: settings.showRottenTomatoes,
                     showTrailer: settings.showTrailer,
+                    trailerDelaySeconds: settings.trailerDelaySeconds,
+                    trailerPauseAfterSeconds: settings.trailerPauseAfterSeconds,
+                    noTrailerDisplaySeconds: settings.noTrailerDisplaySeconds,
                     rottenTomatoesMinimumScore: settings.rottenTomatoesMinimumScore,
                     transitionEffect: settings.transitionEffect,
                     effectPauseTime: settings.effectPauseTime,
@@ -32679,7 +32693,9 @@ if (!document.__niwDelegatedFallback) {
         el.innerHTML =
             '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'all' ? 'active' : '') + '" data-filter="all"><span class="dot dot-total"></span> ' + data.total + ' Filme</button>' +
             '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'zip' ? 'active' : '') + '" data-filter="zip"><span class="dot dot-green"></span> ' + data.withZip + ' mit ZIP</button>' +
-            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'pending' ? 'active' : '') + '" data-filter="pending"><span class="dot dot-orange"></span> ' + data.pending + ' ausstehend</button>';
+            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'pending' ? 'active' : '') + '" data-filter="pending"><span class="dot dot-orange"></span> ' + data.pending + ' ausstehend</button>' +
+            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'trailer' ? 'active' : '') + '" data-filter="trailer"><span class="dot dot-green"></span> ' + (data.withTrailer || 0) + ' Trailer</button>' +
+            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'notrailer' ? 'active' : '') + '" data-filter="notrailer"><span class="dot dot-orange"></span> ' + (data.total - (data.withTrailer || 0)) + ' ohne Trailer</button>';
     }
 
     function puRenderFilmList() {
@@ -32690,19 +32706,30 @@ if (!document.__niwDelegatedFallback) {
         let filtered = puFilmData;
         if (puActiveStatusFilter === 'zip') filtered = filtered.filter(f => f.hasZip);
         else if (puActiveStatusFilter === 'pending') filtered = filtered.filter(f => !f.hasZip);
+        else if (puActiveStatusFilter === 'trailer') filtered = filtered.filter(f => f.hasTrailer);
+        else if (puActiveStatusFilter === 'notrailer') filtered = filtered.filter(f => !f.hasTrailer);
         if (filter) filtered = filtered.filter(f => f.name.toLowerCase().includes(filter));
 
         if (!filtered.length) {
             el.innerHTML = '<div class="pu-film-empty">' + (filter ? 'Keine Treffer' : 'Liste ist leer') + '</div>';
             return;
         }
-        el.innerHTML = filtered.map(f =>
-            '<div class="pu-film-row">' +
-            '<span class="pu-film-dot ' + (f.hasZip ? 'has-zip' : 'pending') + '" title="' + (f.hasZip ? 'ZIP vorhanden' : 'Ausstehend') + '"></span>' +
-            '<span class="pu-film-name">' + puEscHtml(f.name) + '</span>' +
-            '<button class="pu-btn-delete" data-pu-delete="' + puEscAttr(f.name) + '" title="Entfernen"><i class="fas fa-trash-alt"></i></button>' +
-            '</div>'
-        ).join('');
+        el.innerHTML = filtered.map(f => {
+            var trailerBadge = '';
+            if (f.hasTrailer) {
+                var type = f.trailerType || 'unbekannt';
+                var cls = 'ps-trailer-' + type.toLowerCase().replace(/[^a-z]/g, '');
+                trailerBadge = '<span class="ps-trailer-pill ' + cls + '">' + puEscHtml(type) + '</span>';
+            } else {
+                trailerBadge = '<span class="ps-trailer-pill ps-trailer-none">Kein Trailer</span>';
+            }
+            return '<div class="pu-film-row">' +
+                '<span class="pu-film-dot ' + (f.hasZip ? 'has-zip' : 'pending') + '" title="' + (f.hasZip ? 'ZIP vorhanden' : 'Ausstehend') + '"></span>' +
+                '<span class="pu-film-name">' + puEscHtml(f.name) + '</span>' +
+                trailerBadge +
+                '<button class="pu-btn-delete" data-pu-delete="' + puEscAttr(f.name) + '" title="Entfernen"><i class="fas fa-trash-alt"></i></button>' +
+                '</div>';
+        }).join('');
     }
 
     // ============================================================
@@ -33077,6 +33104,82 @@ if (!document.__niwDelegatedFallback) {
                 puToast(err.message, 'error');
             }
         });
+
+        // --- Eigene Posterpacks Upload (Drag & Drop) ---
+        var dropzone = document.getElementById('pu-dropzone');
+        var fileInput = document.getElementById('pu-fileInput');
+        var uploadStatus = document.getElementById('pu-uploadStatus');
+
+        if (dropzone && fileInput) {
+            dropzone.addEventListener('click', function () { fileInput.click(); });
+
+            dropzone.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('dragover');
+            });
+            dropzone.addEventListener('dragleave', function (e) {
+                e.preventDefault();
+                dropzone.classList.remove('dragover');
+            });
+            dropzone.addEventListener('drop', function (e) {
+                e.preventDefault();
+                dropzone.classList.remove('dragover');
+                var files = Array.from(e.dataTransfer.files).filter(function (f) {
+                    return f.name.toLowerCase().endsWith('.zip');
+                });
+                if (files.length) puUploadFiles(files);
+                else puShowUploadStatus('Nur ZIP-Dateien werden akzeptiert', 'error');
+            });
+
+            fileInput.addEventListener('change', function () {
+                if (fileInput.files.length) {
+                    puUploadFiles(Array.from(fileInput.files));
+                    fileInput.value = '';
+                }
+            });
+        }
+
+        async function puUploadFiles(files) {
+            puShowUploadStatus('Lade ' + files.length + ' Datei(en) hoch...', 'uploading');
+            try {
+                var formData = new FormData();
+                files.forEach(function (f) { formData.append('files', f); });
+                formData.append('targetDirectory', 'complete');
+                formData.append('completeSubdir', 'manual');
+
+                var res = await fetch('/api/local/upload', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin',
+                });
+                var data = await res.json();
+
+                if (res.ok && data.success !== false) {
+                    var count = data.filesUploaded || data.totalFiles || files.length;
+                    puShowUploadStatus(count + ' Posterpack(s) hochgeladen!', 'success');
+                    puToast(count + ' Posterpack(s) erfolgreich hochgeladen');
+                    // Refresh film list in case new films appeared
+                    setTimeout(function () { puLoadFilms(); }, 1000);
+                } else {
+                    puShowUploadStatus('Fehler: ' + (data.error || 'Upload fehlgeschlagen'), 'error');
+                    puToast(data.error || 'Upload fehlgeschlagen', 'error');
+                }
+            } catch (err) {
+                puShowUploadStatus('Fehler: ' + err.message, 'error');
+                puToast('Upload fehlgeschlagen: ' + err.message, 'error');
+            }
+        }
+
+        function puShowUploadStatus(msg, type) {
+            if (!uploadStatus) return;
+            uploadStatus.style.display = 'block';
+            uploadStatus.className = 'pu-upload-status ' + (type || '');
+            uploadStatus.textContent = msg;
+            if (type === 'success') {
+                setTimeout(function () { uploadStatus.style.display = 'none'; }, 5000);
+            }
+        }
 
         // Load data & connect SSE
         puLoadFilms();
@@ -33770,6 +33873,146 @@ if (!document.__niwDelegatedFallback) {
             if (!psSection.hidden) {
                 initPosterSelector();
             }
+        }, 200);
+    })();
+})();
+
+/* =========================================================
+   Posterpack Creator
+   ========================================================= */
+(function () {
+    'use strict';
+
+    var pcInited = false;
+
+    function initPosterpackCreator() {
+        if (pcInited) return;
+        pcInited = true;
+
+        var createBtn = document.getElementById('pc-createBtn');
+        var statusEl = document.getElementById('pc-status');
+        var posterPreview = document.getElementById('pc-posterPreview');
+
+        // File button wiring
+        var fileFields = ['poster', 'background', 'thumbnail', 'clearlogo', 'trailer'];
+        fileFields.forEach(function (name) {
+            var btn = document.getElementById('pc-' + name + 'Btn');
+            var input = document.getElementById('pc-' + name + 'File');
+            var label = document.getElementById('pc-' + name + 'Name');
+            if (btn && input) {
+                btn.addEventListener('click', function () { input.click(); });
+                input.addEventListener('change', function () {
+                    if (label) label.textContent = input.files.length ? input.files[0].name : 'Keine Datei';
+                    updateCreateBtn();
+                    // Poster preview
+                    if (name === 'poster' && input.files.length && posterPreview) {
+                        var reader = new FileReader();
+                        reader.onload = function (e) {
+                            posterPreview.innerHTML = '<img src="' + e.target.result + '" alt="Vorschau">';
+                        };
+                        reader.readAsDataURL(input.files[0]);
+                    }
+                });
+            }
+        });
+
+        // Enable/disable create button
+        function updateCreateBtn() {
+            var title = document.getElementById('pc-title');
+            var year = document.getElementById('pc-year');
+            var posterFile = document.getElementById('pc-posterFile');
+            if (createBtn) {
+                createBtn.disabled = !(
+                    title && title.value.trim() &&
+                    year && /^\d{4}$/.test(year.value.trim()) &&
+                    posterFile && posterFile.files.length
+                );
+            }
+        }
+
+        ['pc-title', 'pc-year'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('input', updateCreateBtn);
+        });
+
+        // Create button handler
+        if (createBtn) createBtn.addEventListener('click', async function () {
+            createBtn.disabled = true;
+            showStatus('Posterpack wird erstellt...', 'creating');
+
+            try {
+                var formData = new FormData();
+                formData.append('title', document.getElementById('pc-title').value.trim());
+                formData.append('year', document.getElementById('pc-year').value.trim());
+
+                var optFields = ['genres', 'tagline', 'overview', 'rating', 'runtime', 'contentRating'];
+                optFields.forEach(function (f) {
+                    var el = document.getElementById('pc-' + f);
+                    if (el && el.value.trim()) formData.append(f, el.value.trim());
+                });
+
+                fileFields.forEach(function (name) {
+                    var input = document.getElementById('pc-' + name + 'File');
+                    if (input && input.files.length) formData.append(name, input.files[0]);
+                });
+
+                var res = await fetch('/api/posterpack-creator/create', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin',
+                });
+                var data = await res.json();
+
+                if (res.ok && data.success) {
+                    showStatus('Posterpack "' + data.name + '" erstellt! (' + ((data.size || 0) / 1024 / 1024).toFixed(1) + ' MB)', 'success');
+                    if (window.notify) window.notify.success('Posterpack "' + data.name + '" erstellt!');
+                    resetForm();
+                } else {
+                    showStatus('Fehler: ' + (data.error || 'Unbekannter Fehler'), 'error');
+                    if (window.notify) window.notify.error(data.error || 'Fehler beim Erstellen');
+                }
+            } catch (err) {
+                showStatus('Fehler: ' + err.message, 'error');
+            }
+            updateCreateBtn();
+        });
+
+        function showStatus(msg, type) {
+            if (!statusEl) return;
+            statusEl.style.display = 'block';
+            statusEl.className = 'pc-status ' + (type || '');
+            statusEl.textContent = msg;
+            if (type === 'success') setTimeout(function () { statusEl.style.display = 'none'; }, 8000);
+        }
+
+        function resetForm() {
+            ['pc-title', 'pc-year', 'pc-genres', 'pc-tagline', 'pc-overview', 'pc-rating', 'pc-runtime', 'pc-contentRating'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            fileFields.forEach(function (name) {
+                var input = document.getElementById('pc-' + name + 'File');
+                var label = document.getElementById('pc-' + name + 'Name');
+                if (input) input.value = '';
+                if (label) label.textContent = 'Keine Datei';
+            });
+            if (posterPreview) posterPreview.innerHTML = '';
+        }
+    }
+
+    // Lifecycle: init when section becomes visible
+    (function () {
+        var checkInterval = setInterval(function () {
+            clearInterval(checkInterval);
+            var section = document.getElementById('section-posterpack-creator');
+            if (!section) return;
+            var observer = new MutationObserver(function () {
+                if (!section.hidden && section.classList.contains('active')) {
+                    initPosterpackCreator();
+                }
+            });
+            observer.observe(section, { attributes: true, attributeFilter: ['hidden', 'class'] });
+            if (!section.hidden) initPosterpackCreator();
         }, 200);
     })();
 })();

@@ -230,6 +230,7 @@
       <a href="#" class="nav-item" data-nav="operations"><i class="fas fa-screwdriver-wrench"></i><span>Operations</span></a>
       <a href="#" class="nav-item" data-nav="poster-updater"><i class="fas fa-film"></i><span>Poster Updater</span></a>
       <a href="#" class="nav-item" data-nav="poster-selector"><i class="fas fa-th-list"></i><span>Playlist Editor</span></a>
+      <a href="#" class="nav-item" data-nav="posterpack-creator"><i class="fas fa-magic"></i><span>Posterpack Creator</span></a>
     </nav>
   <div class="sidebar-footer"></div>
   </aside>
@@ -593,6 +594,9 @@
                     </div>
                     <div class="form-grid" style="margin-top:12px;">
                       <div class="form-row full-span"><label for="rottenTomatoesMinimumScore">Minimum RT Score (0–10)</label><div class="number-input-wrapper"><input type="number" min="0" max="10" step="0.5" id="rottenTomatoesMinimumScore" /><div class="number-controls" role="group"><button type="button" class="number-btn number-inc" title="Increase"><i class="fas fa-chevron-up"></i></button><button type="button" class="number-btn number-dec" title="Decrease"><i class="fas fa-chevron-down"></i></button></div></div></div>
+                      <div class="form-row full-span"><label for="trailerDelaySeconds">Trailer Delay (Sek.)</label><div class="number-input-wrapper"><input type="number" min="0" max="60" step="1" id="trailerDelaySeconds" /><div class="number-controls" role="group"><button type="button" class="number-btn number-inc" title="Increase"><i class="fas fa-chevron-up"></i></button><button type="button" class="number-btn number-dec" title="Decrease"><i class="fas fa-chevron-down"></i></button></div></div></div>
+                      <div class="form-row full-span"><label for="trailerPauseAfterSeconds">Pause nach Trailer (Sek.)</label><div class="number-input-wrapper"><input type="number" min="0" max="60" step="1" id="trailerPauseAfterSeconds" /><div class="number-controls" role="group"><button type="button" class="number-btn number-inc" title="Increase"><i class="fas fa-chevron-up"></i></button><button type="button" class="number-btn number-dec" title="Decrease"><i class="fas fa-chevron-down"></i></button></div></div></div>
+                      <div class="form-row full-span"><label for="noTrailerDisplaySeconds">Anzeige ohne Trailer (Sek.)</label><div class="number-input-wrapper"><input type="number" min="10" max="600" step="10" id="noTrailerDisplaySeconds" /><div class="number-controls" role="group"><button type="button" class="number-btn number-inc" title="Increase"><i class="fas fa-chevron-up"></i></button><button type="button" class="number-btn number-dec" title="Decrease"><i class="fas fa-chevron-down"></i></button></div></div></div>
                     </div>
                   </div>
 
@@ -4123,6 +4127,20 @@
                 </div>
                 <div class="pu-terminal" id="pu-trailerTerminal">Warte auf Start...</div>
               </section>
+
+              <!-- Eigene Posterpacks Upload Card -->
+              <section class="perf-card" aria-label="Eigene Posterpacks">
+                <h3><i class="fas fa-upload"></i> Eigene Posterpacks</h3>
+                <div class="pu-dropzone" id="pu-dropzone">
+                  <div class="pu-dropzone-content">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>ZIP-Posterpack hierher ziehen</p>
+                    <p class="pu-dropzone-hint">oder klicken zum Auswählen</p>
+                  </div>
+                  <input type="file" id="pu-fileInput" multiple accept=".zip" hidden>
+                </div>
+                <div class="pu-upload-status" id="pu-uploadStatus" style="display:none;"></div>
+              </section>
             </div>
 
             <!-- Right column: Filmliste -->
@@ -4227,6 +4245,116 @@
                 <div class="ps-playlist" id="ps-playlistList">
                   <div class="ps-film-empty">Playlist ist leer</div>
                 </div>
+              </section>
+            </div>
+
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- Posterpack Creator Section -->
+    <section id="section-posterpack-creator" class="app-section" hidden>
+      <section class="panel operations-panel" style="border: none; background: transparent; box-shadow: none;">
+        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; display: flex; align-items: center;">
+            <span style="display: inline-flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--color-text-primary); padding: 6px 16px; border-radius: 20px; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.3px;">
+              <i class="fas fa-magic" style="opacity: 0.8;"></i>
+              Posterpack Creator
+            </span>
+          </h2>
+        </div>
+        <div class="panel-content" style="padding: 0;">
+          <div class="content-grid" style="gap: 12px;">
+
+            <!-- Left: Metadaten -->
+            <div class="ops-col">
+              <section class="perf-card" aria-label="Metadaten">
+                <h3><i class="fas fa-info-circle"></i> Metadaten</h3>
+                <div class="pc-form" style="margin-top: 12px;">
+                  <div class="pc-field">
+                    <label for="pc-title">Titel <span class="pc-mandatory">*</span></label>
+                    <input type="text" class="pu-input" id="pc-title" placeholder="Filmtitel">
+                  </div>
+                  <div class="pc-field">
+                    <label for="pc-year">Jahr <span class="pc-mandatory">*</span></label>
+                    <input type="number" class="pu-input" id="pc-year" placeholder="2025" min="1900" max="2099">
+                  </div>
+                  <div class="pc-field">
+                    <label for="pc-genres">Genres</label>
+                    <input type="text" class="pu-input" id="pc-genres" placeholder="Action, Thriller, Drama">
+                  </div>
+                  <div class="pc-field">
+                    <label for="pc-tagline">Tagline</label>
+                    <input type="text" class="pu-input" id="pc-tagline" placeholder="Untertitel / Slogan">
+                  </div>
+                  <div class="pc-field">
+                    <label for="pc-overview">Beschreibung</label>
+                    <textarea class="pu-input" id="pc-overview" rows="3" placeholder="Kurzinhalt..."></textarea>
+                  </div>
+                  <div class="pc-row-2">
+                    <div class="pc-field">
+                      <label for="pc-rating">Rating (0-10)</label>
+                      <input type="number" class="pu-input" id="pc-rating" placeholder="7.5" min="0" max="10" step="0.1">
+                    </div>
+                    <div class="pc-field">
+                      <label for="pc-runtime">Laufzeit (Min.)</label>
+                      <input type="number" class="pu-input" id="pc-runtime" placeholder="120" min="1" max="999">
+                    </div>
+                  </div>
+                  <div class="pc-field">
+                    <label for="pc-contentRating">Altersfreigabe</label>
+                    <input type="text" class="pu-input" id="pc-contentRating" placeholder="FSK 12, PG-13, R">
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <!-- Right: Dateien + Erstellen -->
+            <div class="ops-col">
+              <section class="perf-card" aria-label="Dateien">
+                <h3><i class="fas fa-images"></i> Dateien</h3>
+                <div class="pc-form" style="margin-top: 12px;">
+                  <div class="pc-upload-row">
+                    <div class="pc-upload-field">
+                      <label>Poster <span class="pc-mandatory">*</span></label>
+                      <div class="pc-file-btn" id="pc-posterBtn"><i class="fas fa-image"></i> Poster wählen</div>
+                      <input type="file" id="pc-posterFile" accept="image/jpeg,image/png,image/webp" hidden>
+                      <span class="pc-file-name" id="pc-posterName">Keine Datei</span>
+                    </div>
+                    <div class="pc-poster-preview" id="pc-posterPreview"></div>
+                  </div>
+                  <div class="pc-upload-field">
+                    <label>Background</label>
+                    <div class="pc-file-btn" id="pc-backgroundBtn"><i class="fas fa-panorama"></i> Background wählen</div>
+                    <input type="file" id="pc-backgroundFile" accept="image/jpeg,image/png,image/webp" hidden>
+                    <span class="pc-file-name" id="pc-backgroundName">Keine Datei</span>
+                  </div>
+                  <div class="pc-upload-field">
+                    <label>Thumbnail</label>
+                    <div class="pc-file-btn" id="pc-thumbnailBtn"><i class="fas fa-th-large"></i> Thumbnail wählen</div>
+                    <input type="file" id="pc-thumbnailFile" accept="image/jpeg,image/png,image/webp" hidden>
+                    <span class="pc-file-name" id="pc-thumbnailName">Keine Datei</span>
+                  </div>
+                  <div class="pc-upload-field">
+                    <label>ClearLogo</label>
+                    <div class="pc-file-btn" id="pc-clearlogoBtn"><i class="fas fa-certificate"></i> ClearLogo wählen</div>
+                    <input type="file" id="pc-clearlogoFile" accept="image/png,image/webp" hidden>
+                    <span class="pc-file-name" id="pc-clearlogoName">Keine Datei</span>
+                  </div>
+                  <div class="pc-upload-field">
+                    <label>Trailer</label>
+                    <div class="pc-file-btn" id="pc-trailerBtn"><i class="fas fa-video"></i> Trailer wählen</div>
+                    <input type="file" id="pc-trailerFile" accept="video/mp4,video/webm" hidden>
+                    <span class="pc-file-name" id="pc-trailerName">Keine Datei</span>
+                  </div>
+                </div>
+              </section>
+              <section class="perf-card" aria-label="Erstellen" style="margin-top: 12px;">
+                <button class="btn btn-success" id="pc-createBtn" style="width: 100%; padding: 10px;" disabled>
+                  <i class="fas fa-magic"></i> Posterpack erstellen
+                </button>
+                <div class="pc-status" id="pc-status" style="display:none; margin-top: 10px;"></div>
               </section>
             </div>
 

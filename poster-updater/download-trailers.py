@@ -12,7 +12,6 @@ import os
 import sys
 import re
 import yt_dlp
-from dotenv import load_dotenv
 
 print("""
 **************************************************************
@@ -24,26 +23,24 @@ print("""
 import json
 
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
-
-TMDB_API_KEY = os.getenv('TMDB_API_KEY')
-FILMLISTE_PATH = os.getenv('FILMLISTE_PATH', 'filmliste.txt')
+CONFIG_PATH = os.path.join(PROJECT_ROOT, 'config.json')
+FILMLISTE_PATH = 'filmliste.txt'
 TRAILER_DIR = os.path.join(PROJECT_ROOT, 'media', 'trailers')
 TRAILER_INFO_PATH = os.path.join(TRAILER_DIR, 'trailer-info.json')
 
-# Fallback: TMDB API Key aus config.json lesen
-if not TMDB_API_KEY or TMDB_API_KEY == 'false':
-    try:
-        with open(os.path.join(PROJECT_ROOT, 'config.json'), 'r', encoding='utf-8') as _cf:
-            _cfg = json.load(_cf)
-            TMDB_API_KEY = (_cfg.get('tmdbSource', {}).get('apiKey')
-                           or _cfg.get('tmdb', {}).get('apiKey')
-                           or None)
-    except Exception:
-        pass
+# TMDB API Key aus config.json lesen
+TMDB_API_KEY = None
+try:
+    with open(CONFIG_PATH, 'r', encoding='utf-8') as _cf:
+        _cfg = json.load(_cf)
+        TMDB_API_KEY = (_cfg.get('tmdbSource', {}).get('apiKey')
+                       or _cfg.get('tmdb', {}).get('apiKey')
+                       or None)
+except Exception:
+    pass
 
-if not TMDB_API_KEY or TMDB_API_KEY == 'false':
-    print("❌ TMDB_API_KEY fehlt in .env und config.json!")
+if not TMDB_API_KEY:
+    print("TMDB API Key fehlt in config.json (tmdbSource.apiKey)!")
     sys.exit(1)
 
 os.makedirs(TRAILER_DIR, exist_ok=True)

@@ -126,3 +126,11 @@ performance-baseline.json
 
 # Copilot configuration (private)
 .copilot-config.json
+
+# Poster Updater private data
+filmliste.txt
+poster-updater/.env
+
+# Custom patch/backup artifacts
+custom-patches-*.patch
+posterrama-custom-backup-*.tar.gz
