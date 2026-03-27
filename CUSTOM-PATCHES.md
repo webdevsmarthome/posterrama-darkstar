@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-03-27 (basierend auf Version 3.0.1f)
+**Stand:** 2026-03-27 (basierend auf Version 3.0.1g)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 
 ---
@@ -43,6 +43,8 @@
 | 32 | Posterpack Studio (Edit) | routes/posterpack-creator.js, admin.html, admin.js | Creator → Studio: Bestehende Posterpacks laden, bearbeiten, aktualisieren (Dropdown + Vorschauen) |
 | 33 | Poster Updater Filter-Fix | admin.js | withTrailer-Zahl bleibt nach Filter-Klick korrekt |
 | 34 | Filmliste Hoehe | admin.css | Filmliste max-height auf 562px angepasst |
+| 35 | TMDB Clearlogo Fetcher | poster-updater/fetch-clearlogos.py | Laedt fehlende Clearlogos von TMDB und fuegt sie in bestehende ZIPs ein |
+| 36 | TMDB Backdrop Fetcher | poster-updater/fetch-backdrops.py | Laedt fehlende Backgrounds von TMDB und fuegt sie in bestehende ZIPs ein |
 
 ---
 
@@ -267,7 +269,7 @@ language=de-DE statt language=en-US
 
 ### 11. `package.json`
 
-**Version:** `3.0.1f` (statt `3.0.1`)
+**Version:** `3.0.1g` (statt `3.0.1`)
 
 ---
 
