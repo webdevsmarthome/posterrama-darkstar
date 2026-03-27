@@ -229,8 +229,8 @@
       </a>
       <a href="#" class="nav-item" data-nav="operations"><i class="fas fa-screwdriver-wrench"></i><span>Operations</span></a>
       <a href="#" class="nav-item" data-nav="poster-updater"><i class="fas fa-film"></i><span>Poster Updater</span></a>
+      <a href="#" class="nav-item" data-nav="posterpack-studio"><i class="fas fa-magic"></i><span>Posterpack Studio</span></a>
       <a href="#" class="nav-item" data-nav="poster-selector"><i class="fas fa-th-list"></i><span>Playlist Editor</span></a>
-      <a href="#" class="nav-item" data-nav="posterpack-creator"><i class="fas fa-magic"></i><span>Posterpack Creator</span></a>
     </nav>
   <div class="sidebar-footer"></div>
   </aside>
@@ -4253,14 +4253,14 @@
       </section>
     </section>
 
-    <!-- Posterpack Creator Section -->
-    <section id="section-posterpack-creator" class="app-section" hidden>
+    <!-- Posterpack Studio Section -->
+    <section id="section-posterpack-studio" class="app-section" hidden>
       <section class="panel operations-panel" style="border: none; background: transparent; box-shadow: none;">
         <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <h2 style="margin: 0; display: flex; align-items: center;">
             <span style="display: inline-flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--color-text-primary); padding: 6px 16px; border-radius: 20px; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.3px;">
               <i class="fas fa-magic" style="opacity: 0.8;"></i>
-              Posterpack Creator
+              Posterpack Studio
             </span>
           </h2>
         </div>
@@ -4269,6 +4269,14 @@
 
             <!-- Left: Metadaten -->
             <div class="ops-col">
+              <section class="perf-card" aria-label="Posterpack laden" style="margin-bottom: 12px;">
+                <h3><i class="fas fa-folder-open"></i> Posterpack laden</h3>
+                <div style="margin-top: 10px;">
+                  <select class="pu-input" id="pc-packSelect" style="width: 100%;">
+                    <option value="">Neues Posterpack erstellen...</option>
+                  </select>
+                </div>
+              </section>
               <section class="perf-card" aria-label="Metadaten">
                 <h3><i class="fas fa-info-circle"></i> Metadaten</h3>
                 <div class="pc-form" style="margin-top: 12px;">
@@ -4324,23 +4332,32 @@
                     </div>
                     <div class="pc-poster-preview" id="pc-posterPreview"></div>
                   </div>
-                  <div class="pc-upload-field">
-                    <label>Background</label>
-                    <div class="pc-file-btn" id="pc-backgroundBtn"><i class="fas fa-panorama"></i> Background wählen</div>
-                    <input type="file" id="pc-backgroundFile" accept="image/jpeg,image/png,image/webp" hidden>
-                    <span class="pc-file-name" id="pc-backgroundName">Keine Datei</span>
+                  <div class="pc-upload-row">
+                    <div class="pc-upload-field">
+                      <label>Background</label>
+                      <div class="pc-file-btn" id="pc-backgroundBtn"><i class="fas fa-panorama"></i> Background wählen</div>
+                      <input type="file" id="pc-backgroundFile" accept="image/jpeg,image/png,image/webp" hidden>
+                      <span class="pc-file-name" id="pc-backgroundName">Keine Datei</span>
+                    </div>
+                    <div class="pc-img-preview pc-preview-wide" id="pc-backgroundPreview"></div>
                   </div>
-                  <div class="pc-upload-field">
-                    <label>Thumbnail</label>
-                    <div class="pc-file-btn" id="pc-thumbnailBtn"><i class="fas fa-th-large"></i> Thumbnail wählen</div>
-                    <input type="file" id="pc-thumbnailFile" accept="image/jpeg,image/png,image/webp" hidden>
-                    <span class="pc-file-name" id="pc-thumbnailName">Keine Datei</span>
+                  <div class="pc-upload-row">
+                    <div class="pc-upload-field">
+                      <label>Thumbnail</label>
+                      <div class="pc-file-btn" id="pc-thumbnailBtn"><i class="fas fa-th-large"></i> Thumbnail wählen</div>
+                      <input type="file" id="pc-thumbnailFile" accept="image/jpeg,image/png,image/webp" hidden>
+                      <span class="pc-file-name" id="pc-thumbnailName">Keine Datei</span>
+                    </div>
+                    <div class="pc-img-preview" id="pc-thumbnailPreview"></div>
                   </div>
-                  <div class="pc-upload-field">
-                    <label>ClearLogo</label>
-                    <div class="pc-file-btn" id="pc-clearlogoBtn"><i class="fas fa-certificate"></i> ClearLogo wählen</div>
-                    <input type="file" id="pc-clearlogoFile" accept="image/png,image/webp" hidden>
-                    <span class="pc-file-name" id="pc-clearlogoName">Keine Datei</span>
+                  <div class="pc-upload-row">
+                    <div class="pc-upload-field">
+                      <label>ClearLogo</label>
+                      <div class="pc-file-btn" id="pc-clearlogoBtn"><i class="fas fa-certificate"></i> ClearLogo wählen</div>
+                      <input type="file" id="pc-clearlogoFile" accept="image/png,image/webp" hidden>
+                      <span class="pc-file-name" id="pc-clearlogoName">Keine Datei</span>
+                    </div>
+                    <div class="pc-img-preview pc-preview-wide" id="pc-clearlogoPreview"></div>
                   </div>
                   <div class="pc-upload-field">
                     <label>Trailer</label>

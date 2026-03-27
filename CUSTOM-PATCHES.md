@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-03-27 (basierend auf Version 3.0.1e)
+**Stand:** 2026-03-27 (basierend auf Version 3.0.1f)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 
 ---
@@ -40,6 +40,9 @@
 | 29 | Screensaver Playlist nahtlos | screensaver.js | Playlist-Wechsel ohne Page-Reload (inline Media-Queue Refresh) |
 | 30 | dotenv-Bereinigung | download-trailers.py, scan-trailer-types.py, tmdb-get-posters-direct.py | Alle Python-Scripts lesen config.json statt .env |
 | 31 | .gitignore Erweiterung | .gitignore | filmliste.txt, .env, Patch/Backup-Artifacts ignoriert |
+| 32 | Posterpack Studio (Edit) | routes/posterpack-creator.js, admin.html, admin.js | Creator → Studio: Bestehende Posterpacks laden, bearbeiten, aktualisieren (Dropdown + Vorschauen) |
+| 33 | Poster Updater Filter-Fix | admin.js | withTrailer-Zahl bleibt nach Filter-Klick korrekt |
+| 34 | Filmliste Hoehe | admin.css | Filmliste max-height auf 562px angepasst |
 
 ---
 
@@ -81,8 +84,8 @@ Speichert Trailer-Typ in `trailer-info.json`. Ausfuehren: `cd poster-updater && 
 Sammlung aller benannten Playlisten. Wird automatisch beim ersten Aufruf aus `cinema-playlist.json` migriert.
 
 ### `routes/posterpack-creator.js`
-Posterpack Creator Backend — Multipart-Upload (multer), ZIP-Erstellung (JSZip), Trailer-Handling.
-Endpoint: `POST /api/posterpack-creator/create`
+Posterpack Studio Backend — Create + Edit. Multipart-Upload (multer), ZIP-Erstellung (JSZip), Trailer-Handling.
+Endpoints: `GET /api/posterpack-creator/read/:packName`, `POST /api/posterpack-creator/create`, `POST /api/posterpack-creator/update/:packName`
 
 ---
 
@@ -264,7 +267,7 @@ language=de-DE statt language=en-US
 
 ### 11. `package.json`
 
-**Version:** `3.0.1e` (statt `3.0.1`)
+**Version:** `3.0.1f` (statt `3.0.1`)
 
 ---
 

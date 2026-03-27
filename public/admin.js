@@ -3621,7 +3621,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                 'section-operations': 'operations',
                 'section-poster-updater': 'poster-updater',
                 'section-poster-selector': 'poster-selector',
-                'section-posterpack-creator': 'posterpack-creator',
+                'section-posterpack-studio': 'posterpack-studio',
             };
             const key = map[sectionId];
             const all = document.querySelectorAll('.sidebar-nav .nav-item');
@@ -3702,7 +3702,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
             } else if (id === 'section-poster-selector') {
                 // Hide the big page header for Poster Selector (compact panel)
                 pageHeader.style.display = 'none';
-            } else if (id === 'section-posterpack-creator') {
+            } else if (id === 'section-posterpack-studio') {
                 pageHeader.style.display = 'none';
             } else {
                 // Default (Dashboard and any other sections using the big header)
@@ -11065,8 +11065,8 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                     showSection('section-poster-updater');
                 } else if (nav === 'poster-selector') {
                     showSection('section-poster-selector');
-                } else if (nav === 'posterpack-creator') {
-                    showSection('section-posterpack-creator');
+                } else if (nav === 'posterpack-studio') {
+                    showSection('section-posterpack-studio');
                 } else if (nav === 'media-sources') {
                     // Always land on Plex tab by default
                     showSection('section-media-sources');
@@ -32694,8 +32694,8 @@ if (!document.__niwDelegatedFallback) {
             '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'all' ? 'active' : '') + '" data-filter="all"><span class="dot dot-total"></span> ' + data.total + ' Filme</button>' +
             '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'zip' ? 'active' : '') + '" data-filter="zip"><span class="dot dot-green"></span> ' + data.withZip + ' mit ZIP</button>' +
             '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'pending' ? 'active' : '') + '" data-filter="pending"><span class="dot dot-orange"></span> ' + data.pending + ' ausstehend</button>' +
-            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'trailer' ? 'active' : '') + '" data-filter="trailer"><span class="dot dot-green"></span> ' + (data.withTrailer || 0) + ' Trailer</button>' +
-            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'notrailer' ? 'active' : '') + '" data-filter="notrailer"><span class="dot dot-orange"></span> ' + (data.total - (data.withTrailer || 0)) + ' ohne Trailer</button>';
+            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'trailer' ? 'active' : '') + '" data-filter="trailer"><span class="dot dot-green"></span> ' + (data.withTrailer || 0) + ' mit Trailer</button>' +
+            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'notrailer' ? 'active' : '') + '" data-filter="notrailer"><span class="dot dot-orange"></span> ' + ((data.withZip || 0) - (data.withTrailer || 0)) + ' ohne Trailer</button>';
     }
 
     function puRenderFilmList() {
@@ -32991,7 +32991,9 @@ if (!document.__niwDelegatedFallback) {
             var btn = e.target.closest('[data-filter]');
             if (!btn) return;
             puActiveStatusFilter = btn.dataset.filter;
-            puRenderFilmStats({ total: puFilmData.length, withZip: puFilmData.filter(function (f) { return f.hasZip; }).length, pending: puFilmData.filter(function (f) { return !f.hasZip; }).length });
+            var wz = puFilmData.filter(function (f) { return f.hasZip; }).length;
+            var wt = puFilmData.filter(function (f) { return f.hasTrailer; }).length;
+            puRenderFilmStats({ total: puFilmData.length, withZip: wz, pending: puFilmData.length - wz, withTrailer: wt });
             puRenderFilmList();
         });
 
@@ -33878,23 +33880,101 @@ if (!document.__niwDelegatedFallback) {
 })();
 
 /* =========================================================
-   Posterpack Creator
+   Posterpack Studio (Create + Edit)
    ========================================================= */
 (function () {
     'use strict';
 
     var pcInited = false;
+    var pcEditMode = null;
+    var pcZipRelPath = null;
 
-    function initPosterpackCreator() {
+    function initPosterpackStudio() {
         if (pcInited) return;
         pcInited = true;
 
         var createBtn = document.getElementById('pc-createBtn');
         var statusEl = document.getElementById('pc-status');
         var posterPreview = document.getElementById('pc-posterPreview');
-
-        // File button wiring
+        var packSelect = document.getElementById('pc-packSelect');
         var fileFields = ['poster', 'background', 'thumbnail', 'clearlogo', 'trailer'];
+
+        async function loadPackList() {
+            if (!packSelect) return;
+            try {
+                var res = await fetch('/api/poster-selector/films', { credentials: 'same-origin' });
+                var data = await res.json();
+                var films = (data.films || []).sort(function (a, b) { return a.name.localeCompare(b.name, 'de'); });
+                var html = '<option value="">Neues Posterpack erstellen...</option>';
+                films.forEach(function (f) {
+                    html += '<option value="' + f.name.replace(/"/g, '&quot;') + '">' + f.name + ' [' + f.source + ']</option>';
+                });
+                packSelect.innerHTML = html;
+            } catch (_) {}
+        }
+
+        async function loadPosterpack(packName) {
+            if (!packName) { pcEditMode = null; pcZipRelPath = null; resetForm(); updateBtn(); return; }
+            showStatus('Lade Posterpack...', 'creating');
+            try {
+                var res = await fetch('/api/posterpack-creator/read/' + encodeURIComponent(packName), { credentials: 'same-origin' });
+                var data = await res.json();
+                if (!data.success) { showStatus('Fehler: ' + (data.error || ''), 'error'); return; }
+                pcEditMode = packName;
+                pcZipRelPath = data.zipRelPath;
+                var m = data.metadata || {};
+                setVal('pc-title', m.title || '');
+                setVal('pc-year', m.year || '');
+                setVal('pc-genres', Array.isArray(m.genres) ? m.genres.join(', ') : '');
+                setVal('pc-tagline', m.tagline || '');
+                setVal('pc-overview', m.overview || '');
+                setVal('pc-rating', m.rating || '');
+                setVal('pc-runtime', m.runtimeMs ? Math.round(m.runtimeMs / 60000) : '');
+                setVal('pc-contentRating', m.contentRating || '');
+                var files = data.files || [];
+                fileFields.forEach(function (name) {
+                    var label = document.getElementById('pc-' + name + 'Name');
+                    if (!label) return;
+                    var match = files.find(function (f) { return f.toLowerCase().split('/').pop().startsWith(name + '.'); });
+                    if (match) {
+                        label.innerHTML = '<span style="color:var(--color-success);">&#10003;</span> ' + match.split('/').pop();
+                    } else {
+                        label.innerHTML = '<span style="color:var(--color-text-muted);">&#10005;</span> nicht vorhanden';
+                    }
+                });
+                var tl = document.getElementById('pc-trailerName');
+                if (tl) {
+                    if (data.hasTrailer) {
+                        tl.innerHTML = '<span style="color:var(--color-success);">&#10003;</span> ' + packName + '-trailer.mp4';
+                    } else {
+                        tl.innerHTML = '<span style="color:var(--color-text-muted);">&#10005;</span> nicht vorhanden';
+                    }
+                }
+                if (pcZipRelPath) {
+                    var cb = Date.now();
+                    var zipEnc = encodeURIComponent(pcZipRelPath);
+                    if (posterPreview) posterPreview.innerHTML = '<img src="/local-posterpack?zip=' + zipEnc + '&entry=poster&cb=' + cb + '" alt="Poster">';
+                    // Background, Thumbnail, ClearLogo previews
+                    ['background', 'thumbnail', 'clearlogo'].forEach(function (entry) {
+                        var prev = document.getElementById('pc-' + entry + 'Preview');
+                        if (!prev) return;
+                        var hasFile = files.some(function (f) { return f.toLowerCase().split('/').pop().startsWith(entry + '.'); });
+                        if (hasFile) {
+                            prev.innerHTML = '<img src="/local-posterpack?zip=' + zipEnc + '&entry=' + entry + '&cb=' + cb + '" alt="' + entry + '">';
+                        } else {
+                            prev.innerHTML = '';
+                        }
+                    });
+                }
+                statusEl.style.display = 'none';
+            } catch (err) { showStatus('Fehler: ' + err.message, 'error'); }
+            updateBtn();
+        }
+
+        function setVal(id, val) { var el = document.getElementById(id); if (el) el.value = val; }
+
+        if (packSelect) packSelect.addEventListener('change', function () { loadPosterpack(packSelect.value); });
+
         fileFields.forEach(function (name) {
             var btn = document.getElementById('pc-' + name + 'Btn');
             var input = document.getElementById('pc-' + name + 'File');
@@ -33902,93 +33982,86 @@ if (!document.__niwDelegatedFallback) {
             if (btn && input) {
                 btn.addEventListener('click', function () { input.click(); });
                 input.addEventListener('change', function () {
-                    if (label) label.textContent = input.files.length ? input.files[0].name : 'Keine Datei';
-                    updateCreateBtn();
-                    // Poster preview
-                    if (name === 'poster' && input.files.length && posterPreview) {
-                        var reader = new FileReader();
-                        reader.onload = function (e) {
-                            posterPreview.innerHTML = '<img src="' + e.target.result + '" alt="Vorschau">';
-                        };
-                        reader.readAsDataURL(input.files[0]);
+                    if (label) label.textContent = input.files.length ? input.files[0].name : (pcEditMode ? label.textContent : 'Keine Datei');
+                    updateBtn();
+                    if (input.files.length) {
+                        var previewId = name === 'poster' ? 'pc-posterPreview' : 'pc-' + name + 'Preview';
+                        var previewEl = document.getElementById(previewId);
+                        if (previewEl && name !== 'trailer') {
+                            var reader = new FileReader();
+                            reader.onload = function (e) { previewEl.innerHTML = '<img src="' + e.target.result + '" alt="Vorschau">'; };
+                            reader.readAsDataURL(input.files[0]);
+                        }
                     }
                 });
             }
         });
 
-        // Enable/disable create button
-        function updateCreateBtn() {
+        function updateBtn() {
             var title = document.getElementById('pc-title');
             var year = document.getElementById('pc-year');
             var posterFile = document.getElementById('pc-posterFile');
-            if (createBtn) {
-                createBtn.disabled = !(
-                    title && title.value.trim() &&
-                    year && /^\d{4}$/.test(year.value.trim()) &&
-                    posterFile && posterFile.files.length
-                );
+            if (!createBtn) return;
+            if (pcEditMode) {
+                createBtn.disabled = !(title && title.value.trim() && year && /^\d{4}$/.test(year.value.trim()));
+                createBtn.innerHTML = '<i class="fas fa-save"></i> Posterpack aktualisieren';
+            } else {
+                createBtn.disabled = !(title && title.value.trim() && year && /^\d{4}$/.test(year.value.trim()) && posterFile && posterFile.files.length);
+                createBtn.innerHTML = '<i class="fas fa-magic"></i> Posterpack erstellen';
             }
         }
 
         ['pc-title', 'pc-year'].forEach(function (id) {
             var el = document.getElementById(id);
-            if (el) el.addEventListener('input', updateCreateBtn);
+            if (el) el.addEventListener('input', updateBtn);
         });
 
-        // Create button handler
         if (createBtn) createBtn.addEventListener('click', async function () {
             createBtn.disabled = true;
-            showStatus('Posterpack wird erstellt...', 'creating');
-
+            var isEdit = !!pcEditMode;
+            showStatus(isEdit ? 'Posterpack wird aktualisiert...' : 'Posterpack wird erstellt...', 'creating');
             try {
                 var formData = new FormData();
                 formData.append('title', document.getElementById('pc-title').value.trim());
                 formData.append('year', document.getElementById('pc-year').value.trim());
-
-                var optFields = ['genres', 'tagline', 'overview', 'rating', 'runtime', 'contentRating'];
-                optFields.forEach(function (f) {
+                ['genres', 'tagline', 'overview', 'rating', 'runtime', 'contentRating'].forEach(function (f) {
                     var el = document.getElementById('pc-' + f);
-                    if (el && el.value.trim()) formData.append(f, el.value.trim());
+                    if (el) formData.append(f, el.value.trim());
                 });
-
                 fileFields.forEach(function (name) {
                     var input = document.getElementById('pc-' + name + 'File');
                     if (input && input.files.length) formData.append(name, input.files[0]);
                 });
-
-                var res = await fetch('/api/posterpack-creator/create', {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'same-origin',
-                });
+                var url = isEdit
+                    ? '/api/posterpack-creator/update/' + encodeURIComponent(pcEditMode)
+                    : '/api/posterpack-creator/create';
+                var res = await fetch(url, { method: 'POST', body: formData, credentials: 'same-origin' });
                 var data = await res.json();
-
                 if (res.ok && data.success) {
-                    showStatus('Posterpack "' + data.name + '" erstellt! (' + ((data.size || 0) / 1024 / 1024).toFixed(1) + ' MB)', 'success');
-                    if (window.notify) window.notify.success('Posterpack "' + data.name + '" erstellt!');
-                    resetForm();
+                    var msg = isEdit ? 'aktualisiert' : 'erstellt';
+                    showStatus('Posterpack "' + data.name + '" ' + msg + '!', 'success');
+                    if (window.notify) window.notify.success('Posterpack "' + data.name + '" ' + msg + '!');
+                    if (!isEdit) { resetForm(); loadPackList(); }
                 } else {
-                    showStatus('Fehler: ' + (data.error || 'Unbekannter Fehler'), 'error');
-                    if (window.notify) window.notify.error(data.error || 'Fehler beim Erstellen');
+                    showStatus('Fehler: ' + (data.error || 'Unbekannt'), 'error');
+                    if (window.notify) window.notify.error(data.error || 'Fehler');
                 }
-            } catch (err) {
-                showStatus('Fehler: ' + err.message, 'error');
-            }
-            updateCreateBtn();
+            } catch (err) { showStatus('Fehler: ' + err.message, 'error'); }
+            updateBtn();
         });
 
         function showStatus(msg, type) {
             if (!statusEl) return;
-            statusEl.style.display = 'block';
+            statusEl.style.display = msg ? 'block' : 'none';
             statusEl.className = 'pc-status ' + (type || '');
             statusEl.textContent = msg;
             if (type === 'success') setTimeout(function () { statusEl.style.display = 'none'; }, 8000);
         }
 
         function resetForm() {
+            pcEditMode = null; pcZipRelPath = null;
             ['pc-title', 'pc-year', 'pc-genres', 'pc-tagline', 'pc-overview', 'pc-rating', 'pc-runtime', 'pc-contentRating'].forEach(function (id) {
-                var el = document.getElementById(id);
-                if (el) el.value = '';
+                var el = document.getElementById(id); if (el) el.value = '';
             });
             fileFields.forEach(function (name) {
                 var input = document.getElementById('pc-' + name + 'File');
@@ -33997,22 +34070,29 @@ if (!document.__niwDelegatedFallback) {
                 if (label) label.textContent = 'Keine Datei';
             });
             if (posterPreview) posterPreview.innerHTML = '';
+            ['background', 'thumbnail', 'clearlogo'].forEach(function (n) {
+                var p = document.getElementById('pc-' + n + 'Preview');
+                if (p) p.innerHTML = '';
+            });
+            if (packSelect) packSelect.value = '';
+            updateBtn();
         }
+
+        loadPackList();
     }
 
-    // Lifecycle: init when section becomes visible
     (function () {
         var checkInterval = setInterval(function () {
             clearInterval(checkInterval);
-            var section = document.getElementById('section-posterpack-creator');
+            var section = document.getElementById('section-posterpack-studio');
             if (!section) return;
             var observer = new MutationObserver(function () {
                 if (!section.hidden && section.classList.contains('active')) {
-                    initPosterpackCreator();
+                    initPosterpackStudio();
                 }
             });
             observer.observe(section, { attributes: true, attributeFilter: ['hidden', 'class'] });
-            if (!section.hidden) initPosterpackCreator();
+            if (!section.hidden) initPosterpackStudio();
         }, 200);
     })();
 })();

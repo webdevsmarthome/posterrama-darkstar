@@ -19850,7 +19850,7 @@ body.profile-edit-mode #section-display .section-header h2 span {
 .pu-pane.active { display: block; }
 
 /* --- Film list --- */
-.pu-film-list { max-height: 400px; overflow-y: auto; }
+.pu-film-list { max-height: 562px; overflow-y: auto; }
 .pu-film-list::-webkit-scrollbar { width: 5px; }
 .pu-film-list::-webkit-scrollbar-track { background: transparent; }
 .pu-film-list::-webkit-scrollbar-thumb { background: var(--color-bg-tertiary); border-radius: 3px; }
@@ -19975,7 +19975,7 @@ body.profile-edit-mode #section-display .section-header h2 span {
 .pu-upload-status.error { background: rgba(247,118,142,0.12); color: var(--color-error); }
 
 /* ================================================
-   Posterpack Creator
+   Posterpack Studio
    ================================================ */
 .pc-form { display: flex; flex-direction: column; gap: 10px; }
 .pc-field { display: flex; flex-direction: column; gap: 4px; }
@@ -20002,6 +20002,16 @@ body.profile-edit-mode #section-display .section-header h2 span {
 .pc-poster-preview img { width: 100%; height: 100%; object-fit: cover; }
 .pc-poster-preview:empty::after {
     content: 'Vorschau'; font-size: 10px; color: var(--color-text-muted); opacity: 0.5;
+}
+.pc-img-preview {
+    width: 80px; height: 60px; border-radius: 4px; overflow: hidden;
+    background: var(--color-bg-primary); border: 1px solid var(--color-border-light);
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+}
+.pc-img-preview.pc-preview-wide { width: 100px; height: 56px; }
+.pc-img-preview img { width: 100%; height: 100%; object-fit: cover; }
+.pc-img-preview:empty::after {
+    content: ''; /* no placeholder text */
 }
 .pc-status { padding: 8px 12px; border-radius: 6px; font-size: 12px; }
 .pc-status.creating { background: rgba(224,175,104,0.12); color: var(--color-warning); }
