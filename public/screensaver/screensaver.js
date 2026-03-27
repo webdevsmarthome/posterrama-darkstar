@@ -398,13 +398,33 @@
                 video.style.cssText = 'width:100%;height:100%;object-fit:cover;border:0;';
                 trailerVideoEl = video;
 
-                video.oncanplay = () => {
-                    try { video.play().catch(() => {}); } catch (_) {}
+                var playAttempted = false;
+                var tryPlay = function () {
+                    if (playAttempted) return;
+                    playAttempted = true;
+                    // Ensure muted (required for autoplay policy)
+                    video.muted = true;
+                    video.play().then(function () {
+                        // Autoplay succeeded
+                    }).catch(function () {
+                        // Retry once after short delay
+                        setTimeout(function () {
+                            video.muted = true;
+                            video.play().catch(function () {});
+                        }, 200);
+                    });
+                };
+
+                video.oncanplay = function () {
+                    tryPlay();
+                };
+
+                video.onloadeddata = function () {
+                    tryPlay();
                 };
 
                 video.onplay = () => {
                     try {
-                        // Hide poster, metadata, RT badge
                         try { document.body.classList.add('ss-trailer-active'); } catch (_) {}
                         setTimeout(() => { if (trailerEl) trailerEl.classList.add('visible'); }, 500);
                         setTimeout(() => {
@@ -435,6 +455,8 @@
                 // Set src AFTER element is in DOM (Safari compatibility)
                 video.src = trailerUrl;
                 video.load();
+                // Belt-and-suspenders: explicit play after brief delay
+                setTimeout(function () { tryPlay(); }, 500);
             } catch (_) { /* noop */ }
         }
 
