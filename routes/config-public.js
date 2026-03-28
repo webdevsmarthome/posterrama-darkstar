@@ -234,6 +234,7 @@ module.exports = function createConfigPublicRouter({
                 effectPauseTime: config.effectPauseTime || 2,
                 kenBurnsEffect: config.kenBurnsEffect || { enabled: true, durationSeconds: 20 },
                 uiScaling: config.uiScaling || {
+                    poster: 100,
                     content: 100,
                     clearlogo: 100,
                     clock: 100,

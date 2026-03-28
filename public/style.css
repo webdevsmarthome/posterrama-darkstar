@@ -266,6 +266,7 @@ img.lazy-error {
 
     /* UI Scaling variables - defaults to 1 (100%) */
     --content-scale: 1;
+    --poster-scale: 1;
     --clearlogo-scale: 1;
     --clock-scale: 1;
 }
@@ -939,11 +940,11 @@ body.promo-site #promo-box.is-hidden {
     /* Use viewport height for responsive sizing */
     height: min(
         calc(70vh - 100px),
-        calc(270px * var(--content-scale))
+        calc(270px * var(--poster-scale))
     ); /* 70% viewport minus margins, max scaled size */
     width: min(
         calc((70vh - 100px) * 0.667),
-        calc(180px * var(--content-scale))
+        calc(180px * var(--poster-scale))
     ); /* Maintain 2:3 aspect ratio */
     padding-left: 15px; /* Extra space for left shadow */
 }
@@ -1031,8 +1032,7 @@ body.screensaver-mode #poster-wrapper {
     flex-grow: 1;
     min-width: 0; /* Allow text to shrink */
     padding-bottom: 0;
-    transform: scale(var(--content-scale));
-    transform-origin: bottom left;
+    font-size: calc(1em * var(--content-scale));
     padding-left: calc(30px * var(--content-scale)); /* Extra spacing for shadow */
 }
 
@@ -1157,8 +1157,8 @@ body.screensaver-mode #poster-wrapper {
     #poster-wrapper {
         padding-left: 15px !important;
         margin-left: 0 !important;
-        width: calc(180px * var(--content-scale)) !important;
-        height: calc(270px * var(--content-scale)) !important;
+        width: calc(180px * var(--poster-scale)) !important;
+        height: calc(270px * var(--poster-scale)) !important;
         min-width: 180px !important;
         min-height: 270px !important;
         position: relative !important;
@@ -1173,10 +1173,8 @@ body.screensaver-mode #poster-wrapper {
     }
 
     #poster {
-        width: 180px !important;
-        height: 270px !important;
-        transform: scale(var(--content-scale)) !important;
-        transform-origin: bottom left !important;
+        width: 100% !important;
+        height: 100% !important;
         background-size: contain !important;
         position: relative !important;
         top: auto !important;
@@ -1199,6 +1197,7 @@ body.screensaver-mode #poster-wrapper {
     /* Override content scaling for mobile */
     :root {
         --content-scale: 1 !important;
+        --poster-scale: 1 !important;
     }
 
     /* Fix poster layers for mobile */
@@ -1287,8 +1286,7 @@ body.screensaver-mode #poster-wrapper {
         flex: 1; /* Take up remaining space after poster */
         min-width: 0; /* Allow text to wrap/shrink */
         padding-left: 25px !important; /* Extra padding for shadow on mobile */
-        transform: none !important; /* Remove scaling transform on mobile */
-        transform-origin: unset !important; /* Reset transform origin */
+        font-size: 1em !important; /* Reset content scaling on mobile */
     }
 
     #title {

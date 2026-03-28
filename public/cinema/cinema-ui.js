@@ -1769,6 +1769,8 @@
         $('#cinemaTrailerAutohide') &&
             ($('#cinemaTrailerAutohide').value = trailer.autohide || 'never');
         $('#cinemaTrailerReshow') && ($('#cinemaTrailerReshow').value = trailer.reshow || 'never');
+        $('#cinemaTrailerPauseAfter') && ($('#cinemaTrailerPauseAfter').value = trailer.pauseAfterSeconds ?? 7);
+        $('#cinemaNoTrailerDisplay') && ($('#cinemaNoTrailerDisplay').value = trailer.noTrailerDisplaySeconds ?? 120);
 
         // Show/hide re-show row based on autohide value
         const reshowRow = $('#cinemaTrailerReshowRow');
@@ -2818,6 +2820,8 @@
                     quality: $('#cinemaTrailerQuality')?.value || 'default',
                     autohide: $('#cinemaTrailerAutohide')?.value || 'never',
                     reshow: $('#cinemaTrailerReshow')?.value || 'never',
+                    pauseAfterSeconds: parseInt($('#cinemaTrailerPauseAfter')?.value || '7', 10),
+                    noTrailerDisplaySeconds: parseInt($('#cinemaNoTrailerDisplay')?.value || '120', 10),
                 },
                 qrCode: {
                     enabled: !!$('#cinemaQREnabled')?.checked,
@@ -2995,6 +2999,8 @@
                 if (t.quality) setFieldValue($('#cinemaTrailerQuality'), t.quality);
                 if (t.autohide) setFieldValue($('#cinemaTrailerAutohide'), t.autohide);
                 if (t.reshow) setFieldValue($('#cinemaTrailerReshow'), t.reshow);
+                if (t.pauseAfterSeconds !== undefined) setFieldValue($('#cinemaTrailerPauseAfter'), t.pauseAfterSeconds, 'input');
+                if (t.noTrailerDisplaySeconds !== undefined) setFieldValue($('#cinemaNoTrailerDisplay'), t.noTrailerDisplaySeconds, 'input');
             }
             // QR Code settings
             if (promo.qrCode) {
@@ -3417,6 +3423,8 @@
                     quality: $('#cinemaTrailerQuality')?.value || 'default',
                     autohide: $('#cinemaTrailerAutohide')?.value || 'never',
                     reshow: $('#cinemaTrailerReshow')?.value || 'never',
+                    pauseAfterSeconds: parseInt($('#cinemaTrailerPauseAfter')?.value || '7', 10),
+                    noTrailerDisplaySeconds: parseInt($('#cinemaNoTrailerDisplay')?.value || '120', 10),
                 },
                 qrCode: {
                     enabled: !!$('#cinemaQREnabled')?.checked,

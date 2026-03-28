@@ -4096,6 +4096,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
         })();
         const us = c.uiScaling || {};
         setIf('uiScaling_global', us.global ?? 100);
+        setIf('uiScaling_poster', us.poster ?? 100);
         setIf('uiScaling_content', us.content ?? 100);
         setIf('uiScaling_clearlogo', us.clearlogo ?? 100);
         setIf('uiScaling_clock', us.clock ?? 100);
@@ -4720,6 +4721,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
             (function initSliderBars() {
                 const ids = [
                     'uiScaling_global',
+                    'uiScaling_poster',
                     'uiScaling_content',
                     'uiScaling_clearlogo',
                     'uiScaling_clock',
@@ -4805,6 +4807,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
             };
             [
                 'uiScaling_global',
+                'uiScaling_poster',
                 'uiScaling_content',
                 'uiScaling_clearlogo',
                 'uiScaling_clock',
@@ -4818,7 +4821,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
             });
             // UI scaling preset buttons
             const applyUIScaling = vals => {
-                const ids = ['global', 'content', 'clearlogo', 'clock'];
+                const ids = ['global', 'poster', 'content', 'clearlogo', 'clock'];
                 ids.forEach(key => {
                     const el = getVal('uiScaling_' + key);
                     if (el && vals[key] != null) {
@@ -4838,16 +4841,16 @@ window.COLOR_PRESETS = COLOR_PRESETS;
             const pUw = document.getElementById('preset-ultrawide');
             const pReset = document.getElementById('reset-ui-scaling');
             p4k?.addEventListener('click', () =>
-                applyUIScaling({ global: 120, content: 120, clearlogo: 110, clock: 110 })
+                applyUIScaling({ global: 120, poster: 120, content: 120, clearlogo: 110, clock: 110 })
             );
             pFhd?.addEventListener('click', () =>
-                applyUIScaling({ global: 100, content: 100, clearlogo: 100, clock: 100 })
+                applyUIScaling({ global: 100, poster: 100, content: 100, clearlogo: 100, clock: 100 })
             );
             pUw?.addEventListener('click', () =>
-                applyUIScaling({ global: 95, content: 95, clearlogo: 95, clock: 95 })
+                applyUIScaling({ global: 95, poster: 95, content: 95, clearlogo: 95, clock: 95 })
             );
             pReset?.addEventListener('click', () =>
-                applyUIScaling({ global: 100, content: 100, clearlogo: 100, clock: 100 })
+                applyUIScaling({ global: 100, poster: 100, content: 100, clearlogo: 100, clock: 100 })
             );
         } catch (_) {
             /* slider label / bar hydration failed (visual only) */
@@ -6305,6 +6308,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
             })(),
             uiScaling: {
                 global: val('uiScaling_global'),
+                poster: val('uiScaling_poster'),
                 content: val('uiScaling_content'),
                 clearlogo: val('uiScaling_clearlogo'),
                 clock: val('uiScaling_clock'),

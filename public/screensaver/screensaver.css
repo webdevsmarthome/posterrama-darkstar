@@ -59,7 +59,8 @@ body[data-mode='screensaver'] #clock-widget-container {
         transform var(--ss-scene-ms) var(--ss-scene-ease);
     will-change: transform, opacity;
     opacity: var(--ss-scene-opacity);
-    transform: translate3d(var(--ss-scene-x), 0, 0) scale(var(--clock-scale));
+    transform: translate3d(var(--ss-scene-x), 0, 0);
+    transform-origin: top left;
 }
 
 body[data-mode='screensaver'] #clearlogo-container {

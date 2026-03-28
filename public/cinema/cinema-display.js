@@ -141,6 +141,8 @@
                 enabled: false,
                 muted: true,
                 loop: true,
+                pauseAfterSeconds: 7,
+                noTrailerDisplaySeconds: 120,
             },
             qrCode: {
                 enabled: false,
@@ -1473,6 +1475,8 @@
             };
 
             const shouldLoop = trailerConfig.loop === true;
+            const pauseAfterMs = (trailerConfig.pauseAfterSeconds ?? 7) * 1000;
+            const noTrailerMs = (trailerConfig.noTrailerDisplaySeconds ?? 120) * 1000;
             video.onended = () => {
                 if (shouldLoop && !trailerHidden) {
                     // Check BEFORE restarting if we should stop
@@ -1482,20 +1486,20 @@
                     if (loopMatch && trailerLoopCount >= parseInt(loopMatch[1], 10)) {
                         // Loop limit reached — don't restart, remove and advance
                         removeTrailerOverlay();
-                        setTimeout(() => { showNextPoster(); startRotation(); }, 7000);
+                        setTimeout(() => { showNextPoster(); startRotation(); }, pauseAfterMs);
                     } else {
                         video.currentTime = 0;
                         video.play().catch(() => {});
                     }
                 } else {
                     removeTrailerOverlay();
-                    setTimeout(() => { showNextPoster(); startRotation(); }, 7000); // PATCH-TIMING
+                    setTimeout(() => { showNextPoster(); startRotation(); }, pauseAfterMs);
                 }
             };
             video.onerror = () => {
                 log('Trailer: Lokales Video Fehler', { title: media.title });
                 removeTrailerOverlay();
-                startRotation();
+                setTimeout(() => { startRotation(); }, noTrailerMs);
             };
 
             trailerEl.appendChild(video);
@@ -1728,7 +1732,8 @@
                                 event.target.seekTo(0);
                                 event.target.playVideo();
                             } else {
-                                setTimeout(() => { showNextPoster(); startRotation(); }, 7000); // PATCH-TIMING: 7s Pause
+                                const ytPauseMs = (trailerConfig.pauseAfterSeconds ?? 7) * 1000;
+                                setTimeout(() => { showNextPoster(); startRotation(); }, ytPauseMs);
                             }
                         }
                     },

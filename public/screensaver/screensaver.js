@@ -20,6 +20,7 @@
             isPinned: false,
             pinnedMediaId: null,
             isTransitioning: false,
+            lastKnownConfig: null, // Snapshot for applySettings diff comparison
         };
         // Small helpers for DOM access
         const $ = sel => document.getElementById(sel);
@@ -390,29 +391,19 @@
                 currentTrailerKey = 'local-' + (item.title || '');
 
                 const video = document.createElement('video');
-                video.autoplay = true;
                 video.controls = false;
                 video.muted = true;
                 video.playsInline = true;
+                video.setAttribute('playsinline', '');
+                video.setAttribute('webkit-playsinline', '');
                 video.preload = 'auto';
                 // No inline styles — CSS .ss-trailer-overlay video handles sizing + black border crop
                 trailerVideoEl = video;
 
-                var playAttempted = false;
                 var tryPlay = function () {
-                    if (playAttempted) return;
-                    playAttempted = true;
-                    // Ensure muted (required for autoplay policy)
+                    if (!video.paused) return; // Already playing
                     video.muted = true;
-                    video.play().then(function () {
-                        // Autoplay succeeded
-                    }).catch(function () {
-                        // Retry once after short delay
-                        setTimeout(function () {
-                            video.muted = true;
-                            video.play().catch(function () {});
-                        }, 200);
-                    });
+                    video.play().catch(function () {});
                 };
 
                 video.oncanplay = function () {
@@ -420,6 +411,10 @@
                 };
 
                 video.onloadeddata = function () {
+                    tryPlay();
+                };
+
+                video.onloadedmetadata = function () {
                     tryPlay();
                 };
 
@@ -455,8 +450,10 @@
                 // Set src AFTER element is in DOM (Safari compatibility)
                 video.src = trailerUrl;
                 video.load();
-                // Belt-and-suspenders: explicit play after brief delay
-                setTimeout(function () { tryPlay(); }, 500);
+                // Staggered play retries — Safari may need more time before play() succeeds
+                setTimeout(function () { tryPlay(); }, 300);
+                setTimeout(function () { tryPlay(); }, 800);
+                setTimeout(function () { tryPlay(); }, 1500);
             } catch (_) { /* noop */ }
         }
 
@@ -613,6 +610,8 @@
                     } catch (_) {
                         /* noop */
                     }
+                    // Snapshot current config for applySettings diff comparison
+                    try { _state.lastKnownConfig = JSON.parse(JSON.stringify(window.appConfig || {})); } catch (_) { _state.lastKnownConfig = {}; }
                     // Ensure visibility now and on interval in case config changes async
                     api.ensureVisibility();
                     if (_state.ensureTimer) clearInterval(_state.ensureTimer);
@@ -1533,6 +1532,7 @@
                     try {
                         const uiScaling = window.appConfig?.uiScaling || {};
                         const globalScale = (uiScaling.global || 100) / 100;
+                        const posterScale = (uiScaling.poster || 100) / 100;
                         const contentScale = (uiScaling.content || 100) / 100;
                         const clearlogoScale = (uiScaling.clearlogo || 100) / 100;
                         const clockScale = (uiScaling.clock || 100) / 100;
@@ -1546,7 +1546,10 @@
                             root.style.fontSize = '';
                         }
 
-                        // Apply content scale via CSS variable (used by #info-container and #poster-wrapper)
+                        // Apply poster scale via CSS variable (used by #poster-wrapper and #poster)
+                        root.style.setProperty('--poster-scale', String(posterScale));
+
+                        // Apply content scale via CSS variable (used by #text-wrapper)
                         root.style.setProperty('--content-scale', String(contentScale));
 
                         // Apply clearlogo scale via CSS variable (used by #clearlogo-container)
@@ -1699,8 +1702,10 @@
             // Live settings apply (from preview mode, WebSocket, etc.)
             applySettings(patch = {}) {
                 try {
-                    // Get current config for comparison
-                    const oldConfig = window.appConfig || {};
+                    // Use our own snapshot for comparison — window.appConfig is already
+                    // updated by core.js before the settingsUpdated event fires, so comparing
+                    // against it would always find zero changes.
+                    const oldConfig = _state.lastKnownConfig || {};
 
                     // Settings that affect timing/cycling and require restart
                     const restartSettings = ['transitionEffect', 'transitionIntervalSeconds'];
@@ -1738,7 +1743,7 @@
                             if (key === 'uiScaling' && typeof patch[key] === 'object') {
                                 const oldUiScaling = oldConfig.uiScaling || {};
                                 const newUiScaling = patch[key] || {};
-                                const scalingKeys = ['global', 'content', 'clearlogo', 'clock'];
+                                const scalingKeys = ['global', 'poster', 'content', 'clearlogo', 'clock'];
                                 for (const sk of scalingKeys) {
                                     if (
                                         newUiScaling[sk] != null &&
@@ -1766,6 +1771,9 @@
                             hasVisualChanges = true;
                         }
                     }
+
+                    // Update snapshot for next comparison
+                    try { _state.lastKnownConfig = JSON.parse(JSON.stringify(window.appConfig || patch)); } catch (_) { /* noop */ }
 
                     if (!needsRestart && !hasVisualChanges) {
                         return;

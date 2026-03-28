@@ -620,6 +620,7 @@
                   <div class="mode-card" id="sec-scaling" data-card-key="scaling">
                     <div class="card-title" style="margin-bottom:10px;"><i class="fas fa-expand-arrows-alt"></i> UI Element Scaling</div>
                     <div class="form-grid">
+                      <div class="form-row"><label for="uiScaling_poster">Poster</label><div class="modern-slider"><input type="range" id="uiScaling_poster" min="50" max="200" step="5" value="100" /><div class="slider-percentage" data-target="uiScaling.poster">100%</div></div></div>
                       <div class="form-row"><label for="uiScaling_content">Content</label><div class="modern-slider"><input type="range" id="uiScaling_content" min="50" max="200" step="5" value="100" /><div class="slider-percentage" data-target="uiScaling.content">100%</div></div></div>
                       <div class="form-row"><label for="uiScaling_clearlogo">Clearlogo</label><div class="modern-slider"><input type="range" id="uiScaling_clearlogo" min="50" max="200" step="5" value="100" /><div class="slider-percentage" data-target="uiScaling.clearlogo">100%</div></div></div>
                       <div class="form-row"><label for="uiScaling_clock">Clock</label><div class="modern-slider"><input type="range" id="uiScaling_clock" min="50" max="200" step="5" value="100" /><div class="slider-percentage" data-target="uiScaling.clock">100%</div></div></div>
@@ -1817,6 +1818,14 @@
                                 </select>
                                 <span class="select-caret" aria-hidden="true">▾</span>
                               </div>
+                            </div>
+                            <div class="form-row">
+                              <label for="cinemaTrailerPauseAfter">Pause nach Trailer (Sek.)</label>
+                              <div class="number-input-wrapper"><input type="number" min="0" max="60" step="1" id="cinemaTrailerPauseAfter" value="7" /><div class="number-controls" role="group"><button type="button" class="number-btn number-inc" title="Increase"><i class="fas fa-chevron-up"></i></button><button type="button" class="number-btn number-dec" title="Decrease"><i class="fas fa-chevron-down"></i></button></div></div>
+                            </div>
+                            <div class="form-row">
+                              <label for="cinemaNoTrailerDisplay">Anzeige ohne Trailer (Sek.)</label>
+                              <div class="number-input-wrapper"><input type="number" min="10" max="600" step="10" id="cinemaNoTrailerDisplay" value="120" /><div class="number-controls" role="group"><button type="button" class="number-btn number-inc" title="Increase"><i class="fas fa-chevron-up"></i></button><button type="button" class="number-btn number-dec" title="Decrease"><i class="fas fa-chevron-down"></i></button></div></div>
                             </div>
                             <div class="form-row" id="cinemaTrailerReshowRow" style="display:none;">
                               <label for="cinemaTrailerReshow">Re-show after</label>
