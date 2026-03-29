@@ -728,6 +728,10 @@ module.exports = function createFrontendPagesRouter({
                     `screensaver.js?v=${versions['screensaver.js'] || ASSET_VERSION}`
                 )
                 .replace(
+                    /style\.css\?v=[^"&\s]+/g,
+                    `style.css?v=${versions['style.css'] || ASSET_VERSION}`
+                )
+                .replace(
                     /device-mgmt\.js\?v=[^"&\s]+/g,
                     `device-mgmt.js?v=${versions['device-mgmt.js'] || ASSET_VERSION}`
                 )
@@ -746,7 +750,8 @@ module.exports = function createFrontendPagesRouter({
                 .replace(
                     /\/sw\.js(\?v=[^"'\s>]+)?/g,
                     `/sw.js?v=${versions['sw.js'] || ASSET_VERSION}`
-                );
+                )
+                .replace(/\{\{ASSET_VERSION\}\}/g, ASSET_VERSION);
 
             // Inject debug viewer if enabled
             const finalHtml = injectDebugViewer(stamped, getConfig ? getConfig() : null);

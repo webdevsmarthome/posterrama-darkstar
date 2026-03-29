@@ -69,7 +69,8 @@ module.exports = function createPosterpackCreatorRouter({ logger, refreshPlaylis
     }
 
     function buildMetadata(body, oldMetadata) {
-        const { title, year, genres, overview, tagline, rating, runtime, contentRating } = body;
+        const { title, year, genres, overview, tagline, rating, runtime, contentRating,
+                director, studio, resolution, audioCodec, aspectRatio, hdr } = body;
         const base = oldMetadata || {};
         return {
             itemType: base.itemType || 'movie',
@@ -82,6 +83,14 @@ module.exports = function createPosterpackCreatorRouter({ logger, refreshPlaylis
             rating: rating ? parseFloat(rating) : (base.rating || null),
             runtimeMs: runtime ? parseInt(runtime, 10) * 60000 : (base.runtimeMs || null),
             contentRating: contentRating !== undefined ? (String(contentRating).trim() || null) : (base.contentRating || null),
+            director: director !== undefined ? (String(director).trim() || null) : (base.director || null),
+            directors: director !== undefined ? String(director).split(',').map(s => s.trim()).filter(Boolean) : (base.directors || []),
+            studio: studio !== undefined ? (String(studio).trim() || null) : (base.studio || null),
+            studios: studio !== undefined ? String(studio).split(',').map(s => s.trim()).filter(Boolean) : (base.studios || []),
+            resolution: resolution !== undefined ? (String(resolution).trim() || null) : (base.resolution || null),
+            audioCodec: audioCodec !== undefined ? (String(audioCodec).trim() || null) : (base.audioCodec || null),
+            aspectRatio: aspectRatio !== undefined ? (String(aspectRatio).trim() || null) : (base.aspectRatio || null),
+            hdr: hdr !== undefined ? (String(hdr).trim() || null) : (base.hdr || null),
             source: base.source || 'private',
             images: base.images || { primaryPoster: 'poster.jpg' },
             // Preserve other fields from original metadata

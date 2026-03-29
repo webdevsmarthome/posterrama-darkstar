@@ -130,6 +130,26 @@ for i, film in enumerate(films, 1):
     images = api_call(f'movie/{movie_id}/images')
     videos = api_call(f'movie/{movie_id}/videos')
     credits = api_call(f'movie/{movie_id}/credits')
+    release_dates = api_call(f'movie/{movie_id}/release_dates')
+
+    # CERTIFICATION (DE bevorzugt, US Fallback)
+    certification = ""
+    if release_dates and release_dates.get('results'):
+        cert_de = cert_us = ""
+        for country in release_dates['results']:
+            iso = country.get('iso_3166_1', '')
+            for rel in country.get('release_dates', []):
+                c = (rel.get('certification') or '').strip()
+                if c:
+                    if iso == 'DE' and not cert_de: cert_de = c
+                    if iso == 'US' and not cert_us: cert_us = c
+        certification = cert_de or cert_us
+
+    # DIRECTORS + STUDIOS
+    directors_list = []
+    if credits and credits.get('crew'):
+        directors_list = [c['name'] for c in credits['crew'] if c.get('job') == 'Director']
+    studios_list = [c['name'] for c in details.get('production_companies', [])]
     
     # TEMP DIRECTORY (sicher erstellen)
     tmp_dir = os.path.join(os.getcwd(), f"tmp_{i:03d}_{clean_title[:20].replace(' ', '_')}")
@@ -213,11 +233,19 @@ for i, film in enumerate(films, 1):
                 trailer = f"https://www.youtube.com/watch?v={v['key']}"
                 break
     
+    # TAGLINE (DE bevorzugt, EN Fallback)
+    tagline = (details.get('tagline') or '').strip()
+    if not tagline:
+        details_en = api_call(f'movie/{movie_id}', {'language': 'en-US'})
+        if details_en:
+            tagline = (details_en.get('tagline') or '').strip()
+
     # ULTIMATE METADATA
     metadata = {
         "itemType": "movie",
         "title": details.get('title', clean_title),
         "originalTitle": details.get('original_title', ''),
+        "tagline": tagline,
         "year": int(year) if year else 0,
         "tmdbId": movie_id,
         "imdbId": details.get('imdb_id', ''),
@@ -228,6 +256,11 @@ for i, film in enumerate(films, 1):
         "runtimeMs": details.get('runtime', 0) * 60000,
         "budget": details.get('budget', 0),
         "revenue": details.get('revenue', 0),
+        "contentRating": certification,
+        "director": directors_list[0] if directors_list else "",
+        "directors": directors_list,
+        "studio": studios_list[0] if studios_list else "",
+        "studios": studios_list,
         "cast": cast_data,
         "peopleImages": people_imgs,
         "trailer": trailer,

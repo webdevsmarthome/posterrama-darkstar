@@ -178,6 +178,9 @@ module.exports = function createConfigPublicRouter({
                 return undefined;
             }
 
+            // PATCH: config may be a Config class instance where raw values live in config.config
+            const cfg = (config && config.config && typeof config.config === 'object') ? config.config : config;
+
             const userAgent = req.get('user-agent') || '';
             const isMobile = /Mobile|Android|iPhone|iPad/i.test(userAgent);
 
@@ -209,45 +212,49 @@ module.exports = function createConfigPublicRouter({
                 },
             };
             const baseConfig = {
-                clockWidget: config.clockWidget !== false,
-                clockTimezone: config.clockTimezone || 'auto',
-                clockFormat: config.clockFormat || '24h',
-                syncEnabled: config.syncEnabled !== false,
-                syncAlignMaxDelayMs: Number.isFinite(Number(config.syncAlignMaxDelayMs))
-                    ? Number(config.syncAlignMaxDelayMs)
+                clockWidget: cfg.clockWidget !== false,
+                clockTimezone: cfg.clockTimezone || 'auto',
+                clockFormat: cfg.clockFormat || '24h',
+                syncEnabled: cfg.syncEnabled !== false,
+                syncAlignMaxDelayMs: Number.isFinite(Number(cfg.syncAlignMaxDelayMs))
+                    ? Number(cfg.syncAlignMaxDelayMs)
                     : 1200,
-                cinemaMode: config.cinemaMode || false,
-                cinemaOrientation: config.cinema?.orientation || config.cinemaOrientation || 'auto',
-                cinema: config.cinema || {},
-                screensaverMode: config.screensaverMode || { orientation: 'auto' },
-                wallartMode: { ...wallartDefaults, ...(config.wallartMode || {}) },
-                transitionIntervalSeconds: config.transitionIntervalSeconds || 15,
-                backgroundRefreshMinutes: Number.isFinite(Number(config.backgroundRefreshMinutes))
-                    ? Number(config.backgroundRefreshMinutes)
+                cinemaMode: cfg.cinemaMode || false,
+                cinemaOrientation: cfg.cinema?.orientation || cfg.cinemaOrientation || 'auto',
+                cinema: cfg.cinema || {},
+                screensaverMode: cfg.screensaverMode || { orientation: 'auto' },
+                wallartMode: { ...wallartDefaults, ...(cfg.wallartMode || {}) },
+                transitionIntervalSeconds: cfg.transitionIntervalSeconds || 15,
+                backgroundRefreshMinutes: Number.isFinite(Number(cfg.backgroundRefreshMinutes))
+                    ? Number(cfg.backgroundRefreshMinutes)
                     : 60,
-                showClearLogo: config.showClearLogo !== false,
-                showPoster: config.showPoster !== false,
-                showMetadata: config.showMetadata === true,
-                showRottenTomatoes: config.showRottenTomatoes !== false,
-                rottenTomatoesMinimumScore: config.rottenTomatoesMinimumScore || 0,
-                transitionEffect: config.transitionEffect || 'kenburns',
-                effectPauseTime: config.effectPauseTime || 2,
-                kenBurnsEffect: config.kenBurnsEffect || { enabled: true, durationSeconds: 20 },
-                uiScaling: config.uiScaling || {
+                showClearLogo: cfg.showClearLogo !== false,
+                showPoster: cfg.showPoster !== false,
+                showMetadata: cfg.showMetadata === true,
+                showRottenTomatoes: cfg.showRottenTomatoes !== false,
+                showTrailer: cfg.showTrailer !== false,
+                rottenTomatoesMinimumScore: cfg.rottenTomatoesMinimumScore || 0,
+                transitionEffect: cfg.transitionEffect || 'kenburns',
+                effectPauseTime: cfg.effectPauseTime || 2,
+                kenBurnsEffect: cfg.kenBurnsEffect || { enabled: true, durationSeconds: 20 },
+                uiScaling: cfg.uiScaling || {
                     poster: 100,
                     content: 100,
                     clearlogo: 100,
                     clock: 100,
                     global: 100,
                 },
-                mediaServers: config.mediaServers || null,
-                localDirectory: config.localDirectory
+                trailerDelaySeconds: cfg.trailerDelaySeconds,
+                trailerPauseAfterSeconds: cfg.trailerPauseAfterSeconds,
+                noTrailerDisplaySeconds: cfg.noTrailerDisplaySeconds,
+                mediaServers: cfg.mediaServers || null,
+                localDirectory: cfg.localDirectory
                     ? {
-                          enabled: config.localDirectory.enabled || false,
+                          enabled: cfg.localDirectory.enabled || false,
                       }
                     : null,
-                pauseIndicator: config.pauseIndicator || { enabled: true },
-                burnInPrevention: config.burnInPrevention || null,
+                pauseIndicator: cfg.pauseIndicator || { enabled: true },
+                burnInPrevention: cfg.burnInPrevention || null,
             };
 
             // Try to identify device and merge settings from profile (Global < Profile)

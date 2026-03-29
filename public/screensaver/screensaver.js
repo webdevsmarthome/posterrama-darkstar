@@ -67,6 +67,7 @@
             // In the refactored screensaver, we render the poster on the single #poster element
             try {
                 const poster = $('poster');
+                const wrapper = $('poster-wrapper');
                 if (!poster) return;
                 if (url) {
                     // PROGRESSIVE LOADING: Show thumbnail first for instant feedback
@@ -78,11 +79,19 @@
                     poster.style.filter = 'blur(3px)';
                     poster.style.transition = 'filter 0.5s ease-out';
 
-                    // Load full quality in background
+                    // Load full quality in background + adapt wrapper height to poster aspect ratio
                     const fullImg = new Image();
                     fullImg.onload = () => {
                         poster.style.backgroundImage = `url('${url}')`;
                         poster.style.filter = 'none';
+                        // Adapt wrapper height to actual poster aspect ratio (width stays fixed)
+                        if (wrapper && fullImg.naturalWidth > 0 && fullImg.naturalHeight > 0) {
+                            const ww = wrapper.offsetWidth;
+                            if (ww > 0) {
+                                const aspectRatio = fullImg.naturalHeight / fullImg.naturalWidth;
+                                wrapper.style.height = Math.round(ww * aspectRatio) + 'px';
+                            }
+                        }
                     };
                     fullImg.onerror = () => {
                         // Keep thumbnail, remove blur
@@ -91,6 +100,8 @@
                     fullImg.src = url;
                 } else {
                     poster.style.backgroundImage = '';
+                    // Reset wrapper height to default
+                    if (wrapper) wrapper.style.height = '';
                 }
             } catch (_) {
                 /* noop */

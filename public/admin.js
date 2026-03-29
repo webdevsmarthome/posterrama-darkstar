@@ -33949,6 +33949,12 @@ if (!document.__niwDelegatedFallback) {
                 setVal('pc-rating', m.rating || '');
                 setVal('pc-runtime', m.runtimeMs ? Math.round(m.runtimeMs / 60000) : '');
                 setVal('pc-contentRating', m.contentRating || '');
+                setVal('pc-director', m.director || (m.directors || []).join(', ') || '');
+                setVal('pc-studio', m.studio || (m.studios || []).join(', ') || '');
+                setVal('pc-resolution', m.resolution || '');
+                setVal('pc-audioCodec', m.audioCodec || '');
+                setVal('pc-aspectRatio', m.aspectRatio || '');
+                setVal('pc-hdr', m.hdr || '');
                 var files = data.files || [];
                 fileFields.forEach(function (name) {
                     var label = document.getElementById('pc-' + name + 'Name');
@@ -34042,7 +34048,7 @@ if (!document.__niwDelegatedFallback) {
                 var formData = new FormData();
                 formData.append('title', document.getElementById('pc-title').value.trim());
                 formData.append('year', document.getElementById('pc-year').value.trim());
-                ['genres', 'tagline', 'overview', 'rating', 'runtime', 'contentRating'].forEach(function (f) {
+                ['genres', 'tagline', 'overview', 'rating', 'runtime', 'contentRating', 'director', 'studio', 'resolution', 'audioCodec', 'aspectRatio', 'hdr'].forEach(function (f) {
                     var el = document.getElementById('pc-' + f);
                     if (el) formData.append(f, el.value.trim());
                 });
@@ -34078,7 +34084,7 @@ if (!document.__niwDelegatedFallback) {
 
         function resetForm() {
             pcEditMode = null; pcZipRelPath = null;
-            ['pc-title', 'pc-year', 'pc-genres', 'pc-tagline', 'pc-overview', 'pc-rating', 'pc-runtime', 'pc-contentRating'].forEach(function (id) {
+            ['pc-title', 'pc-year', 'pc-genres', 'pc-tagline', 'pc-overview', 'pc-rating', 'pc-runtime', 'pc-contentRating', 'pc-director', 'pc-studio', 'pc-resolution', 'pc-audioCodec', 'pc-aspectRatio', 'pc-hdr'].forEach(function (id) {
                 var el = document.getElementById(id); if (el) el.value = '';
             });
             fileFields.forEach(function (name) {

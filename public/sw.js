@@ -1,7 +1,7 @@
 // Posterrama PWA Service Worker
-// Version 2.3.0 - Bypass SW cache for cinema-display.js
+// Version 2.3.1 - Bypass SW cache for style.css
 
-const CACHE_NAME = 'posterrama-pwa-v2.3.0';
+const CACHE_NAME = 'posterrama-pwa-v2.3.1';
 const MEDIA_CACHE_NAME = 'posterrama-media-v1.1.1';
 
 // Cache limits to avoid QuotaExceededError
@@ -125,12 +125,13 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Always fetch latest admin and logs assets from network (no SW cache). Fallback to cache only if offline.
+    // Always fetch latest admin, logs and display assets from network (no SW cache). Fallback to cache only if offline.
     if (
         url.pathname === '/admin.js' ||
         url.pathname === '/admin.css' ||
         url.pathname === '/logs.js' ||
-        url.pathname === '/logs.css'
+        url.pathname === '/logs.css' ||
+        url.pathname === '/style.css'
     ) {
         event.respondWith(fetch(request, { cache: 'no-store' }).catch(() => caches.match(request)));
         return;

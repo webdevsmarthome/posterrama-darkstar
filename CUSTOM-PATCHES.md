@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-03-27 (basierend auf Version 3.0.1h)
+**Stand:** 2026-03-29 (basierend auf Version 3.0.1j)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 
 ---
@@ -54,6 +54,16 @@
 | 43 | Screensaver Trailer Fixes | screensaver.js, screensaver.css | Autoplay triple-fallback, Video-Crop, Duplicate-Keyhandler entfernt, alle 4 Transition-Pfade mit Trailer |
 | 44 | Screensaver startCycler Fix | screensaver.js | startCycler() aus next/prev/resume entfernt — createTrailerOverlay verwaltet Timer allein |
 | 45 | Broadcast Debug Logging | routes/poster-selector.js | Logging fuer playlist.refresh Broadcast (Diagnose) |
+| 46 | Tagline Fetcher | poster-updater/fetch-taglines.py, tmdb-get-posters-direct.py | Laedt fehlende Taglines von TMDB (DE bevorzugt, EN Fallback) und fuegt sie in ZIPs ein |
+| 47 | Metadata-Extras Fetcher | poster-updater/fetch-metadata-extras.py, tmdb-get-posters-direct.py | Certification (FSK), Director, Studio von TMDB in alle ZIPs |
+| 48 | Posterpack Studio erweitert | routes/posterpack-creator.js, admin.html, admin.js | Neue Felder: Regisseur, Studio, Aufloesung, Audio, Seitenverhaeltnis, HDR |
+| 49 | Media-Aggregator erweitert | lib/media-aggregator.js | Director, Studio, Resolution, Audio, AspectRatio, HDR aus ZIP-Metadata durchreichen |
+| 50 | Config-Public Fix | routes/config-public.js | config.config statt config fuer Raw-Werte (uiScaling, showRottenTomatoes etc. wurden ignoriert) |
+| 51 | style.css background Fix | public/style.css | background-image statt background Shorthand (verhinderte background-size:contain) |
+| 52 | Poster-Link Fix | public/style.css | #poster-link display:block+100% fuer Chrome/Safari (poster-wrapper Kind hatte 0x0) |
+| 53 | Poster dynamische Hoehe | public/screensaver/screensaver.js | Wrapper-Hoehe passt sich per JS an Poster-Seitenverhaeltnis an |
+| 54 | Screensaver style.css Cache | routes/frontend-pages.js, public/sw.js | style.css Cache-Buster + SW-Bypass fuer Screensaver-Route |
+| 55 | Screensaver Inline-CSS Fix | public/screensaver.html | background-size:contain statt cover in Inline-CSS |
 
 ---
 
