@@ -350,8 +350,8 @@ body {
     padding: 2.5rem !important;
     width: 100%;
     max-width: 420px;
-    backdrop-filter: blur(20px) !important;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3) !important;
+    backdrop-filter: blur(8px) !important;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3) !important;
     z-index: 9999;
     text-align: center;
     color: #e2e8f0;
@@ -514,14 +514,14 @@ body.no-media-background {
     transform: translate(-50%, -50%) scale(0.95); /* Start slightly smaller for animation */
     z-index: 50;
     background-color: rgba(20, 20, 20, 0.88);
-    backdrop-filter: blur(15px);
+    backdrop-filter: blur(6px);
     color: #fff;
     padding: 40px 50px;
     border-radius: 16px;
     text-align: center;
     max-width: 600px;
     width: 90%;
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.1);
     opacity: 0; /* Start hidden for animation */
     transition:
@@ -961,12 +961,12 @@ body.promo-site #promo-box.is-hidden {
     border-radius: 8px;
     position: relative;
     z-index: 1;
-    box-shadow: 0 15px 25px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.45);
 }
 
 /* Enhanced drop shadow for screensaver mode */
 body.screensaver-mode #poster {
-    box-shadow: -8px 15px 30px rgba(0, 0, 0, 0.6); /* Left and bottom shadow for depth */
+    box-shadow: -4px 8px 15px rgba(0, 0, 0, 0.6); /* Left and bottom shadow for depth */
 }
 
 /* Extra space for shadow in screensaver mode */

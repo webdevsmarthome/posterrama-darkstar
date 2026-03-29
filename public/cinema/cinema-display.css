@@ -1103,7 +1103,7 @@ body[data-orientation='portrait-flipped'] #poster {
         var(--ambilight-color, rgba(255, 255, 255, 0.3)) 0%,
         transparent 70%
     );
-    filter: blur(80px);
+    filter: blur(15px);
     opacity: var(--ambilight-strength, 0.5);
     transition:
         background 0.5s ease,
@@ -1327,7 +1327,7 @@ body.cinema-bg-ambient::after {
     );
     z-index: 2;
     opacity: 0.6;
-    filter: blur(80px);
+    filter: blur(15px);
     pointer-events: none;
 }
 
@@ -3759,8 +3759,8 @@ body.cinema-tint-active::after {
     gap: 1rem;
     padding: 2rem 3rem;
     background: rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     opacity: 0;
@@ -3813,8 +3813,8 @@ body.cinema-tint-active::after {
     height: 34px;
     padding: 0;
     background: rgba(0, 0, 0, 0.28);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow:

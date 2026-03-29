@@ -80,7 +80,7 @@
                     poster.style.transition = 'filter 0.5s ease-out';
 
                     // Load full quality in background + adapt wrapper height to poster aspect ratio
-                    const fullImg = new Image();
+                    let fullImg = new Image();
                     fullImg.onload = () => {
                         poster.style.backgroundImage = `url('${url}')`;
                         poster.style.filter = 'none';
@@ -92,10 +92,16 @@
                                 wrapper.style.height = Math.round(ww * aspectRatio) + 'px';
                             }
                         }
+                        fullImg.onload = null;
+                        fullImg.onerror = null;
+                        fullImg = null;
                     };
                     fullImg.onerror = () => {
                         // Keep thumbnail, remove blur
                         poster.style.filter = 'none';
+                        fullImg.onload = null;
+                        fullImg.onerror = null;
+                        fullImg = null;
                     };
                     fullImg.src = url;
                 } else {
@@ -594,7 +600,8 @@
                         };
                         _clockUpdateFn = updateClock; // Store for later use
                         updateClock(); // Initial update
-                        setInterval(updateClock, 1000); // Update every second
+                        if (_state._clockInterval) clearInterval(_state._clockInterval);
+                        _state._clockInterval = setInterval(updateClock, 1000);
                     } catch (_) {
                         /* clock update is optional */
                     }
@@ -668,6 +675,14 @@
                             }, 2500);
                         };
                         const onInteract = () => showControls();
+                        // Remove previous listeners if re-initialized (prevent accumulation)
+                        if (_state._onInteract) {
+                            document.body?.removeEventListener('mousemove', _state._onInteract);
+                            document.body?.removeEventListener('touchstart', _state._onInteract);
+                            window.removeEventListener('mousemove', _state._onInteract);
+                            window.removeEventListener('touchstart', _state._onInteract);
+                        }
+                        _state._onInteract = onInteract;
                         // Bind to body for faster response similar to legacy behavior
                         if (document && document.body) {
                             document.body.addEventListener('mousemove', onInteract, {
@@ -733,7 +748,8 @@
                         // Note: Pause indicator functions are defined outside this try block
                         // so they can be accessed by window.__posterramaPlayback
 
-                        document.addEventListener('keydown', e => {
+                        if (_state._onKeydown) document.removeEventListener('keydown', _state._onKeydown);
+                        _state._onKeydown = e => {
                             try {
                                 showControls();
                             } catch (_) {
@@ -779,7 +795,8 @@
                                     if (pauseBtn) pauseBtn.classList.remove('is-paused');
                                 }
                             }
-                        });
+                        };
+                        document.addEventListener('keydown', _state._onKeydown);
                     } catch (_) {
                         /* noop */
                     }
@@ -988,7 +1005,8 @@
                                 }
                             } catch (_) {}
                         }
-                        setInterval(ssCheckPlaylistChange, 5000);
+                        if (_state._playlistInterval) clearInterval(_state._playlistInterval);
+                        _state._playlistInterval = setInterval(ssCheckPlaylistChange, 5000);
                         ssCheckPlaylistChange();
                     } catch (_) { /* noop */ }
 
@@ -1002,7 +1020,8 @@
                             }
                         };
 
-                        document.addEventListener('keydown', e => {
+                        if (_state._onDpadKeydown) document.removeEventListener('keydown', _state._onDpadKeydown);
+                        _state._onDpadKeydown = e => {
                             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')
                                 return;
 
@@ -1034,7 +1053,8 @@
                                     }
                                     break;
                             }
-                        });
+                        };
+                        document.addEventListener('keydown', _state._onDpadKeydown);
                     } catch (_) {
                         /* D-pad init best-effort */
                     }
@@ -1052,6 +1072,27 @@
                     if (_state.cycleTimer) {
                         clearInterval(_state.cycleTimer);
                         _state.cycleTimer = null;
+                    }
+                    if (_state._clockInterval) {
+                        clearInterval(_state._clockInterval);
+                        _state._clockInterval = null;
+                    }
+                    if (_state._playlistInterval) {
+                        clearInterval(_state._playlistInterval);
+                        _state._playlistInterval = null;
+                    }
+                    if (_state._onInteract) {
+                        document.body?.removeEventListener('mousemove', _state._onInteract);
+                        document.body?.removeEventListener('touchstart', _state._onInteract);
+                        _state._onInteract = null;
+                    }
+                    if (_state._onKeydown) {
+                        document.removeEventListener('keydown', _state._onKeydown);
+                        _state._onKeydown = null;
+                    }
+                    if (_state._onDpadKeydown) {
+                        document.removeEventListener('keydown', _state._onDpadKeydown);
+                        _state._onDpadKeydown = null;
                     }
                     _state.started = false;
                 } catch (_) {

@@ -3,7 +3,11 @@
  * Fullscreen animated cards showing grouped films (like artist-cards for music)
  */
 
-console.log('[Film Cards] Script loaded - setting up message listener');
+// Debug logging — disabled in production for RPi4 performance
+const _fcDebug = window.location.search.includes('debug=filmcards');
+const _fcLog = _fcDebug ? console.log.bind(console) : () => {};
+
+_fcLog('[Film Cards] Script loaded - setting up message listener');
 
 (function () {
     'use strict';
@@ -57,7 +61,7 @@ console.log('[Film Cards] Script loaded - setting up message listener');
             // Important: preview/admin can reinitialize rapidly on live setting changes.
             // Clear any previous timers to avoid accumulating intervals and freezing the browser.
             this.stop();
-            console.log('[Film Cards] Initialize called with:', {
+            _fcLog('[Film Cards] Initialize called with:', {
                 hasContainer: !!params.container,
                 mediaCount: params.mediaQueue?.length || 0,
                 hasConfig: !!params.appConfig,
@@ -75,7 +79,7 @@ console.log('[Film Cards] Script loaded - setting up message listener');
             this._isPreview = !!isPreview;
 
             if (!container || !mediaQueue.length) {
-                console.log('[Film Cards] Early return - no container or media');
+                _fcLog('[Film Cards] Early return - no container or media');
                 return { currentPosters: [], usedPosters: new Set() };
             }
 
@@ -110,7 +114,7 @@ console.log('[Film Cards] Script loaded - setting up message listener');
             const posterRotationSeconds = parseInt(filmCardsCfg.posterRotationSeconds) || 15;
             const accentColor = filmCardsCfg.accentColor || '#b40f0f';
 
-            console.log('[Film Cards] Config:', {
+            _fcLog('[Film Cards] Config:', {
                 groupBy,
                 minGroupSize,
                 cardRotationSeconds,
@@ -138,7 +142,7 @@ console.log('[Film Cards] Script loaded - setting up message listener');
                     // Random: pick random groupBy each time
                     const modes = ['director', 'genre', 'actor', 'collection'];
                     const randomMode = modes[Math.floor(Math.random() * modes.length)];
-                    console.log('[Film Cards] Random mode selected:', randomMode);
+                    _fcLog('[Film Cards] Random mode selected:', randomMode);
                     if (randomMode === 'director') {
                         groupsMap = this.groupByDirector(mediaForGrouping, minGroupSize);
                     } else if (randomMode === 'genre') {
@@ -153,10 +157,10 @@ console.log('[Film Cards] Script loaded - setting up message listener');
             }
 
             let groups = Array.from(groupsMap.values());
-            console.log('[Film Cards] Grouped into', groups.length, 'groups');
+            _fcLog('[Film Cards] Grouped into', groups.length, 'groups');
 
             if (groups.length === 0) {
-                console.warn('[Film Cards] No groups found after grouping');
+                _fcLog('[Film Cards] No groups found after grouping');
                 return { currentPosters: [], usedPosters: new Set() };
             }
 
@@ -168,7 +172,7 @@ console.log('[Film Cards] Script loaded - setting up message listener');
 
             // Shuffle groups randomly
             groups = groups.sort(() => Math.random() - 0.5);
-            console.log('[Film Cards] Groups shuffled randomly');
+            _fcLog('[Film Cards] Groups shuffled randomly');
 
             // Clear container and set up fullscreen layout
             container.innerHTML = '';
@@ -196,7 +200,7 @@ console.log('[Film Cards] Script loaded - setting up message listener');
             let currentCard = null;
 
             const showGroup = () => {
-                console.log('[Film Cards] Showing group', currentGroupIndex);
+                _fcLog('[Film Cards] Showing group', currentGroupIndex);
 
                 // Stop any previous poster rotation immediately (don't wait for next interval tick).
                 if (this._posterRotationIntervalId) {
@@ -210,7 +214,7 @@ console.log('[Film Cards] Script loaded - setting up message listener');
                 container.innerHTML = '';
 
                 const groupData = groups[currentGroupIndex];
-                console.log('[Film Cards] Creating card for group:', groupData.name);
+                _fcLog('[Film Cards] Creating card for group:', groupData.name);
                 currentCard = this.createFilmCard(groupData, groupBy, accentColor);
                 container.appendChild(currentCard);
 
@@ -223,7 +227,7 @@ console.log('[Film Cards] Script loaded - setting up message listener');
             };
 
             // Initial display
-            console.log('[Film Cards] Starting initial display');
+            _fcLog('[Film Cards] Starting initial display');
             showGroup();
 
             // Rotate to next group
@@ -252,10 +256,10 @@ console.log('[Film Cards] Script loaded - setting up message listener');
         groupByDirector(mediaQueue, minSize) {
             const groupMap = new Map();
 
-            console.log('[Film Cards] Grouping', mediaQueue.length, 'films by director');
+            _fcLog('[Film Cards] Grouping', mediaQueue.length, 'films by director');
 
             const validItems = mediaQueue.filter(item => item != null);
-            console.log('[Film Cards] Valid items after filtering:', validItems.length);
+            _fcLog('[Film Cards] Valid items after filtering:', validItems.length);
 
             validItems.forEach(item => {
                 // Get directors array (can have multiple directors)
@@ -333,7 +337,7 @@ console.log('[Film Cards] Script loaded - setting up message listener');
         groupByGenre(mediaQueue, minSize) {
             const groupMap = new Map();
 
-            console.log('[Film Cards] Grouping', mediaQueue.length, 'films by genre');
+            _fcLog('[Film Cards] Grouping', mediaQueue.length, 'films by genre');
 
             const validItems = mediaQueue.filter(item => item != null);
 
@@ -399,7 +403,7 @@ console.log('[Film Cards] Script loaded - setting up message listener');
         groupByActor(mediaQueue, minSize) {
             const groupMap = new Map();
 
-            console.log('[Film Cards] Grouping', mediaQueue.length, 'films by actor');
+            _fcLog('[Film Cards] Grouping', mediaQueue.length, 'films by actor');
 
             const validItems = mediaQueue.filter(item => item != null);
 
@@ -479,7 +483,7 @@ console.log('[Film Cards] Script loaded - setting up message listener');
         groupByCollection(mediaQueue, minSize) {
             const groupMap = new Map();
 
-            console.log('[Film Cards] Grouping', mediaQueue.length, 'films by collection');
+            _fcLog('[Film Cards] Grouping', mediaQueue.length, 'films by collection');
 
             const validItems = mediaQueue.filter(item => item != null);
 
@@ -1033,13 +1037,13 @@ console.log('[Film Cards] Script loaded - setting up message listener');
          */
         startPosterRotation(card, groupData, rotationSeconds) {
             if (!groupData.films || groupData.films.length <= 1) {
-                console.log('[Film Cards] Not enough films to rotate for', groupData.name);
+                _fcLog('[Film Cards] Not enough films to rotate for', groupData.name);
                 return null;
             }
 
             const posterGrid = card.querySelector('.film-poster-grid');
             if (!posterGrid) {
-                console.warn('[Film Cards] Could not find poster grid');
+                _fcLog('[Film Cards] Could not find poster grid');
                 return null;
             }
 
@@ -1076,7 +1080,7 @@ console.log('[Film Cards] Script loaded - setting up message listener');
                 const availableFilms = allFilms.filter(film => !visibleUrls.has(film.posterUrl));
 
                 if (availableFilms.length === 0) {
-                    console.log('[Film Cards] All films currently visible, skipping rotation');
+                    _fcLog('[Film Cards] All films currently visible, skipping rotation');
                     return;
                 }
 
@@ -1222,12 +1226,12 @@ console.log('[Film Cards] Script loaded - setting up message listener');
     document.head.appendChild(style);
 
     // Listen for live accent color updates from admin interface
-    console.log('[Film Cards] Registering message listener for accent color updates');
+    _fcLog('[Film Cards] Registering message listener for accent color updates');
     window.addEventListener('message', event => {
-        console.log('[Film Cards] Received message:', event.data);
+        _fcLog('[Film Cards] Received message:', event.data);
         if (event.data && event.data.type === 'FILMCARDS_ACCENT_COLOR_UPDATE') {
             const newColor = event.data.color;
-            console.log('[Film Cards] Received live color update:', newColor);
+            _fcLog('[Film Cards] Received live color update:', newColor);
 
             // Update all overlay elements with new gradient
             const overlays = document.querySelectorAll('.film-card-overlay');

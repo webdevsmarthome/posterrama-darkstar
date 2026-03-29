@@ -2519,7 +2519,8 @@
 
     function initStars() {
         stars = [];
-        const numStars = Math.floor((starfieldCanvas.width * starfieldCanvas.height) / 4000);
+        // Cap star count for RPi4 GPU performance
+        const numStars = Math.min(200, Math.floor((starfieldCanvas.width * starfieldCanvas.height) / 4000));
         for (let i = 0; i < numStars; i++) {
             stars.push({
                 x: Math.random() * starfieldCanvas.width,
@@ -2539,7 +2540,8 @@
         starfieldCtx.fillStyle = '#000';
         starfieldCtx.fillRect(0, 0, starfieldCanvas.width, starfieldCanvas.height);
 
-        stars.forEach(star => {
+        for (let i = 0; i < stars.length; i++) {
+            const star = stars[i];
             // Twinkle effect
             star.twinklePhase += star.twinkleSpeed;
             const twinkle = Math.sin(star.twinklePhase) * 0.3 + 0.7;
@@ -2550,13 +2552,13 @@
             starfieldCtx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
             starfieldCtx.fill();
 
-            // Slow drift
+            // Slow drift — recycled in-place, no new objects
             star.y += star.speed;
             if (star.y > starfieldCanvas.height) {
                 star.y = 0;
                 star.x = Math.random() * starfieldCanvas.width;
             }
-        });
+        }
 
         starfieldAnimationId = requestAnimationFrame(animateStarfield);
     }
@@ -4178,7 +4180,8 @@
         } catch (_) {}
     }
     // Poll every 5 seconds for playlist changes
-    setInterval(checkPlaylistChange, 5000);
+    if (window._cinemaPlaylistInterval) clearInterval(window._cinemaPlaylistInterval);
+    window._cinemaPlaylistInterval = setInterval(checkPlaylistChange, 5000);
     // Initial hash capture
     checkPlaylistChange();
 

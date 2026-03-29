@@ -73,12 +73,15 @@ class LazyLoader {
             img.classList.add('lazy-loading');
 
             // Create new image to preload
-            const newImg = new Image();
+            let newImg = new Image();
 
             // Set up load handlers
             await new Promise((resolve, reject) => {
                 // Add timeout to prevent hanging
                 const timeout = setTimeout(() => {
+                    newImg.onload = null;
+                    newImg.onerror = null;
+                    newImg = null;
                     reject(new Error(`Timeout loading image: ${lazySrc}`));
                 }, 10000); // 10 second timeout
 
@@ -93,13 +96,18 @@ class LazyLoader {
                     // Remove from failed images if it was there
                     this.failedImages.delete(img);
 
-                    // Info log removed to keep browser console clean
+                    newImg.onload = null;
+                    newImg.onerror = null;
+                    newImg = null;
                     resolve();
                 };
 
                 newImg.onerror = event => {
                     clearTimeout(timeout);
                     console.error(`[LazyLoader] Image error event:`, event);
+                    newImg.onload = null;
+                    newImg.onerror = null;
+                    newImg = null;
                     reject(new Error(`Failed to load image: ${lazySrc}`));
                 };
 

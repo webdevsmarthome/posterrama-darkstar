@@ -15,6 +15,10 @@
 (function () {
     'use strict';
 
+    // Debug logging — disabled in production for RPi4 performance
+    const _debug = window.location.search.includes('debug=parallax');
+    const _log = _debug ? console.log.bind(console) : () => {};
+
     // Module state
     const state = {
         isActive: false,
@@ -36,7 +40,7 @@
      * @param {Array} posters - Array of poster items to display
      */
     function init(config, posters) {
-        console.log('[ParallaxScrolling] Initializing with config:', config);
+        _log('[ParallaxScrolling] Initializing with config:', config);
 
         // Clean up any existing instance
         cleanup();
@@ -55,7 +59,7 @@
         // Start animation loop
         startScrolling();
 
-        console.log('[ParallaxScrolling] Initialized with', state.layers.length, 'layers');
+        _log('[ParallaxScrolling] Initialized with', state.layers.length, 'layers');
     }
 
     /**
@@ -266,7 +270,7 @@
             });
 
             if (!res.ok) {
-                console.warn('[ParallaxScrolling] Failed to fetch more posters:', res.status);
+                _log('[ParallaxScrolling] Failed to fetch more posters:', res.status);
                 state.isFetching = false;
                 return;
             }
@@ -281,12 +285,18 @@
             if (newPosters.length > 0) {
                 console.log(`[ParallaxScrolling] Loaded ${newPosters.length} new posters`);
 
-                // Add new posters to pool
+                // Add new posters to pool (cap at 1000 to prevent unbounded memory growth)
                 state.allPosters.push(...newPosters);
+                if (state.allPosters.length > 1000) {
+                    state.allPosters = state.allPosters.slice(-1000);
+                }
 
-                // Add shuffled new posters to queue
+                // Add shuffled new posters to queue (cap at 500)
                 const shuffledNew = shuffleArray(newPosters);
                 state.posterQueue.push(...shuffledNew);
+                if (state.posterQueue.length > 500) {
+                    state.posterQueue = state.posterQueue.slice(-500);
+                }
             }
         } catch (err) {
             console.error('[ParallaxScrolling] Error fetching more posters:', err);
@@ -311,7 +321,7 @@
 
         // If queue is empty, add shuffled posters from existing pool while waiting for fetch
         if (state.posterQueue.length === 0) {
-            console.log('[ParallaxScrolling] Queue empty, reshuffling existing pool...');
+            _log('[ParallaxScrolling] Queue empty, reshuffling existing pool...');
             state.posterQueue = shuffleArray([...state.allPosters]);
         }
 
@@ -458,7 +468,7 @@
      * Stop scrolling and clean up
      */
     function cleanup() {
-        console.log('[ParallaxScrolling] Cleaning up');
+        _log('[ParallaxScrolling] Cleaning up');
 
         state.isActive = false;
 
@@ -487,7 +497,7 @@
      * @param {Object} newConfig - New parallax configuration
      */
     function updateConfig(newConfig) {
-        console.log('[ParallaxScrolling] Updating config:', newConfig);
+        _log('[ParallaxScrolling] Updating config:', newConfig);
 
         state.config = newConfig;
 
@@ -520,5 +530,5 @@
         isActive: () => state.isActive,
     };
 
-    console.log('[ParallaxScrolling] Module loaded');
+    _log('[ParallaxScrolling] Module loaded');
 })();
