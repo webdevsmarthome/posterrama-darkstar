@@ -33917,6 +33917,111 @@ if (!document.__niwDelegatedFallback) {
         var packSelect = document.getElementById('pc-packSelect');
         var fileFields = ['poster', 'background', 'thumbnail', 'clearlogo', 'trailer'];
 
+        // --- Genre Multi-Select ---
+        var PC_GENRES = [
+            'Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Disaster',
+            'Documentary', 'Drama', 'Family', 'Fantasy', 'Heimatfilm', 'History',
+            'Home Movie', 'Horror', 'Indie', 'Martial Arts', 'Music', 'Mystery',
+            'Noir', 'Original', 'Romance', 'Science Fiction', 'Sport', 'Thriller',
+            'TV Movie', 'War', 'Western'
+        ];
+        var pcSelectedGenres = [];
+        var pcGenreSelect = document.getElementById('pc-genre-select');
+        var pcGenreSelected = document.getElementById('pc-genre-selected');
+        var pcGenreDropdown = document.getElementById('pc-genre-dropdown');
+        var pcGenreHidden = document.getElementById('pc-genres');
+
+        function pcRenderGenreDropdown() {
+            pcGenreDropdown.innerHTML = PC_GENRES.map(function (g) {
+                var sel = pcSelectedGenres.indexOf(g) !== -1;
+                return '<div class="pc-genre-option' + (sel ? ' selected' : '') + '" data-genre="' + g + '">' +
+                    '<span class="pc-genre-option-check">' + (sel ? '&#10003;' : '') + '</span>' +
+                    '<span>' + g + '</span></div>';
+            }).join('');
+        }
+
+        function pcRenderSelectedGenres() {
+            if (pcSelectedGenres.length === 0) {
+                pcGenreSelected.innerHTML = '<span class="pc-genre-placeholder">Genres auswählen...</span>';
+            } else {
+                pcGenreSelected.innerHTML = pcSelectedGenres.map(function (g) {
+                    return '<span class="pc-genre-tag">' + g +
+                        '<span class="pc-genre-tag-remove" data-genre="' + g + '">&times;</span></span>';
+                }).join('');
+            }
+            pcGenreHidden.value = pcSelectedGenres.join(', ');
+        }
+
+        function pcToggleGenre(genre) {
+            var idx = pcSelectedGenres.indexOf(genre);
+            if (idx !== -1) { pcSelectedGenres.splice(idx, 1); }
+            else { pcSelectedGenres.push(genre); }
+            pcRenderSelectedGenres();
+            pcRenderGenreDropdown();
+        }
+
+        function pcSetGenres(genres) {
+            pcSelectedGenres = Array.isArray(genres) ? genres.filter(Boolean) : [];
+            pcRenderSelectedGenres();
+            pcRenderGenreDropdown();
+        }
+
+        if (pcGenreSelect) {
+            pcGenreSelected.addEventListener('click', function (e) {
+                if (e.target.classList.contains('pc-genre-tag-remove')) {
+                    pcToggleGenre(e.target.getAttribute('data-genre'));
+                    return;
+                }
+                pcGenreSelect.classList.toggle('open');
+            });
+            pcGenreDropdown.addEventListener('click', function (e) {
+                var opt = e.target.closest('.pc-genre-option');
+                if (opt) pcToggleGenre(opt.getAttribute('data-genre'));
+            });
+            document.addEventListener('click', function (e) {
+                if (!pcGenreSelect.contains(e.target)) pcGenreSelect.classList.remove('open');
+            });
+            pcRenderGenreDropdown();
+            pcRenderSelectedGenres();
+        }
+
+        // --- Cast Editor ---
+        var pcCastList = document.getElementById('pc-cast-list');
+        var pcCastAddBtn = document.getElementById('pc-cast-add-btn');
+
+        function pcAddCastRow(name, role) {
+            var row = document.createElement('div');
+            row.className = 'pc-cast-row';
+            row.innerHTML =
+                '<input type="text" class="pc-cast-name" placeholder="Name" value="' + (name || '').replace(/"/g, '&quot;') + '">' +
+                '<input type="text" class="pc-cast-role" placeholder="Rolle" value="' + (role || '').replace(/"/g, '&quot;') + '">' +
+                '<button type="button" class="pc-cast-row-remove" title="Entfernen">&times;</button>';
+            row.querySelector('.pc-cast-row-remove').addEventListener('click', function () { row.remove(); });
+            pcCastList.appendChild(row);
+        }
+
+        function pcGetCast() {
+            var rows = pcCastList.querySelectorAll('.pc-cast-row');
+            var cast = [];
+            rows.forEach(function (row) {
+                var name = row.querySelector('.pc-cast-name').value.trim();
+                var role = row.querySelector('.pc-cast-role').value.trim();
+                if (name) cast.push({ name: name, role: role || '' });
+            });
+            return cast;
+        }
+
+        function pcSetCast(castArray) {
+            pcCastList.innerHTML = '';
+            if (Array.isArray(castArray)) {
+                castArray.forEach(function (c) { pcAddCastRow(c.name, c.role); });
+            }
+        }
+
+        if (pcCastAddBtn) {
+            pcCastAddBtn.addEventListener('click', function () { pcAddCastRow('', ''); });
+        }
+
         async function loadPackList() {
             if (!packSelect) return;
             try {
@@ -33943,18 +34048,33 @@ if (!document.__niwDelegatedFallback) {
                 var m = data.metadata || {};
                 setVal('pc-title', m.title || '');
                 setVal('pc-year', m.year || '');
-                setVal('pc-genres', Array.isArray(m.genres) ? m.genres.join(', ') : '');
+                pcSetGenres(Array.isArray(m.genres) ? m.genres : []);
                 setVal('pc-tagline', m.tagline || '');
                 setVal('pc-overview', m.overview || '');
                 setVal('pc-rating', m.rating || '');
                 setVal('pc-runtime', m.runtimeMs ? Math.round(m.runtimeMs / 60000) : '');
-                setVal('pc-contentRating', m.contentRating || '');
-                setVal('pc-director', m.director || (m.directors || []).join(', ') || '');
-                setVal('pc-studio', m.studio || (m.studios || []).join(', ') || '');
+                // Map bare numbers to FSK format for dropdown match
+                var cr = String(m.contentRating || '').trim();
+                if (/^\d+$/.test(cr)) cr = 'FSK ' + cr;
+                setVal('pc-contentRating', cr);
+                // Director: from metadata field, or extract from cast with role "Director"
+                var directorVal = m.director || (m.directors || []).join(', ') || '';
+                if (!directorVal && Array.isArray(m.cast)) {
+                    var dirEntry = m.cast.find(function (c) { return c.role === 'Director'; });
+                    if (dirEntry) directorVal = dirEntry.name;
+                }
+                setVal('pc-director', directorVal);
+                // Try first studio from array, fall back to string
+                var studioVal = m.studio || (Array.isArray(m.studios) && m.studios[0]) || '';
+                setVal('pc-studio', studioVal);
                 setVal('pc-resolution', m.resolution || '');
                 setVal('pc-audioCodec', m.audioCodec || '');
                 setVal('pc-aspectRatio', m.aspectRatio || '');
                 setVal('pc-hdr', m.hdr || '');
+                setVal('pc-trailer', m.trailer || '');
+                setVal('pc-releaseDate', m.releaseDate ? String(m.releaseDate).substring(0, 10) : '');
+                // Load cast into editor
+                pcSetCast(Array.isArray(m.cast) ? m.cast : []);
                 var files = data.files || [];
                 fileFields.forEach(function (name) {
                     var label = document.getElementById('pc-' + name + 'Name');
@@ -34048,10 +34168,13 @@ if (!document.__niwDelegatedFallback) {
                 var formData = new FormData();
                 formData.append('title', document.getElementById('pc-title').value.trim());
                 formData.append('year', document.getElementById('pc-year').value.trim());
-                ['genres', 'tagline', 'overview', 'rating', 'runtime', 'contentRating', 'director', 'studio', 'resolution', 'audioCodec', 'aspectRatio', 'hdr'].forEach(function (f) {
+                ['genres', 'tagline', 'overview', 'rating', 'runtime', 'contentRating', 'director', 'studio', 'resolution', 'audioCodec', 'aspectRatio', 'hdr', 'trailer', 'releaseDate'].forEach(function (f) {
                     var el = document.getElementById('pc-' + f);
                     if (el) formData.append(f, el.value.trim());
                 });
+                // Append cast as JSON string
+                var castData = pcGetCast();
+                if (castData.length > 0) formData.append('cast', JSON.stringify(castData));
                 fileFields.forEach(function (name) {
                     var input = document.getElementById('pc-' + name + 'File');
                     if (input && input.files.length) formData.append(name, input.files[0]);
@@ -34084,9 +34207,10 @@ if (!document.__niwDelegatedFallback) {
 
         function resetForm() {
             pcEditMode = null; pcZipRelPath = null;
-            ['pc-title', 'pc-year', 'pc-genres', 'pc-tagline', 'pc-overview', 'pc-rating', 'pc-runtime', 'pc-contentRating', 'pc-director', 'pc-studio', 'pc-resolution', 'pc-audioCodec', 'pc-aspectRatio', 'pc-hdr'].forEach(function (id) {
+            ['pc-title', 'pc-year', 'pc-genres', 'pc-tagline', 'pc-overview', 'pc-rating', 'pc-runtime', 'pc-contentRating', 'pc-director', 'pc-studio', 'pc-resolution', 'pc-audioCodec', 'pc-aspectRatio', 'pc-hdr', 'pc-trailer', 'pc-releaseDate'].forEach(function (id) {
                 var el = document.getElementById(id); if (el) el.value = '';
             });
+            pcSetGenres([]);
             fileFields.forEach(function (name) {
                 var input = document.getElementById('pc-' + name + 'File');
                 var label = document.getElementById('pc-' + name + 'Name');
@@ -34098,6 +34222,7 @@ if (!document.__niwDelegatedFallback) {
                 var p = document.getElementById('pc-' + n + 'Preview');
                 if (p) p.innerHTML = '';
             });
+            pcSetCast([]);
             if (packSelect) packSelect.value = '';
             updateBtn();
         }

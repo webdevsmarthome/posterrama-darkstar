@@ -20042,6 +20042,94 @@ body.profile-edit-mode #section-display .section-header h2 span {
 }
 .pu-input:focus { border-color: var(--color-secondary); }
 .pu-input::placeholder { color: var(--color-text-muted); }
+select.pu-input {
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+    padding-right: 30px; cursor: pointer;
+}
+select.pu-input option { background: var(--color-bg-secondary); color: var(--color-text-primary); }
+select.pu-input optgroup { font-weight: 600; color: var(--color-text-secondary); }
+
+/* PosterPack Studio – Genre Multi-Select */
+.pc-genre-select { position: relative; width: 100%; }
+.pc-genre-selected {
+    display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+    min-height: 36px; padding: 4px 8px; cursor: pointer;
+    background: var(--color-bg-primary); color: var(--color-text-primary);
+    border: 1px solid var(--color-border-light); border-radius: 6px;
+    font-size: 13px; transition: border-color 0.2s;
+}
+.pc-genre-selected:focus,
+.pc-genre-select.open .pc-genre-selected { border-color: var(--color-secondary); }
+.pc-genre-placeholder { color: var(--color-text-muted); font-size: 13px; }
+.pc-genre-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500;
+    background: var(--color-secondary); color: #fff; white-space: nowrap;
+}
+.pc-genre-tag-remove {
+    cursor: pointer; font-size: 14px; line-height: 1; opacity: 0.7;
+    margin-left: 2px;
+}
+.pc-genre-tag-remove:hover { opacity: 1; }
+.pc-genre-dropdown {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    max-height: 220px; overflow-y: auto; z-index: 100;
+    background: var(--color-bg-secondary); border: 1px solid var(--color-border-light);
+    border-radius: 6px; margin-top: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.pc-genre-select.open .pc-genre-dropdown { display: block; }
+.pc-genre-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; cursor: pointer; font-size: 13px;
+    color: var(--color-text-primary); transition: background 0.15s;
+}
+.pc-genre-option:hover { background: var(--color-bg-hover); }
+.pc-genre-option.selected { background: rgba(var(--color-secondary-rgb, 99,102,241), 0.15); }
+.pc-genre-option-check {
+    width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0;
+    border: 1px solid var(--color-border-light); display: flex;
+    align-items: center; justify-content: center; font-size: 11px;
+    transition: all 0.15s;
+}
+.pc-genre-option.selected .pc-genre-option-check {
+    background: var(--color-secondary); border-color: var(--color-secondary); color: #fff;
+}
+
+/* PosterPack Studio – Cast Editor */
+.pc-cast-list { display: flex; flex-direction: column; gap: 6px; }
+.pc-cast-row {
+    display: flex; align-items: center; gap: 6px;
+}
+.pc-cast-row input {
+    flex: 1; padding: 6px 10px;
+    background: var(--color-bg-primary); color: var(--color-text-primary);
+    border: 1px solid var(--color-border-light); border-radius: 5px;
+    font-size: 12px; font-family: inherit; outline: none;
+    transition: border-color 0.2s;
+}
+.pc-cast-row input:focus { border-color: var(--color-secondary); }
+.pc-cast-row input::placeholder { color: var(--color-text-muted); }
+.pc-cast-row .pc-cast-name { flex: 1.2; }
+.pc-cast-row .pc-cast-role { flex: 0.8; }
+.pc-cast-row-remove {
+    width: 28px; height: 28px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid var(--color-border-light); border-radius: 5px;
+    color: var(--color-text-muted); cursor: pointer; font-size: 14px;
+    transition: all 0.15s;
+}
+.pc-cast-row-remove:hover { color: #ef4444; border-color: #ef4444; }
+.pc-cast-add-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 6px; padding: 5px 12px;
+    background: none; border: 1px dashed var(--color-border-light); border-radius: 5px;
+    color: var(--color-text-secondary); cursor: pointer; font-size: 12px;
+    font-family: inherit; transition: all 0.15s;
+}
+.pc-cast-add-btn:hover { border-color: var(--color-secondary); color: var(--color-secondary); }
 
 /* ================================================
    Playlist Editor (own section in sidebar)

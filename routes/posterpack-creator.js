@@ -70,7 +70,8 @@ module.exports = function createPosterpackCreatorRouter({ logger, refreshPlaylis
 
     function buildMetadata(body, oldMetadata) {
         const { title, year, genres, overview, tagline, rating, runtime, contentRating,
-                director, studio, resolution, audioCodec, aspectRatio, hdr } = body;
+                director, studio, resolution, audioCodec, aspectRatio, hdr, trailer,
+                releaseDate, cast: castRaw } = body;
         const base = oldMetadata || {};
         return {
             itemType: base.itemType || 'movie',
@@ -91,12 +92,14 @@ module.exports = function createPosterpackCreatorRouter({ logger, refreshPlaylis
             audioCodec: audioCodec !== undefined ? (String(audioCodec).trim() || null) : (base.audioCodec || null),
             aspectRatio: aspectRatio !== undefined ? (String(aspectRatio).trim() || null) : (base.aspectRatio || null),
             hdr: hdr !== undefined ? (String(hdr).trim() || null) : (base.hdr || null),
+            trailer: trailer !== undefined ? (String(trailer).trim() || null) : (base.trailer || null),
+            releaseDate: releaseDate !== undefined ? (String(releaseDate).trim() || null) : (base.releaseDate || null),
             source: base.source || 'private',
             images: base.images || { primaryPoster: 'poster.jpg' },
             // Preserve other fields from original metadata
             ...(base.tmdbId ? { tmdbId: base.tmdbId } : {}),
             ...(base.imdbId ? { imdbId: base.imdbId } : {}),
-            ...(base.cast ? { cast: base.cast } : {}),
+            ...(castRaw ? { cast: (function () { try { return JSON.parse(castRaw); } catch (_) { return base.cast || []; } })() } : (base.cast ? { cast: base.cast } : {})),
             ...(base.peopleImages ? { peopleImages: base.peopleImages } : {}),
             ...(base.clearlogo ? { clearlogo: base.clearlogo } : {}),
             ...(base.rottenTomatoes ? { rottenTomatoes: base.rottenTomatoes } : {}),
