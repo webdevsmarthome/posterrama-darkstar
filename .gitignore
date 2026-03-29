@@ -131,6 +131,10 @@ performance-baseline.json
 filmliste.txt
 poster-updater/.env
 
+# Cinema playlists (private/local data)
+public/cinema-playlist.json
+public/cinema-playlists.json
+
 # Custom patch/backup artifacts
 custom-patches-*.patch
 posterrama-custom-backup-*.tar.gz
