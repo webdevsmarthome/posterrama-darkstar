@@ -190,13 +190,27 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
             }
             // Also delete the corresponding trailer if it exists
             try {
-                const trailerPath = path.join(__dirname, '..', 'media', 'trailers', name + '-trailer.mp4');
+                const nameNormalized = name.normalize('NFC');
+                const trailerPath = path.join(TRAILER_DIR, nameNormalized + '-trailer.mp4');
                 await fsp.unlink(trailerPath);
-                logger.info(`poster-updater: Deleted trailer: ${name}-trailer.mp4`);
+                logger.info(`poster-updater: Deleted trailer: ${nameNormalized}-trailer.mp4`);
             } catch (err) {
                 if (err.code !== 'ENOENT') {
                     logger.warn(`poster-updater: Failed to delete trailer: ${err.message}`);
                 }
+            }
+            // Remove trailer-info.json entry
+            try {
+                const infoRaw = await fsp.readFile(TRAILER_INFO_PATH, 'utf8');
+                const info = JSON.parse(infoRaw);
+                const nameNormalized = name.normalize('NFC');
+                if (info[nameNormalized]) {
+                    delete info[nameNormalized];
+                    await fsp.writeFile(TRAILER_INFO_PATH, JSON.stringify(info, null, 2) + '\n', 'utf8');
+                    logger.info(`poster-updater: Removed trailer-info entry: ${nameNormalized}`);
+                }
+            } catch (err) {
+                logger.warn(`poster-updater: Failed to update trailer-info.json: ${err.message}`);
             }
             // Remove from all playlists (cinema-playlists.json + live cinema-playlist.json)
             try {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Posterrama Backdrop Fetcher
-Laedt fehlende Backgrounds/Backdrops von TMDB herunter und fuegt sie in bestehende ZIP-Posterpacks ein.
+Laedt fehlende Backgrounds/Backdrops von TMDB herunter und fuegt sie in bestehende ZIP-PosterPacks ein.
 """
 
 import os
@@ -168,7 +168,7 @@ def add_backdrop_to_zip(zip_path, img_bytes):
 
 # --- Main ---
 missing = find_zips_without_backdrop()
-print(f"  Posterpacks ohne Background: {len(missing)}")
+print(f"  PosterPacks ohne Background: {len(missing)}")
 print(f"  Starte TMDB-Suche...\n")
 
 erfolg = 0

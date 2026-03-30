@@ -63,13 +63,13 @@ du -sh public/
 
 ## Server Startup Performance
 
-### ZIP Posterpack Quick-Start (2026-03)
+### ZIP PosterPack Quick-Start (2026-03)
 
 Posterrama includes ~1100 ZIP posterpacks on SD card. Two bottlenecks were identified and fixed:
 
 | Bottleneck | Location | Before | After |
 | --- | --- | --- | --- |
-| `scanZipPosterpacks()` full scan (stat + AdmZip for each ZIP) | `sources/local.js` | ~60s | <1s (in-memory cache) |
+| `scanZipPosterPacks()` full scan (stat + AdmZip for each ZIP) | `sources/local.js` | ~60s | <1s (in-memory cache) |
 | `normalizeLocalItem()` opening every ZIP with `new AdmZip()` | `lib/media-aggregator.js` | ~198s | <1s (zipHas/zipMetadata passthrough) |
 
 **Total initial playlist fetch**: 198s → ~1.5s (Raspberry Pi 4, SD card)

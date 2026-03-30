@@ -134,7 +134,9 @@ module.exports = function createPosterSelectorRouter({ logger, wsHub }) {
             } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.zip') && !entry.name.startsWith('._')) {
                 const name = entry.name.replace(/\.zip$/i, '');
                 const relative = path.relative(baseDir, dir);
-                results.push({ name, source: relative || '.' });
+                let mtime = null;
+                try { mtime = (await fsp.stat(fullPath)).mtimeMs; } catch { }
+                results.push({ name, source: relative || '.', mtime });
             }
         }
         return results;

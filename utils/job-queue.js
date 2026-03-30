@@ -50,7 +50,7 @@ function isProbablyImageBuffer(buf) {
     }
 }
 
-function buildGamePosterpackMetadata({ item, sourceType, assets, peopleImages }) {
+function buildGamePosterPackMetadata({ item, sourceType, assets, peopleImages }) {
     const nowYear = new Date().getUTCFullYear();
     const isPlausibleYear = y => Number.isFinite(y) && y >= 1900 && y <= nowYear + 2;
 
@@ -155,7 +155,7 @@ function buildGamePosterpackMetadata({ item, sourceType, assets, peopleImages })
 }
 
 /**
- * Background Job Queue System for Posterpack Generation
+ * Background Job Queue System for PosterPack Generation
  * Handles concurrent job processing with progress tracking and status management
  */
 class JobQueue extends EventEmitter {
@@ -201,7 +201,7 @@ class JobQueue extends EventEmitter {
      * @param {Object} options - Generation options
      * @returns {Promise<string>} Job ID
      */
-    async addPosterpackGenerationJob(sourceType, libraryIds, options = {}) {
+    async addPosterPackGenerationJob(sourceType, libraryIds, options = {}) {
         const jobId = this.generateJobId();
 
         const job = {
@@ -266,7 +266,7 @@ class JobQueue extends EventEmitter {
      * }} payload
      * @returns {Promise<string>} Job ID
      */
-    async addMotionPosterpackJob(payload) {
+    async addMotionPosterPackJob(payload) {
         const jobId = this.generateJobId();
         const job = {
             id: jobId,
@@ -398,10 +398,10 @@ class JobQueue extends EventEmitter {
             // Process based on job type
             switch (job.type) {
                 case 'posterpack-generation':
-                    await this.processPosterpackGeneration(job);
+                    await this.processPosterPackGeneration(job);
                     break;
                 case 'motion-posterpack':
-                    await this.processMotionPosterpack(job);
+                    await this.processMotionPosterPack(job);
                     break;
                 default:
                     throw new Error(`Unknown job type: ${job.type}`);
@@ -489,7 +489,7 @@ class JobQueue extends EventEmitter {
      * Process posterpack generation job
      * @param {Object} job - Job object
      */
-    async processPosterpackGeneration(job) {
+    async processPosterPackGeneration(job) {
         const { sourceType, libraryIds, options } = job;
 
         // Get source adapter
@@ -890,7 +890,7 @@ class JobQueue extends EventEmitter {
                     }
                 }
 
-                const result = await this.generatePosterpackForItem(
+                const result = await this.generatePosterPackForItem(
                     enrichedItem,
                     sourceType,
                     options,
@@ -973,7 +973,7 @@ class JobQueue extends EventEmitter {
      * Process a motion posterpack job.
      * @param {any} job
      */
-    async processMotionPosterpack(job) {
+    async processMotionPosterPack(job) {
         const safeZipBaseName = name => {
             return String(name || '')
                 .replace(/[\\/:*?"<>|]/g, '-')
@@ -1191,9 +1191,9 @@ class JobQueue extends EventEmitter {
      * @param {Object|null} exportLogger - Optional logger
      * @returns {Promise<Object>} Generation result
      */
-    async generatePosterpackForItem(item, sourceType, options, exportLogger = null) {
+    async generatePosterPackForItem(item, sourceType, options, exportLogger = null) {
         // Debug: Log item structure
-        logger.info(`JobQueue: generatePosterpackForItem called`, {
+        logger.info(`JobQueue: generatePosterPackForItem called`, {
             title: item.title,
             hasExtras: !!item.extras,
             extrasCount: item.extras?.length || 0,
@@ -1201,7 +1201,7 @@ class JobQueue extends EventEmitter {
         });
 
         // Generate output filename
-        const outputFilename = this.generatePosterpackFilename(item, options);
+        const outputFilename = this.generatePosterPackFilename(item, options);
 
         const exportFolderForSource = st => {
             const s = String(st || '').toLowerCase();
@@ -2082,7 +2082,7 @@ class JobQueue extends EventEmitter {
 
         // Add metadata (enriched)
         const metadata = isGame
-            ? buildGamePosterpackMetadata({ item, sourceType, assets, peopleImages })
+            ? buildGamePosterPackMetadata({ item, sourceType, assets, peopleImages })
             : {
                   itemType: item.type || null,
                   title: item.title,
@@ -2297,7 +2297,7 @@ class JobQueue extends EventEmitter {
      * @param {Object} _options - Generation options (unused)
      * @returns {string} Filename
      */
-    generatePosterpackFilename(item, _options) {
+    generatePosterPackFilename(item, _options) {
         // Enforce fixed naming convention: ignore client-provided overrides
         const template =
             this.config.localDirectory?.posterpackGeneration?.outputNaming ||

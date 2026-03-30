@@ -13,7 +13,7 @@ const MANUAL_DIR = path.join(COMPLETE_DIR, 'manual');
 const TRAILER_DIR = path.join(__dirname, '..', 'media', 'trailers');
 const TRAILER_INFO_PATH = path.join(TRAILER_DIR, 'trailer-info.json');
 
-module.exports = function createPosterpackCreatorRouter({ logger, refreshPlaylistCache }) {
+module.exports = function createPosterPackCreatorRouter({ logger, refreshPlaylistCache }) {
     const router = express.Router();
 
     const upload = multer({
@@ -113,13 +113,14 @@ module.exports = function createPosterpackCreatorRouter({ logger, refreshPlaylis
     async function handleTrailer(packName, trailerFile) {
         if (!trailerFile) return;
         await fsp.mkdir(TRAILER_DIR, { recursive: true });
-        const trailerPath = path.join(TRAILER_DIR, `${packName}-trailer.mp4`);
+        const normalizedName = packName.normalize('NFC');
+        const trailerPath = path.join(TRAILER_DIR, `${normalizedName}-trailer.mp4`);
         await fsp.writeFile(trailerPath, trailerFile.buffer);
         logger.info(`posterpack-creator: Saved trailer for ${packName}`);
         try {
             let trailerInfo = {};
             try { trailerInfo = JSON.parse(await fsp.readFile(TRAILER_INFO_PATH, 'utf8')); } catch { }
-            trailerInfo[packName] = 'DE';
+            trailerInfo[normalizedName] = 'DE';
             await fsp.writeFile(TRAILER_INFO_PATH, JSON.stringify(trailerInfo, null, 2) + '\n', 'utf8');
         } catch (err) {
             logger.warn('posterpack-creator: Failed to update trailer-info.json:', err.message);
@@ -148,7 +149,7 @@ module.exports = function createPosterpackCreatorRouter({ logger, refreshPlaylis
             const packName = decodeURIComponent(req.params.packName);
             const zipPath = findZipPath(packName);
             if (!zipPath) {
-                return res.status(404).json({ success: false, error: 'Posterpack nicht gefunden' });
+                return res.status(404).json({ success: false, error: 'PosterPack nicht gefunden' });
             }
 
             const zip = new AdmZip(zipPath);
@@ -204,7 +205,7 @@ module.exports = function createPosterpackCreatorRouter({ logger, refreshPlaylis
             const zipPath = path.join(MANUAL_DIR, `${packName}.zip`);
 
             if (fs.existsSync(zipPath)) {
-                return res.status(409).json({ success: false, error: `Posterpack "${packName}" existiert bereits` });
+                return res.status(409).json({ success: false, error: `PosterPack "${packName}" existiert bereits` });
             }
 
             const metadata = buildMetadata(req.body, null);
@@ -252,7 +253,7 @@ module.exports = function createPosterpackCreatorRouter({ logger, refreshPlaylis
             const packName = decodeURIComponent(req.params.packName);
             const existingZipPath = findZipPath(packName);
             if (!existingZipPath) {
-                return res.status(404).json({ success: false, error: 'Posterpack nicht gefunden' });
+                return res.status(404).json({ success: false, error: 'PosterPack nicht gefunden' });
             }
 
             // Read existing ZIP

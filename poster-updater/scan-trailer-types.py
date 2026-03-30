@@ -12,6 +12,7 @@ import sys
 import re
 import json
 import time
+import unicodedata
 
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 CONFIG_PATH = os.path.join(PROJECT_ROOT, 'config.json')
@@ -62,7 +63,7 @@ print(f"  Trailer-Dateien gefunden: {len(trailer_files)}")
 # Nur Trailer ohne Typ-Info scannen
 to_scan = []
 for tf in trailer_files:
-    name = tf.replace('-trailer.mp4', '')
+    name = unicodedata.normalize('NFC', tf.replace('-trailer.mp4', ''))
     if name not in trailer_info:
         to_scan.append(name)
 

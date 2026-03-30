@@ -38,12 +38,12 @@ try:
 except (FileNotFoundError, json.JSONDecodeError):
     pass
 
-# --- Alle Posterpacks finden ---
+# --- Alle PosterPacks finden ---
 all_zips = set()
 for root, dirs, files in os.walk(COMPLETE_DIR):
     for f in files:
         if f.lower().endswith('.zip') and not f.startswith('._'):
-            all_zips.add(f.replace('.zip', '').replace('.ZIP', ''))
+            all_zips.add(unicodedata.normalize('NFC', f.replace('.zip', '').replace('.ZIP', '')))
 
 # --- Vorhandene Trailer finden ---
 existing_trailers = set()
@@ -54,7 +54,7 @@ for f in os.listdir(TRAILER_DIR):
 # --- Fehlende Trailer ermitteln ---
 missing = sorted([z for z in all_zips if unicodedata.normalize('NFC', z) not in existing_trailers])
 
-print(f"  Posterpacks gesamt: {len(all_zips)}")
+print(f"  PosterPacks gesamt: {len(all_zips)}")
 print(f"  Trailer vorhanden:  {len(existing_trailers)}")
 print(f"  Ohne Trailer:       {len(missing)}")
 
@@ -172,6 +172,7 @@ for i, name in enumerate(missing, 1):
         fehler += 1
         continue
 
+    name = unicodedata.normalize('NFC', name)
     trailer_path = os.path.join(TRAILER_DIR, f"{name}-trailer.mp4")
 
     # YouTube-Suche

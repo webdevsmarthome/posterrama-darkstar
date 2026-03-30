@@ -229,7 +229,7 @@
       </a>
       <a href="#" class="nav-item" data-nav="operations"><i class="fas fa-screwdriver-wrench"></i><span>Operations</span></a>
       <a href="#" class="nav-item" data-nav="poster-updater"><i class="fas fa-film"></i><span>Poster Updater</span></a>
-      <a href="#" class="nav-item" data-nav="posterpack-studio"><i class="fas fa-magic"></i><span>Posterpack Studio</span></a>
+      <a href="#" class="nav-item" data-nav="posterpack-studio"><i class="fas fa-magic"></i><span>PosterPack Studio</span></a>
       <a href="#" class="nav-item" data-nav="poster-selector"><i class="fas fa-th-list"></i><span>Playlist Editor</span></a>
     </nav>
   <div class="sidebar-footer"></div>
@@ -2830,15 +2830,15 @@
             </div>
           </div>
 
-          <!-- Posterpack Generation -->
+          <!-- PosterPack Generation -->
           <div class="form-section">
-            <div class="section-title"><i class="fas fa-archive"></i> Posterpack Generation</div>
+            <div class="section-title"><i class="fas fa-archive"></i> PosterPack Generation</div>
           </div>
           <div class="form-grid">
             <div class="form-group" style="grid-column: 1 / -1;" id="posterpack-mode-group">
               <label style="margin:0 0 8px; font-weight:600; color: var(--color-text-secondary);">Mode</label>
               <div class="pp-mode-row">
-                <div class="segmented" role="tablist" aria-label="Posterpack Mode">
+                <div class="segmented" role="tablist" aria-label="PosterPack Mode">
                   <label class="seg" role="tab" aria-checked="true" title="Generate posterpacks in bulk">
                     <input type="radio" name="posterpack.mode" id="posterpack.mode.standard" value="standard" checked>
                     <i class="fas fa-archive"></i> <span class="seg-text">Standard</span>
@@ -2917,7 +2917,7 @@
               </div>
             </div>
             
-            <!-- Posterpack Library Selection (per source) -->
+            <!-- PosterPack Library Selection (per source) -->
             <div class="form-group" id="posterpack-lib-section" style="grid-column: 1 / -1;" hidden>
               <div class="form-subsection">
                 <h4>Libraries</h4>
@@ -3181,7 +3181,7 @@
                   <span class="spinner"></span><i class="fas fa-eye"></i><span>Preview Selection</span>
                 </button>
                 <button class="btn btn-success btn-sm" id="btn-generate-posterpack">
-                  <span class="spinner"></span><i class="fas fa-archive"></i><span>Generate Posterpack</span>
+                  <span class="spinner"></span><i class="fas fa-archive"></i><span>Generate PosterPack</span>
                 </button>
               </div>
             </div>
@@ -4120,8 +4120,8 @@
               </section>
 
               <!-- Download Runner Card -->
-              <section class="perf-card" aria-label="Posterpack Download">
-                <h3><i class="fas fa-download"></i> Posterpack Download</h3>
+              <section class="perf-card" aria-label="PosterPack Download">
+                <h3><i class="fas fa-download"></i> PosterPack Download</h3>
                 <div class="pu-runner-controls" style="margin-top: 12px;">
                   <button class="btn btn-success btn-sm" id="pu-runStartBtn">Download starten</button>
                   <button class="btn btn-danger btn-sm" id="pu-runStopBtn" disabled>Stopp</button>
@@ -4142,13 +4142,13 @@
                 <div class="pu-terminal" id="pu-trailerTerminal">Warte auf Start...</div>
               </section>
 
-              <!-- Eigene Posterpacks Upload Card -->
-              <section class="perf-card" aria-label="Eigene Posterpacks">
-                <h3><i class="fas fa-upload"></i> Eigene Posterpacks</h3>
+              <!-- Eigene PosterPacks Upload Card -->
+              <section class="perf-card" aria-label="Eigene PosterPacks">
+                <h3><i class="fas fa-upload"></i> Eigene PosterPacks</h3>
                 <div class="pu-dropzone" id="pu-dropzone">
                   <div class="pu-dropzone-content">
                     <i class="fas fa-cloud-upload-alt"></i>
-                    <p>ZIP-Posterpack hierher ziehen</p>
+                    <p>ZIP-PosterPack hierher ziehen</p>
                     <p class="pu-dropzone-hint">oder klicken zum Auswählen</p>
                   </div>
                   <input type="file" id="pu-fileInput" multiple accept=".zip" hidden>
@@ -4193,13 +4193,13 @@
 
             <!-- Left: Available Films -->
             <div class="ops-col">
-              <section class="perf-card" aria-label="Verfügbare Posterpacks">
+              <section class="perf-card" aria-label="Verfügbare PosterPacks">
                 <h3 style="display: flex; align-items: center; gap: 8px;">
-                  <i class="fas fa-archive"></i> Verfügbare Posterpacks
+                  <i class="fas fa-archive"></i> Verfügbare PosterPacks
                   <span class="ps-badge" id="ps-availableCount">0</span>
                 </h3>
                 <div style="margin: 12px 0 10px;">
-                  <input type="text" class="ps-input" id="ps-filter" placeholder="Posterpacks filtern...">
+                  <input type="text" class="ps-input" id="ps-filter" placeholder="PosterPacks filtern...">
                 </div>
                 <div class="ps-trailer-filters" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;">
                   <button class="ps-trailer-filter-btn active" data-ps-trailer-filter="all" title="Alle anzeigen">Alle</button>
@@ -4209,8 +4209,13 @@
                   <button class="ps-trailer-filter-btn" data-ps-trailer-filter="EN" title="Englisch">EN</button>
                   <button class="ps-trailer-filter-btn" data-ps-trailer-filter="none" title="Kein Trailer">Kein Trailer</button>
                 </div>
+                <div class="ps-sort-filters" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;">
+                  <button class="ps-sort-filter-btn active" data-ps-sort="az" title="A → Z"><i class="fas fa-sort-alpha-down"></i> A–Z</button>
+                  <button class="ps-sort-filter-btn" data-ps-sort="za" title="Z → A"><i class="fas fa-sort-alpha-up-alt"></i> Z–A</button>
+                  <button class="ps-sort-filter-btn" data-ps-sort="newest" title="Zuletzt hinzugefügt"><i class="fas fa-clock"></i> Neueste</button>
+                </div>
                 <div class="ps-available-list" id="ps-availableList">
-                  <div class="ps-film-empty">Lade Posterpacks...</div>
+                  <div class="ps-film-empty">Lade PosterPacks...</div>
                 </div>
               </section>
             </div>
@@ -4267,14 +4272,14 @@
       </section>
     </section>
 
-    <!-- Posterpack Studio Section -->
+    <!-- PosterPack Studio Section -->
     <section id="section-posterpack-studio" class="app-section" hidden>
       <section class="panel operations-panel" style="border: none; background: transparent; box-shadow: none;">
         <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <h2 style="margin: 0; display: flex; align-items: center;">
             <span style="display: inline-flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--color-text-primary); padding: 6px 16px; border-radius: 20px; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.3px;">
               <i class="fas fa-magic" style="opacity: 0.8;"></i>
-              Posterpack Studio
+              PosterPack Studio
             </span>
           </h2>
         </div>
@@ -4283,11 +4288,11 @@
 
             <!-- Left: Metadaten -->
             <div class="ops-col">
-              <section class="perf-card" aria-label="Posterpack laden" style="margin-bottom: 12px;">
-                <h3><i class="fas fa-folder-open"></i> Posterpack laden</h3>
+              <section class="perf-card" aria-label="PosterPack laden" style="margin-bottom: 12px;">
+                <h3><i class="fas fa-folder-open"></i> PosterPack laden</h3>
                 <div style="margin-top: 10px;">
                   <select class="pu-input" id="pc-packSelect" style="width: 100%;">
-                    <option value="">Neues Posterpack erstellen...</option>
+                    <option value="">Neues PosterPack erstellen...</option>
                   </select>
                 </div>
               </section>
@@ -4545,7 +4550,7 @@
               </section>
               <section class="perf-card" aria-label="Erstellen" style="margin-top: 12px;">
                 <button class="btn btn-success" id="pc-createBtn" style="width: 100%; padding: 10px;" disabled>
-                  <i class="fas fa-magic"></i> Posterpack erstellen
+                  <i class="fas fa-magic"></i> PosterPack erstellen
                 </button>
                 <div class="pc-status" id="pc-status" style="display:none; margin-top: 10px;"></div>
               </section>

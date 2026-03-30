@@ -1569,7 +1569,7 @@ module.exports = function createMediaRouter({
                     try {
                         if (config.localDirectory?.enabled && localDirectorySource) {
                             const zipFiles =
-                                await localDirectorySource.scanZipPosterpacks('poster');
+                                await localDirectorySource.scanZipPosterPacks('poster');
                             const files = Array.isArray(zipFiles) ? zipFiles : [];
 
                             const slugify = s =>

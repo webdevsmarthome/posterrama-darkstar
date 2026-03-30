@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-03-29 (basierend auf Version 3.0.1j)
+**Stand:** 2026-03-30 (basierend auf Version 3.0.1j)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 
 ---
@@ -33,14 +33,14 @@
 | 22 | Screensaver Layout | screensaver.css | Uhr (oben links), ClearLogo (oben rechts), Trailer (unten links) mit einheitlichem 3vh Abstand |
 | 23 | Cinema Trailer Scale | cinema-display.css | scale(1.20) statt scale(1.25) fuer gleichmaessigen 16:9→21:9 Crop |
 | 24 | RT-Badge Cleanup | screensaver.js | RT-Badge wird nicht ins DOM eingefuegt wenn Rotten Tomatoes deaktiviert |
-| 25 | Posterpack Creator | routes/posterpack-creator.js, admin.html, admin.js, admin.css, server.js | Eigener Menuepunkt: Formular fuer Titel/Jahr/Poster/Background/Trailer → ZIP erstellen |
+| 25 | PosterPack Creator | routes/posterpack-creator.js, admin.html, admin.js, admin.css, server.js | Eigener Menuepunkt: Formular fuer Titel/Jahr/Poster/Background/Trailer → ZIP erstellen |
 | 26 | Poster Updater Trailer-Status | routes/poster-updater.js, admin.js | Trailer-Badges + Filter im Poster Updater (wie Playlist Editor) |
-| 27 | Eigene Posterpacks Upload | admin.html, admin.js, admin.css | Drag & Drop ZIP-Upload im Poster Updater |
+| 27 | Eigene PosterPacks Upload | admin.html, admin.js, admin.css | Drag & Drop ZIP-Upload im Poster Updater |
 | 28 | Konfig. Trailer-Timings | config.json, admin.html, admin.js, screensaver.js | trailerDelaySeconds, trailerPauseAfterSeconds, noTrailerDisplaySeconds konfigurierbar |
 | 29 | Screensaver Playlist nahtlos | screensaver.js | Playlist-Wechsel ohne Page-Reload (inline Media-Queue Refresh) |
 | 30 | dotenv-Bereinigung | download-trailers.py, scan-trailer-types.py, tmdb-get-posters-direct.py | Alle Python-Scripts lesen config.json statt .env |
 | 31 | .gitignore Erweiterung | .gitignore | filmliste.txt, .env, Patch/Backup-Artifacts ignoriert |
-| 32 | Posterpack Studio (Edit) | routes/posterpack-creator.js, admin.html, admin.js | Creator → Studio: Bestehende Posterpacks laden, bearbeiten, aktualisieren (Dropdown + Vorschauen) |
+| 32 | PosterPack Studio (Edit) | routes/posterpack-creator.js, admin.html, admin.js | Creator → Studio: Bestehende PosterPacks laden, bearbeiten, aktualisieren (Dropdown + Vorschauen) |
 | 33 | Poster Updater Filter-Fix | admin.js | withTrailer-Zahl bleibt nach Filter-Klick korrekt |
 | 34 | Filmliste Hoehe | admin.css | Filmliste max-height auf 562px angepasst |
 | 35 | TMDB Clearlogo Fetcher | poster-updater/fetch-clearlogos.py | Laedt fehlende Clearlogos von TMDB und fuegt sie in bestehende ZIPs ein |
@@ -56,7 +56,7 @@
 | 45 | Broadcast Debug Logging | routes/poster-selector.js | Logging fuer playlist.refresh Broadcast (Diagnose) |
 | 46 | Tagline Fetcher | poster-updater/fetch-taglines.py, tmdb-get-posters-direct.py | Laedt fehlende Taglines von TMDB (DE bevorzugt, EN Fallback) und fuegt sie in ZIPs ein |
 | 47 | Metadata-Extras Fetcher | poster-updater/fetch-metadata-extras.py, tmdb-get-posters-direct.py | Certification (FSK), Director, Studio von TMDB in alle ZIPs |
-| 48 | Posterpack Studio erweitert | routes/posterpack-creator.js, admin.html, admin.js | Neue Felder: Regisseur, Studio, Aufloesung, Audio, Seitenverhaeltnis, HDR |
+| 48 | PosterPack Studio erweitert | routes/posterpack-creator.js, admin.html, admin.js | Neue Felder: Regisseur, Studio, Aufloesung, Audio, Seitenverhaeltnis, HDR |
 | 49 | Media-Aggregator erweitert | lib/media-aggregator.js | Director, Studio, Resolution, Audio, AspectRatio, HDR aus ZIP-Metadata durchreichen |
 | 50 | Config-Public Fix | routes/config-public.js | config.config statt config fuer Raw-Werte (uiScaling, showRottenTomatoes etc. wurden ignoriert) |
 | 51 | style.css background Fix | public/style.css | background-image statt background Shorthand (verhinderte background-size:contain) |
@@ -64,6 +64,10 @@
 | 53 | Poster dynamische Hoehe | public/screensaver/screensaver.js | Wrapper-Hoehe passt sich per JS an Poster-Seitenverhaeltnis an |
 | 54 | Screensaver style.css Cache | routes/frontend-pages.js, public/sw.js | style.css Cache-Buster + SW-Bypass fuer Screensaver-Route |
 | 55 | Screensaver Inline-CSS Fix | public/screensaver.html | background-size:contain statt cover in Inline-CSS |
+| 56 | Unicode NFC-Normalisierung | posterpack-creator.js, download-trailers.py, download-trailers-youtube.py, scan-trailer-types.py, poster-updater.js | Alle Trailer-Schreibstellen normalisieren Dateinamen + JSON-Keys zu NFC — verhindert NFC/NFD-Duplikate |
+| 57 | Trailer-Info Cleanup bei Loeschung | routes/poster-updater.js | Beim Loeschen eines Films wird der Eintrag aus trailer-info.json entfernt |
+| 58 | PosterPack Branding | 26 Dateien | Einheitliche Schreibweise "PosterPack" statt "Posterpack" |
+| 59 | Playlist Editor Sortierung | routes/poster-selector.js, admin.html, admin.js, admin.css | Sortier-Buttons (A–Z, Z–A, Neueste) fuer verfuegbare PosterPacks im Playlist Editor |
 
 ---
 
@@ -79,7 +83,7 @@ Playlist Editor Backend — Multi-Playlist-API (CRUD, Aktivierung), Trailer-Info
 - GET/POST /playlists, PUT/DELETE /playlists/:id, PUT /playlists/:id/activate
 
 ### `routes/poster-updater.js`
-Poster-Updater Backend — Film-Verwaltung, Posterpack-Download, **Trailer-Download** (neu).
+Poster-Updater Backend — Film-Verwaltung, PosterPack-Download, **Trailer-Download** (neu).
 **Achtung:** Diese Datei existiert moeglicherweise im Original, wurde aber erweitert:
 - ZIP-Loeschung beim Film-Entfernen (DELETE /films/:name)
 - Trailer-Download Endpoints (/trailers/run, /trailers/run/status, /trailers/run/stop)
@@ -105,7 +109,7 @@ Speichert Trailer-Typ in `trailer-info.json`. Ausfuehren: `cd poster-updater && 
 Sammlung aller benannten Playlisten. Wird automatisch beim ersten Aufruf aus `cinema-playlist.json` migriert.
 
 ### `routes/posterpack-creator.js`
-Posterpack Studio Backend — Create + Edit. Multipart-Upload (multer), ZIP-Erstellung (JSZip), Trailer-Handling.
+PosterPack Studio Backend — Create + Edit. Multipart-Upload (multer), ZIP-Erstellung (JSZip), Trailer-Handling.
 Endpoints: `GET /api/posterpack-creator/read/:packName`, `POST /api/posterpack-creator/create`, `POST /api/posterpack-creator/update/:packName`
 
 ---
@@ -150,12 +154,12 @@ app.use('/api/poster-selector', isAuthenticated, createPosterSelectorRouter({ lo
 
 **b) Section "Poster Updater":**
 - Kompakter Header mit Film-Icon
-- Zwei Spalten: Filmliste + TMDB-Suche (links), Posterpack-Download + Trailer-Download (rechts)
+- Zwei Spalten: Filmliste + TMDB-Suche (links), PosterPack-Download + Trailer-Download (rechts)
 - Delete-Modal nach `</main>`
 
 **c) Section "Playlist Editor":**
 - Zwei Spalten Layout
-- Links: Verfuegbare Posterpacks mit Trailer-Typ-Badges + Trailer-Filter-Buttons (Alle, DE-off., DE, EN-off., EN, Kein Trailer)
+- Links: Verfuegbare PosterPacks mit Trailer-Typ-Badges + Trailer-Filter-Buttons (Alle, DE-off., DE, EN-off., EN, Kein Trailer)
 - Rechts: Playlist-Dropdown (Multi-Playlist), Aktiv-Indikator, Neu/Duplizieren/Umbenennen/Loeschen-Buttons, Toggle, Sort-Buttons, Drag & Drop
 
 ### 3. `public/admin.css`
@@ -195,14 +199,14 @@ Alle Styles mit Prefix `pu-` (Poster Updater) und `ps-` (Playlist Editor):
 ```
 
 **d) Poster Updater IIFE** (am Ende der Datei):
-- Film-Liste laden/rendern, TMDB-Suche, Posterpack-Download-Runner
+- Film-Liste laden/rendern, TMDB-Suche, PosterPack-Download-Runner
 - Trailer-Download-Runner (SSE)
 - Delete-Modal, Filter, Stats
 
 **e) Playlist Editor IIFE** (am Ende der Datei):
 - Multi-Playlist-System: psPlaylists, psActivePlaylistId, psCurrentPlaylistId
 - Playlist-Selector-Dropdown mit Aktionsbuttons (Neu, Duplizieren, Umbenennen, Loeschen, Aktivieren)
-- Verfuegbare Posterpacks mit Trailer-Typ-Badges + Trailer-Filter
+- Verfuegbare PosterPacks mit Trailer-Typ-Badges + Trailer-Filter
 - Drag & Drop Sortierung, Hoch/Runter-Buttons, Sort-Buttons (A-Z, Z-A, Jahr)
 - Toggle fuer Playlist aktiv + BroadcastChannel Notification
 

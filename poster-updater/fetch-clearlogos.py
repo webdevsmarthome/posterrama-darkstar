@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Posterrama Clearlogo Fetcher
-Laedt fehlende Clearlogos von TMDB herunter und fuegt sie in bestehende ZIP-Posterpacks ein.
+Laedt fehlende Clearlogos von TMDB herunter und fuegt sie in bestehende ZIP-PosterPacks ein.
 Prioritaet: Deutsche Logos > Englische Logos
 """
 
@@ -201,7 +201,7 @@ def add_clearlogo_to_zip(zip_path, logo_bytes):
 
 # --- Main ---
 missing = find_zips_without_clearlogo()
-print(f"  Posterpacks ohne Clearlogo: {len(missing)}")
+print(f"  PosterPacks ohne Clearlogo: {len(missing)}")
 print(f"  Starte TMDB-Suche...\n")
 
 erfolg = 0

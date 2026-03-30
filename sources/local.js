@@ -20,7 +20,7 @@ class LocalDirectorySource {
         this.rootPath = ld.rootPath || path.resolve(process.cwd(), 'media');
         this.watchDirectories = Array.isArray(ld.watchDirectories) ? ld.watchDirectories : [];
         // Gate automatic ZIP importing (default: off)
-        this.autoImportPosterpacks = ld.autoImportPosterpacks === true;
+        this.autoImportPosterPacks = ld.autoImportPosterPacks === true;
         // Consolidated list of absolute root directories to use
         this.rootPaths = [this.rootPath, ...this.watchDirectories]
             .filter(Boolean)
@@ -95,7 +95,7 @@ class LocalDirectorySource {
             enabled: this.enabled,
             rootPath: this.rootPath,
             scanInterval: this.scanInterval,
-            autoImportPosterpacks: this.autoImportPosterpacks,
+            autoImportPosterPacks: this.autoImportPosterPacks,
         });
     }
 
@@ -118,7 +118,7 @@ class LocalDirectorySource {
      * Helper: test if a filepath is specifically inside complete/manual (user-provided posterpacks)
      * Generated packs from Plex/Jellyfin must NOT be auto-imported to posters/backgrounds.
      */
-    isInManualPosterpack(filePath) {
+    isInManualPosterPack(filePath) {
         try {
             const p = path.resolve(filePath);
             return this.rootPaths.some(base => {
@@ -150,7 +150,7 @@ class LocalDirectorySource {
      * Import all posterpack ZIPs from complete/*-export and manual folders into posters/backgrounds
      * Best-effort and idempotent: skips if destination files already exist.
      */
-    async importPosterpacks(options = {}) {
+    async importPosterPacks(options = {}) {
         // ZIP-only semantics: do not extract. Optionally copy generated ZIPs into complete/manual.
         const { includeGenerated = false } = options;
         let copied = 0;
@@ -215,7 +215,7 @@ class LocalDirectorySource {
      * Returns true if at least one asset was imported, false otherwise
      */
     // Deprecated: no longer extracts posterpack ZIPs; kept for backward compatibility
-    async processPosterpackZip(_zipFilePath, _options = {}) {
+    async processPosterPackZip(_zipFilePath, _options = {}) {
         return false;
     }
 
@@ -238,7 +238,7 @@ class LocalDirectorySource {
             if (type === 'motion') {
                 let zipFiles = [];
                 try {
-                    zipFiles = await this.scanMotionZipPosterpacks();
+                    zipFiles = await this.scanMotionZipPosterPacks();
                 } catch (e) {
                     logger.warn(
                         `LocalDirectorySource: Failed to scan ZIP motion posterpacks: ${e?.message}`
@@ -248,7 +248,7 @@ class LocalDirectorySource {
                 if (Array.isArray(zipFiles) && zipFiles.length) {
                     const items = zipFiles
                         .slice(0, count)
-                        .map(f => this.createMotionZipPosterpackMediaItem(f));
+                        .map(f => this.createMotionZipPosterPackMediaItem(f));
                     this.updateMetrics();
                     logger.debug(
                         `LocalDirectorySource: Returned ${items.length} items for type motion (ZIP packs)`
@@ -257,10 +257,10 @@ class LocalDirectorySource {
                 }
 
                 // Backward compatibility: folder-based motion packs under motion/<Movie Name>/...
-                const packs = await this.scanMotionPosterpacks();
+                const packs = await this.scanMotionPosterPacks();
                 const items = packs
                     .slice(0, count)
-                    .map(p => this.createMotionPosterpackMediaItem(p));
+                    .map(p => this.createMotionPosterPackMediaItem(p));
                 this.updateMetrics();
                 logger.debug(
                     `LocalDirectorySource: Returned ${items.length} items for type motion (folder packs fallback)`
@@ -281,7 +281,7 @@ class LocalDirectorySource {
             // Augment with ZIP-based poster/background assets from complete/* without extraction
             if (type === 'poster' || type === 'background') {
                 try {
-                    const zipFiles = await this.scanZipPosterpacks(type);
+                    const zipFiles = await this.scanZipPosterPacks(type);
                     files.push(...zipFiles);
                 } catch (e) {
                     logger.warn(
@@ -383,7 +383,7 @@ class LocalDirectorySource {
      * - background.(jpg|jpeg|png|webp) (optional)
      * - metadata.json (optional, posterpack-style)
      */
-    async scanMotionPosterpacks() {
+    async scanMotionPosterPacks() {
         const results = [];
         const videoExts = ['mp4', 'webm', 'm4v', 'mov', 'mkv', 'avi'];
         const imageExts = ['jpg', 'jpeg', 'png', 'webp'];
@@ -469,7 +469,7 @@ class LocalDirectorySource {
         return results;
     }
 
-    createMotionPosterpackMediaItem(pack) {
+    createMotionPosterPackMediaItem(pack) {
         const meta = pack?.metadata && typeof pack.metadata === 'object' ? pack.metadata : {};
         const title = meta.title || meta.name || meta.originalTitle || pack.name;
         const year = meta.year || meta.releaseYear || meta.releasedYear || null;
@@ -579,7 +579,7 @@ class LocalDirectorySource {
      *
      * @returns {Promise<Array<{name:string,path:string,size:number,modified:Date,extension:string,directory:string,type:string,zipHas:any,zipMetadata:any}>>}
      */
-    async scanMotionZipPosterpacks() {
+    async scanMotionZipPosterPacks() {
         const results = [];
         const imageExts = ['jpg', 'jpeg', 'png', 'webp'];
         const videoExts = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'm4v'];
@@ -684,7 +684,7 @@ class LocalDirectorySource {
         return results;
     }
 
-    async scanZipPosterpacks(type) {
+    async scanZipPosterPacks(type) {
         const results = [];
         const want = type === 'background' ? 'background' : type === 'motion' ? 'motion' : 'poster';
         const exts = ['jpg', 'jpeg', 'png', 'webp'];
@@ -824,7 +824,7 @@ class LocalDirectorySource {
      * Build a cinema-only motion media item from a ZIP posterpack record.
      * @param {{path:string, directory:string, type:string, zipHas?:any, zipMetadata?:any}} file
      */
-    createMotionZipPosterpackMediaItem(file) {
+    createMotionZipPosterPackMediaItem(file) {
         const zipMeta =
             file?.zipMetadata && typeof file.zipMetadata === 'object' ? file.zipMetadata : {};
         const title =
@@ -1864,7 +1864,7 @@ class LocalDirectorySource {
                     const isZip = /\.zip$/i.test(filePath);
                     if (
                         isZip &&
-                        (this.isInCompleteExport(filePath) || this.isInManualPosterpack(filePath))
+                        (this.isInCompleteExport(filePath) || this.isInManualPosterPack(filePath))
                     ) {
                         this.events.emit('posterpacks-changed', { path: filePath, kind: 'add' });
                     }
@@ -1906,7 +1906,7 @@ class LocalDirectorySource {
                 const wasZip = /\.zip$/i.test(filePath);
                 if (
                     wasZip &&
-                    (this.isInCompleteExport(filePath) || this.isInManualPosterpack(filePath))
+                    (this.isInCompleteExport(filePath) || this.isInManualPosterPack(filePath))
                 ) {
                     this.events.emit('posterpacks-changed', { path: filePath, kind: 'remove' });
                 }
@@ -1938,7 +1938,7 @@ class LocalDirectorySource {
                 const isZip = /\.zip$/i.test(filePath);
                 if (
                     isZip &&
-                    (this.isInCompleteExport(filePath) || this.isInManualPosterpack(filePath))
+                    (this.isInCompleteExport(filePath) || this.isInManualPosterPack(filePath))
                 ) {
                     this.events.emit('posterpacks-changed', { path: filePath, kind: 'change' });
                 }
@@ -2135,10 +2135,10 @@ class LocalDirectorySource {
             await this.startFileWatcher();
 
             // Import any existing posterpacks (manual only by default) so the screensaver can use them automatically
-            if (this.autoImportPosterpacks === true) {
+            if (this.autoImportPosterPacks === true) {
                 try {
                     // By default, only import from complete/manual to avoid mass-importing generated exports
-                    await this.importPosterpacks({ includeGenerated: false });
+                    await this.importPosterPacks({ includeGenerated: false });
                 } catch (e) {
                     logger.warn(
                         `LocalDirectorySource: Initial posterpack import encountered issues: ${e?.message}`

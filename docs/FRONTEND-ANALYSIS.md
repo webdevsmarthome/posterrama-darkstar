@@ -227,7 +227,7 @@ The server-side initial playlist fetch (which blocks first media delivery to dis
 
 ```
 Phase                           Before    After
-ZIP scan (scanZipPosterpacks)   ~60s      <1s
+ZIP scan (scanZipPosterPacks)   ~60s      <1s
 Normalization (normalizeLocal)  ~198s     <1s
 Total initial fetch             ~198s     ~1.5s
 Server listen (app.listen)      ~210s     ~3s after process start

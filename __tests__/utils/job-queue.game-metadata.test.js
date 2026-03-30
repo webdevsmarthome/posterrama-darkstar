@@ -50,7 +50,7 @@ describe('JobQueue game posterpack metadata + assets', () => {
             guids: ['romm://RomM/1776', 'igdb://2342'],
         };
 
-        const res = await jq.generatePosterpackForItem(
+        const res = await jq.generatePosterPackForItem(
             item,
             'romm',
             {

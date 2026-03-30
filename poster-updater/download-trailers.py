@@ -11,6 +11,7 @@ import requests
 import os
 import sys
 import re
+import unicodedata
 import yt_dlp
 
 print("""
@@ -154,8 +155,9 @@ for i, entry in enumerate(films, 1):
         fehler += 1
         continue
 
-    clean_title = m.group(1).strip()
+    clean_title = unicodedata.normalize('NFC', m.group(1).strip())
     year = m.group(2)
+    entry = unicodedata.normalize('NFC', entry)
     trailer_filename = f"{clean_title} ({year})-trailer.mp4"
     trailer_path = os.path.join(TRAILER_DIR, trailer_filename)
 

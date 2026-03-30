@@ -2,7 +2,7 @@
 """
 Posterrama Metadata-Extras Fetcher
 Laedt fehlende Certification (FSK), Director und Studio von TMDB
-und fuegt sie in die metadata.json der bestehenden ZIP-Posterpacks ein.
+und fuegt sie in die metadata.json der bestehenden ZIP-PosterPacks ein.
 """
 
 import os

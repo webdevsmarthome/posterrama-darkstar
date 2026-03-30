@@ -8,7 +8,7 @@ function tempDir(prefix) {
     return fs.mkdtemp(path.join(os.tmpdir(), prefix));
 }
 
-function makePosterpackZip(entries) {
+function makePosterPackZip(entries) {
     const zip = new AdmZip();
     Object.entries(entries).forEach(([name, val]) => {
         zip.addFile(name, Buffer.isBuffer(val) ? val : Buffer.from(String(val)));
@@ -37,7 +37,7 @@ describe('LocalDirectorySource posterpack importer', () => {
 
         // Create a posterpack ZIP
         const meta = { title: 'Test Movie', year: 2024, genres: ['Action'], tags: ['HD'] };
-        const buf = makePosterpackZip({
+        const buf = makePosterPackZip({
             'poster.jpg': 'P',
             'background.jpg': 'B',
             'clearlogo.png': 'C',
@@ -48,8 +48,8 @@ describe('LocalDirectorySource posterpack importer', () => {
         await fs.writeFile(zipPath, buf);
 
         // Import: should count ZIPs but not extract assets
-        const count = await src.importPosterpacks();
-        // Manual ZIPs are not copied by importPosterpacks (they already live in complete/manual)
+        const count = await src.importPosterPacks();
+        // Manual ZIPs are not copied by importPosterPacks (they already live in complete/manual)
         expect(count).toBeGreaterThanOrEqual(0);
 
         // Verify no extraction occurred

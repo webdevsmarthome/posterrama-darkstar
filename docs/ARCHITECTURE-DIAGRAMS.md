@@ -743,13 +743,13 @@ sequenceDiagram
 
  Server->>Aggregator: refreshPlaylistCache()
  Aggregator->>Local: fetchMedia('poster', 2000)
- Local->>Local: scanZipPosterpacks() → returns from _zipScanBootCache
+ Local->>Local: scanZipPosterPacks() → returns from _zipScanBootCache
  Local-->>Aggregator: 1114 poster items (zipHas + zipMetadata included)
  Aggregator->>Aggregator: normalizeLocalItem() → uses item.zipHas (no AdmZip)
  Note over Aggregator: Fast path: zero ZIP I/O
 
  Aggregator->>Local: fetchMedia('background', 50)
- Local->>Local: scanZipPosterpacks() → returns from _zipScanBootCache
+ Local->>Local: scanZipPosterPacks() → returns from _zipScanBootCache
  Local-->>Aggregator: 1058 background items
  Aggregator-->>Server: 2228 total items (~1.5s)
 

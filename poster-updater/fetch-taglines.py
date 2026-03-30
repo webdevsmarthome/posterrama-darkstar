@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Posterrama Tagline Fetcher
-Laedt fehlende Taglines von TMDB und fuegt sie in die metadata.json der bestehenden ZIP-Posterpacks ein.
+Laedt fehlende Taglines von TMDB und fuegt sie in die metadata.json der bestehenden ZIP-PosterPacks ein.
 Prioritaet: Deutsche Tagline > Englische Tagline
 """
 

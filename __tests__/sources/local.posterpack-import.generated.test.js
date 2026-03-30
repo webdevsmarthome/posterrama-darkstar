@@ -8,7 +8,7 @@ function tempDir(prefix) {
     return fs.mkdtemp(path.join(os.tmpdir(), prefix));
 }
 
-function makePosterpackZip(entries) {
+function makePosterPackZip(entries) {
     const zip = new AdmZip();
     Object.entries(entries).forEach(([name, val]) => {
         zip.addFile(name, Buffer.isBuffer(val) ? val : Buffer.from(String(val)));
@@ -36,7 +36,7 @@ describe('LocalDirectorySource posterpack importer (generated exports)', () => {
             },
         });
 
-        const buf = makePosterpackZip({
+        const buf = makePosterPackZip({
             'poster.jpg': 'P',
             'background.jpg': 'B',
             'metadata.json': JSON.stringify({ title: 'Gen Movie', year: 2023 }),
@@ -45,7 +45,7 @@ describe('LocalDirectorySource posterpack importer (generated exports)', () => {
         await fs.writeFile(zipPath, buf);
 
         // Should copy when includeGenerated option is passed
-        const count = await src.importPosterpacks({ includeGenerated: true });
+        const count = await src.importPosterPacks({ includeGenerated: true });
         expect(count).toBeGreaterThanOrEqual(1);
 
         // Verify the ZIP was copied to complete/manual and no extraction occurred

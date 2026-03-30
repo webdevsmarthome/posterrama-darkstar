@@ -1514,7 +1514,7 @@ app.get(
                 zip = new AdmZip(zipFull);
                 entries = zip.getEntries();
             } catch (e) {
-                logger.error('[Local Posterpack] Corrupted or invalid ZIP file', {
+                logger.error('[Local PosterPack] Corrupted or invalid ZIP file', {
                     zipPath: zipFull,
                     error: e.message,
                     stack: e.stack,
@@ -1524,7 +1524,7 @@ app.get(
 
             // Validate ZIP has entries
             if (!entries || entries.length === 0) {
-                logger.warn('[Local Posterpack] Empty ZIP file', { zipPath: zipFull });
+                logger.warn('[Local PosterPack] Empty ZIP file', { zipPath: zipFull });
                 return res.status(404).send('Entry not found in ZIP');
             }
 
@@ -1554,14 +1554,14 @@ app.get(
             try {
                 data = target.getData();
                 if (!data || data.length === 0) {
-                    logger.warn('[Local Posterpack] Empty entry data', {
+                    logger.warn('[Local PosterPack] Empty entry data', {
                         zipPath: zipFull,
                         entry: target.entryName,
                     });
                     return res.status(404).send('Entry contains no data');
                 }
             } catch (e) {
-                logger.error('[Local Posterpack] Failed to extract entry from ZIP', {
+                logger.error('[Local PosterPack] Failed to extract entry from ZIP', {
                     zipPath: zipFull,
                     entry: target.entryName,
                     error: e.message,
@@ -1605,7 +1605,7 @@ app.get(
             res.setHeader('Content-Length', data.length);
             return res.end(data);
         } catch (err) {
-            logger.error('[Local Posterpack] Failed to stream zip entry', {
+            logger.error('[Local PosterPack] Failed to stream zip entry', {
                 error: err.message,
                 stack: err.stack,
             });
@@ -1683,7 +1683,7 @@ app.head(
                 zip = new AdmZip(zipFull);
                 entries = zip.getEntries();
             } catch (e) {
-                logger.error('[Local Posterpack HEAD] Failed to open ZIP', {
+                logger.error('[Local PosterPack HEAD] Failed to open ZIP', {
                     zipPath: zipFull,
                     error: e.message,
                 });
@@ -1718,7 +1718,7 @@ app.head(
             if (!found) return res.sendStatus(404);
             return res.sendStatus(200);
         } catch (e) {
-            logger.error('[Local Posterpack HEAD] Unexpected error', {
+            logger.error('[Local PosterPack HEAD] Unexpected error', {
                 error: e.message,
                 stack: e.stack,
             });
@@ -4004,8 +4004,8 @@ const createPosterSelectorRouter = require('./routes/poster-selector');
 app.use('/api/poster-selector', isAuthenticated, createPosterSelectorRouter({ logger, wsHub }));
 
 // === POSTERPACK CREATOR ROUTES ===
-const createPosterpackCreatorRouter = require('./routes/posterpack-creator');
-app.use('/api/posterpack-creator', isAuthenticated, createPosterpackCreatorRouter({ logger, refreshPlaylistCache }));
+const createPosterPackCreatorRouter = require('./routes/posterpack-creator');
+app.use('/api/posterpack-creator', isAuthenticated, createPosterPackCreatorRouter({ logger, refreshPlaylistCache }));
 
 // --- Device bypass status endpoint (public) ---
 // Lightweight probe so clients can quickly decide to skip device management boot sequence.

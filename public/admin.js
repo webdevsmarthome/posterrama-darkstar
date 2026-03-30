@@ -2,7 +2,7 @@
 // NOTE: Removed blanket 'eslint-disable no-empty'; empty catches now annotated with purpose.
 /* global saveConfigPatch, miniCache, inflight, refreshOverviewLastSync */
 /* global initMsForSelect, rebuildMsForSelect, getMultiSelectValues, fetchPlexLibraries */
-/* global fetchJellyfinLibraries, populatePosterpackLibraries */
+/* global fetchJellyfinLibraries, populatePosterPackLibraries */
 /* global loadMusicGenresForMultiselect, loadMusicArtistsForMultiselect */
 
 // Import UI Components
@@ -28,7 +28,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
     let __adminAuthLost = false;
     let __adminAuthLostNotified = false;
 
-    // Posterpack debug logger removed
+    // PosterPack debug logger removed
 
     // Early fallback binding for notification button (before heavy logic) so we at least log clicks.
     try {
@@ -575,7 +575,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
         }
     }
     // Forward declaration for linter (defined later)
-    function loadPosterpackServerFilterOptions() {}
+    function loadPosterPackServerFilterOptions() {}
 
     function __ensureAllMultiselects() {
         // Media Sources (main panels)
@@ -586,17 +586,17 @@ window.COLOR_PRESETS = COLOR_PRESETS;
         __ensureMsWired('plex-ms-music-artists', 'plex.musicArtists');
         __ensureMsWired('jf-ms-movies', 'jf.movies');
         __ensureMsWired('jf-ms-shows', 'jf.shows');
-        // Posterpack section
+        // PosterPack section
         __ensureMsWired('pp-plex-ms-movies', 'pp-plex.movies');
         __ensureMsWired('pp-plex-ms-shows', 'pp-plex.shows');
         __ensureMsWired('pp-jf-ms-movies', 'pp-jf.movies');
         __ensureMsWired('pp-jf-ms-shows', 'pp-jf.shows');
-        // Posterpack server filters (ratings/genres/qualities)
+        // PosterPack server filters (ratings/genres/qualities)
         __ensureMsWired('pp-srv-ms-ratings', 'pp-server.ratings');
         __ensureMsWired('pp-srv-ms-genres', 'pp-server.genres');
         __ensureMsWired('pp-srv-ms-qualities', 'pp-server.qualities');
         try {
-            loadPosterpackServerFilterOptions().catch(() => {});
+            loadPosterPackServerFilterOptions().catch(() => {});
         } catch (_) {
             /* posterpack filter multiselect wiring on DOM ready failed (non-fatal) */
         }
@@ -2321,7 +2321,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                 // which sums all enabled sources with proper filtering and shows
                 // playlist count in the secondary line (e.g., "585 cached")
 
-                // Update Posterpack Content Source labels with (not configured) only when missing (disabled still counts as configured)
+                // Update PosterPack Content Source labels with (not configured) only when missing (disabled still counts as configured)
                 try {
                     const sel = document.getElementById('posterpack.source');
                     if (sel) {
@@ -19164,10 +19164,10 @@ window.COLOR_PRESETS = COLOR_PRESETS;
 
             // Keep Motion picker source dropdown in sync with enabled/disabled sources
             try {
-                if (typeof window?.__syncPosterpackMotionSourceAvailability === 'function') {
+                if (typeof window?.__syncPosterPackMotionSourceAvailability === 'function') {
                     setTimeout(() => {
                         try {
-                            window.__syncPosterpackMotionSourceAvailability();
+                            window.__syncPosterPackMotionSourceAvailability();
                         } catch (_) {
                             /* ignore */
                         }
@@ -21885,11 +21885,11 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                     rebuildMsForSelect('plex-ms-movies', 'plex.movies');
                     rebuildMsForSelect('plex-ms-shows', 'plex.shows');
                     rebuildMsForSelect('plex-ms-music', 'plex.music');
-                    // If Posterpack source is currently Plex, immediately sync Posterpack lists
+                    // If PosterPack source is currently Plex, immediately sync PosterPack lists
                     try {
                         const srcSel = document.getElementById('posterpack.source');
                         if (srcSel && srcSel.value === 'plex') {
-                            populatePosterpackLibraries('plex');
+                            populatePosterPackLibraries('plex');
                         }
                     } catch (_) {
                         /* posterpack library populate optional; ignore */
@@ -22477,11 +22477,11 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                     // Rebuild multiselect options with counts
                     rebuildMsForSelect('jf-ms-movies', 'jf.movies');
                     rebuildMsForSelect('jf-ms-shows', 'jf.shows');
-                    // If Posterpack source is currently Jellyfin, immediately sync Posterpack lists
+                    // If PosterPack source is currently Jellyfin, immediately sync PosterPack lists
                     try {
                         const srcSel = document.getElementById('posterpack.source');
                         if (srcSel && srcSel.value === 'jellyfin') {
-                            populatePosterpackLibraries('jellyfin');
+                            populatePosterPackLibraries('jellyfin');
                         }
                     } catch (_) {
                         /* posterpack library populate optional; ignore */
@@ -27451,12 +27451,12 @@ if (!document.__niwDelegatedFallback) {
 
         // Browse button removed (redundant with Refresh)
 
-        // Posterpack generation
+        // PosterPack generation
         const generateBtn = document.getElementById('btn-generate-posterpack');
-        if (generateBtn) generateBtn.addEventListener('click', generatePosterpack);
+        if (generateBtn) generateBtn.addEventListener('click', generatePosterPack);
 
         const previewBtn = document.getElementById('btn-preview-posterpack');
-        if (previewBtn) previewBtn.addEventListener('click', previewPosterpackSelection);
+        if (previewBtn) previewBtn.addEventListener('click', previewPosterPackSelection);
 
         const sourceSelect = document.getElementById('posterpack.source');
         if (sourceSelect) {
@@ -27468,13 +27468,13 @@ if (!document.__niwDelegatedFallback) {
             setTimeout(() => handleSourceSelection({ target: sourceSelect }), 800);
         }
 
-        // Posterpack mode toggle (bulk vs motion)
+        // PosterPack mode toggle (bulk vs motion)
         try {
-            initPosterpackMotionModeUi();
+            initPosterPackMotionModeUi();
         } catch (_) {
             /* optional UI wiring */
         }
-        // Initialize Posterpack multiselect widgets (empty; options populated later)
+        // Initialize PosterPack multiselect widgets (empty; options populated later)
         try {
             if (typeof initMsForSelect === 'function') {
                 initMsForSelect('pp-plex-ms-movies', 'pp-plex.movies');
@@ -27499,15 +27499,15 @@ if (!document.__niwDelegatedFallback) {
     }
 
     // --- Motion posterpack generation (single item) ---
-    let __motionPosterpackQueue = [];
-    let __motionPosterpackLastResults = [];
-    let __motionPosterpackSelectedIds = new Set();
-    let __motionPosterpackDetailsByKey = new Map();
-    let __motionPosterpackSearchSeq = 0;
+    let __motionPosterPackQueue = [];
+    let __motionPosterPackLastResults = [];
+    let __motionPosterPackSelectedIds = new Set();
+    let __motionPosterPackDetailsByKey = new Map();
+    let __motionPosterPackSearchSeq = 0;
     const __MOTION_POSTERPACK_QUEUE_MAX = 5;
 
-    function getPosterpackQueueLimit() {
-        return getPosterpackMode && getPosterpackMode() === 'motion'
+    function getPosterPackQueueLimit() {
+        return getPosterPackMode && getPosterPackMode() === 'motion'
             ? __MOTION_POSTERPACK_QUEUE_MAX
             : Infinity;
     }
@@ -27525,30 +27525,30 @@ if (!document.__niwDelegatedFallback) {
 
     function isMotionItemQueued(item) {
         const id = getMotionItemId(item);
-        return !!id && __motionPosterpackQueue.some(q => getMotionItemId(q) === id);
+        return !!id && __motionPosterPackQueue.some(q => getMotionItemId(q) === id);
     }
 
     function isMotionItemSelected(item) {
         const id = getMotionItemId(item);
         return (
             !!id &&
-            __motionPosterpackSelectedIds instanceof Set &&
-            __motionPosterpackSelectedIds.has(id)
+            __motionPosterPackSelectedIds instanceof Set &&
+            __motionPosterPackSelectedIds.has(id)
         );
     }
 
     function setMotionItemSelected(item, selected) {
         const id = getMotionItemId(item);
         if (!id) return;
-        if (!(__motionPosterpackSelectedIds instanceof Set)) {
-            __motionPosterpackSelectedIds = new Set();
+        if (!(__motionPosterPackSelectedIds instanceof Set)) {
+            __motionPosterPackSelectedIds = new Set();
         }
-        if (selected) __motionPosterpackSelectedIds.add(id);
-        else __motionPosterpackSelectedIds.delete(id);
+        if (selected) __motionPosterPackSelectedIds.add(id);
+        else __motionPosterPackSelectedIds.delete(id);
     }
 
     function addMotionItemsToQueue(items) {
-        const limit = getPosterpackQueueLimit();
+        const limit = getPosterPackQueueLimit();
         const max = Number.isFinite(limit) ? limit : Infinity;
         let added = 0;
         let skippedQueued = 0;
@@ -27560,19 +27560,19 @@ if (!document.__niwDelegatedFallback) {
                 skippedQueued++;
                 continue;
             }
-            if (Array.isArray(__motionPosterpackQueue) && __motionPosterpackQueue.length >= max) {
+            if (Array.isArray(__motionPosterPackQueue) && __motionPosterPackQueue.length >= max) {
                 skippedLimit++;
                 break;
             }
-            __motionPosterpackQueue.push(item);
+            __motionPosterPackQueue.push(item);
             added++;
         }
 
         // Remove any items that are now queued from the selection set.
         try {
-            if (__motionPosterpackSelectedIds instanceof Set) {
-                for (const q of __motionPosterpackQueue) {
-                    __motionPosterpackSelectedIds.delete(getMotionItemId(q));
+            if (__motionPosterPackSelectedIds instanceof Set) {
+                for (const q of __motionPosterPackQueue) {
+                    __motionPosterPackSelectedIds.delete(getMotionItemId(q));
                 }
             }
         } catch (_) {
@@ -27582,32 +27582,32 @@ if (!document.__niwDelegatedFallback) {
         return { added, skippedQueued, skippedLimit };
     }
 
-    function clearMotionPosterpackSelectionUi() {
-        __motionPosterpackQueue = [];
-        __motionPosterpackSelectedIds = new Set();
+    function clearMotionPosterPackSelectionUi() {
+        __motionPosterPackQueue = [];
+        __motionPosterPackSelectedIds = new Set();
         try {
-            renderMotionPosterpackSelected();
-            renderMotionPosterpackResults(__motionPosterpackLastResults);
-            updatePosterpackGenerateButtonLabel();
+            renderMotionPosterPackSelected();
+            renderMotionPosterPackResults(__motionPosterPackLastResults);
+            updatePosterPackGenerateButtonLabel();
         } catch (_) {
             /* ignore */
         }
     }
 
     function removeQueuedMotionItems(predicate) {
-        if (!Array.isArray(__motionPosterpackQueue) || __motionPosterpackQueue.length === 0) {
+        if (!Array.isArray(__motionPosterPackQueue) || __motionPosterPackQueue.length === 0) {
             return 0;
         }
-        const before = __motionPosterpackQueue.length;
-        __motionPosterpackQueue = __motionPosterpackQueue.filter(it => !predicate(it));
-        const removed = before - __motionPosterpackQueue.length;
+        const before = __motionPosterPackQueue.length;
+        __motionPosterPackQueue = __motionPosterPackQueue.filter(it => !predicate(it));
+        const removed = before - __motionPosterPackQueue.length;
         if (removed > 0) {
             try {
                 // Keep selection set in sync (remove anything no longer present).
-                const keep = new Set(__motionPosterpackQueue.map(getMotionItemId));
-                if (__motionPosterpackSelectedIds instanceof Set) {
-                    __motionPosterpackSelectedIds = new Set(
-                        Array.from(__motionPosterpackSelectedIds).filter(id => keep.has(id))
+                const keep = new Set(__motionPosterPackQueue.map(getMotionItemId));
+                if (__motionPosterPackSelectedIds instanceof Set) {
+                    __motionPosterPackSelectedIds = new Set(
+                        Array.from(__motionPosterPackSelectedIds).filter(id => keep.has(id))
                     );
                 }
             } catch (_) {
@@ -27615,9 +27615,9 @@ if (!document.__niwDelegatedFallback) {
             }
 
             try {
-                renderMotionPosterpackSelected();
-                renderMotionPosterpackResults(__motionPosterpackLastResults);
-                updatePosterpackGenerateButtonLabel();
+                renderMotionPosterPackSelected();
+                renderMotionPosterPackResults(__motionPosterPackLastResults);
+                updatePosterPackGenerateButtonLabel();
             } catch (_) {
                 /* ignore */
             }
@@ -27635,30 +27635,30 @@ if (!document.__niwDelegatedFallback) {
             .replace(/'/g, '&#39;');
     }
 
-    function getPosterpackMode() {
+    function getPosterPackMode() {
         const isMotion = !!document.getElementById('posterpack.mode.motion')?.checked;
         return isMotion ? 'motion' : 'standard';
     }
 
-    function updatePosterpackGenerateButtonLabel() {
+    function updatePosterPackGenerateButtonLabel() {
         const btn = document.getElementById('btn-generate-posterpack');
         if (!btn) return;
         // Don't clobber the in-progress state.
         if (btn.disabled && /fa-spinner/.test(btn.innerHTML)) return;
 
-        if (getPosterpackMode() === 'motion') {
-            const n = Array.isArray(__motionPosterpackQueue) ? __motionPosterpackQueue.length : 0;
+        if (getPosterPackMode() === 'motion') {
+            const n = Array.isArray(__motionPosterPackQueue) ? __motionPosterPackQueue.length : 0;
             const suffix = n > 0 ? ` (${n})` : '';
-            btn.innerHTML = `<i class="fas fa-film"></i> Generate Motion Posterpacks${suffix}`;
+            btn.innerHTML = `<i class="fas fa-film"></i> Generate Motion PosterPacks${suffix}`;
         } else {
-            const n = Array.isArray(__motionPosterpackQueue) ? __motionPosterpackQueue.length : 0;
+            const n = Array.isArray(__motionPosterPackQueue) ? __motionPosterPackQueue.length : 0;
             const suffix = n > 0 ? ` (${n})` : '';
-            btn.innerHTML = `<i class="fas fa-archive"></i> Generate Posterpacks${suffix}`;
+            btn.innerHTML = `<i class="fas fa-archive"></i> Generate PosterPacks${suffix}`;
         }
     }
 
-    function syncPosterpackModeUi() {
-        const mode = getPosterpackMode();
+    function syncPosterPackModeUi() {
+        const mode = getPosterPackMode();
 
         const motionSection = document.getElementById('posterpack-motion-section');
         const libSection = document.getElementById('posterpack-lib-section');
@@ -27696,10 +27696,10 @@ if (!document.__niwDelegatedFallback) {
             if (sourceSelect) handleSourceSelection({ target: sourceSelect });
         }
 
-        updatePosterpackGenerateButtonLabel();
+        updatePosterPackGenerateButtonLabel();
     }
 
-    function setPosterpackModeActive(mode) {
+    function setPosterPackModeActive(mode) {
         try {
             const container = document.querySelector('#posterpack-mode-group .segmented');
             if (!container) return;
@@ -27731,17 +27731,17 @@ if (!document.__niwDelegatedFallback) {
         }
     }
 
-    function renderMotionPosterpackSelected() {
+    function renderMotionPosterPackSelected() {
         const host = document.getElementById('posterpack-motion-selected');
         if (!host) return;
 
-        if (!Array.isArray(__motionPosterpackQueue) || __motionPosterpackQueue.length === 0) {
+        if (!Array.isArray(__motionPosterPackQueue) || __motionPosterPackQueue.length === 0) {
             host.innerHTML = '<em>No items queued</em>';
-            updatePosterpackGenerateButtonLabel();
+            updatePosterPackGenerateButtonLabel();
             return;
         }
 
-        const itemsHtml = __motionPosterpackQueue
+        const itemsHtml = __motionPosterPackQueue
             .map((it, idx) => {
                 const t = it.title || it.name || 'Untitled';
                 const y = it.year ? ` (${it.year})` : '';
@@ -27769,13 +27769,13 @@ if (!document.__niwDelegatedFallback) {
             })
             .join('');
 
-        const isMotion = getPosterpackMode && getPosterpackMode() === 'motion';
+        const isMotion = getPosterPackMode && getPosterPackMode() === 'motion';
         const maxText = isMotion ? `/${__MOTION_POSTERPACK_QUEUE_MAX}` : '';
 
         host.innerHTML = `
             <div style="border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:10px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-                    <div><strong>Selected</strong> <span style="opacity:.8; font-size:12px;">(${__motionPosterpackQueue.length}${maxText})</span></div>
+                    <div><strong>Selected</strong> <span style="opacity:.8; font-size:12px;">(${__motionPosterPackQueue.length}${maxText})</span></div>
                     <button class="btn btn-secondary btn-sm" data-action="clear-motion-queue">
                         <i class="fas fa-xmark"></i> Clear all
                     </button>
@@ -27790,10 +27790,10 @@ if (!document.__niwDelegatedFallback) {
                 const clearBtn = e.target.closest('[data-action="clear-motion-queue"]');
                 if (clearBtn) {
                     e.preventDefault();
-                    __motionPosterpackQueue = [];
-                    renderMotionPosterpackSelected();
-                    renderMotionPosterpackResults(__motionPosterpackLastResults);
-                    updatePosterpackGenerateButtonLabel();
+                    __motionPosterPackQueue = [];
+                    renderMotionPosterPackSelected();
+                    renderMotionPosterPackResults(__motionPosterPackLastResults);
+                    updatePosterPackGenerateButtonLabel();
                     return;
                 }
                 const rm = e.target.closest('[data-action="remove-motion-queue"]');
@@ -27801,18 +27801,18 @@ if (!document.__niwDelegatedFallback) {
                 e.preventDefault();
                 const idx = Number(rm.getAttribute('data-idx'));
                 if (Number.isFinite(idx) && idx >= 0) {
-                    __motionPosterpackQueue.splice(idx, 1);
-                    renderMotionPosterpackSelected();
-                    renderMotionPosterpackResults(__motionPosterpackLastResults);
-                    updatePosterpackGenerateButtonLabel();
+                    __motionPosterPackQueue.splice(idx, 1);
+                    renderMotionPosterPackSelected();
+                    renderMotionPosterPackResults(__motionPosterPackLastResults);
+                    updatePosterPackGenerateButtonLabel();
                 }
             });
         }
 
-        updatePosterpackGenerateButtonLabel();
+        updatePosterPackGenerateButtonLabel();
     }
 
-    function renderMotionPosterpackResults(items) {
+    function renderMotionPosterPackResults(items) {
         const host = document.getElementById('posterpack-motion-results');
         if (!host) return;
 
@@ -27821,8 +27821,8 @@ if (!document.__niwDelegatedFallback) {
             return;
         }
 
-        const limit = getPosterpackQueueLimit();
-        const queueFullNow = Number.isFinite(limit) && __motionPosterpackQueue.length >= limit;
+        const limit = getPosterPackQueueLimit();
+        const queueFullNow = Number.isFinite(limit) && __motionPosterPackQueue.length >= limit;
         const visible = items.slice(0, 25);
         const selectableItems = visible.filter(it => it && !isMotionItemQueued(it));
         const selectedCount = selectableItems.filter(it => isMotionItemSelected(it)).length;
@@ -27908,8 +27908,8 @@ if (!document.__niwDelegatedFallback) {
             const key = (it?.key || it?.id || '').toString();
             const info = parseCompositeKey(src, key);
             const details =
-                __motionPosterpackDetailsByKey instanceof Map
-                    ? __motionPosterpackDetailsByKey.get(key)
+                __motionPosterPackDetailsByKey instanceof Map
+                    ? __motionPosterPackDetailsByKey.get(key)
                     : null;
 
             const parts = [];
@@ -28008,24 +28008,24 @@ if (!document.__niwDelegatedFallback) {
                 if (action === 'motion-select-all') {
                     const checked = t.checked === true;
                     if (checked) {
-                        for (const it of __motionPosterpackLastResults.slice(0, 25)) {
+                        for (const it of __motionPosterPackLastResults.slice(0, 25)) {
                             if (!it || isMotionItemQueued(it)) continue;
                             setMotionItemSelected(it, true);
                         }
                     } else {
-                        __motionPosterpackSelectedIds = new Set();
+                        __motionPosterPackSelectedIds = new Set();
                     }
-                    renderMotionPosterpackResults(__motionPosterpackLastResults);
+                    renderMotionPosterPackResults(__motionPosterPackLastResults);
                     return;
                 }
 
                 if (action === 'motion-select') {
                     const idx = Number(t.getAttribute('data-idx'));
-                    const item = __motionPosterpackLastResults[idx];
+                    const item = __motionPosterPackLastResults[idx];
                     if (!item) return;
                     if (isMotionItemQueued(item)) return;
                     setMotionItemSelected(item, t.checked === true);
-                    renderMotionPosterpackResults(__motionPosterpackLastResults);
+                    renderMotionPosterPackResults(__motionPosterPackLastResults);
                 }
             });
 
@@ -28047,7 +28047,7 @@ if (!document.__niwDelegatedFallback) {
                 const addSelectedBtn = e.target.closest('[data-action="motion-add-selected"]');
                 if (addSelectedBtn) {
                     e.preventDefault();
-                    const toAdd = __motionPosterpackLastResults
+                    const toAdd = __motionPosterPackLastResults
                         .slice(0, 25)
                         .filter(it => it && !isMotionItemQueued(it) && isMotionItemSelected(it));
                     const { added, skippedLimit } = addMotionItemsToQueue(toAdd);
@@ -28063,24 +28063,24 @@ if (!document.__niwDelegatedFallback) {
                         showNotification('Nothing to add', 'info');
                     }
 
-                    renderMotionPosterpackSelected();
-                    renderMotionPosterpackResults(__motionPosterpackLastResults);
-                    updatePosterpackGenerateButtonLabel();
+                    renderMotionPosterPackSelected();
+                    renderMotionPosterPackResults(__motionPosterPackLastResults);
+                    updatePosterPackGenerateButtonLabel();
                     return;
                 }
 
                 const btn = e.target.closest('[data-action="select-motion"]');
                 if (!btn) return;
                 const idx = Number(btn.getAttribute('data-idx'));
-                const item = __motionPosterpackLastResults[idx];
+                const item = __motionPosterPackLastResults[idx];
                 if (!item) return;
 
                 if (isMotionItemQueued(item)) {
                     showNotification('Item is already in the queue', 'info');
                     return;
                 }
-                const limit = getPosterpackQueueLimit();
-                if (Number.isFinite(limit) && __motionPosterpackQueue.length >= limit) {
+                const limit = getPosterPackQueueLimit();
+                if (Number.isFinite(limit) && __motionPosterPackQueue.length >= limit) {
                     showNotification(
                         `You can queue up to ${__MOTION_POSTERPACK_QUEUE_MAX} items`,
                         'warning'
@@ -28088,19 +28088,19 @@ if (!document.__niwDelegatedFallback) {
                     return;
                 }
 
-                __motionPosterpackQueue.push(item);
+                __motionPosterPackQueue.push(item);
                 // If user had it selected, clear it.
                 try {
-                    if (__motionPosterpackSelectedIds instanceof Set) {
-                        __motionPosterpackSelectedIds.delete(getMotionItemId(item));
+                    if (__motionPosterPackSelectedIds instanceof Set) {
+                        __motionPosterPackSelectedIds.delete(getMotionItemId(item));
                     }
                 } catch (_) {
                     /* ignore */
                 }
 
-                renderMotionPosterpackSelected();
-                renderMotionPosterpackResults(__motionPosterpackLastResults);
-                updatePosterpackGenerateButtonLabel();
+                renderMotionPosterPackSelected();
+                renderMotionPosterPackResults(__motionPosterPackLastResults);
+                updatePosterPackGenerateButtonLabel();
 
                 return;
             });
@@ -28113,12 +28113,12 @@ if (!document.__niwDelegatedFallback) {
                 if (e.target?.closest?.('button')) return;
 
                 const idx = Number(row.getAttribute('data-idx'));
-                const item = __motionPosterpackLastResults[idx];
+                const item = __motionPosterPackLastResults[idx];
                 if (!item) return;
                 if (isMotionItemQueued(item)) return;
 
-                const limit = getPosterpackQueueLimit();
-                if (Number.isFinite(limit) && __motionPosterpackQueue.length >= limit) {
+                const limit = getPosterPackQueueLimit();
+                if (Number.isFinite(limit) && __motionPosterPackQueue.length >= limit) {
                     // Match checkbox disabling behavior when queue is full.
                     showNotification(
                         `You can queue up to ${__MOTION_POSTERPACK_QUEUE_MAX} items`,
@@ -28128,7 +28128,7 @@ if (!document.__niwDelegatedFallback) {
                 }
 
                 setMotionItemSelected(item, !isMotionItemSelected(item));
-                renderMotionPosterpackResults(__motionPosterpackLastResults);
+                renderMotionPosterPackResults(__motionPosterPackLastResults);
             });
         }
     }
@@ -28147,9 +28147,9 @@ if (!document.__niwDelegatedFallback) {
         el.setAttribute('data-kind', kind);
     }
 
-    let __motionPosterpackSourceAvailability = null;
+    let __motionPosterPackSourceAvailability = null;
 
-    function computeMotionPosterpackSourceAvailability(cfgPayload) {
+    function computeMotionPosterPackSourceAvailability(cfgPayload) {
         const payload = cfgPayload || {};
         const cfg = payload?.config || payload || {};
         const mediaServers = Array.isArray(cfg.mediaServers) ? cfg.mediaServers : [];
@@ -28169,12 +28169,12 @@ if (!document.__niwDelegatedFallback) {
             plex: hasEnabledServer('plex'),
             jellyfin: hasEnabledServer('jellyfin'),
             romm: hasEnabledServer('romm'),
-            // For Posterpack search we only need an API key; TMDB "source" enablement is unrelated.
+            // For PosterPack search we only need an API key; TMDB "source" enablement is unrelated.
             tmdb: !!(tmdbKeyInCfg || tmdbKeyInEnv),
         };
     }
 
-    function syncMotionPosterpackSourceUi({ availability, reason } = {}) {
+    function syncMotionPosterPackSourceUi({ availability, reason } = {}) {
         const sourceEl = document.getElementById('posterpack.motion.source');
         const queryEl = document.getElementById('posterpack.motion.query');
         const searchBtn = document.getElementById('posterpack.motion.searchBtn');
@@ -28182,9 +28182,9 @@ if (!document.__niwDelegatedFallback) {
 
         const incoming = availability && typeof availability === 'object' ? availability : null;
         const existing =
-            __motionPosterpackSourceAvailability &&
-            typeof __motionPosterpackSourceAvailability === 'object'
-                ? __motionPosterpackSourceAvailability
+            __motionPosterPackSourceAvailability &&
+            typeof __motionPosterPackSourceAvailability === 'object'
+                ? __motionPosterPackSourceAvailability
                 : null;
 
         // Fail-open: if we don't know availability yet, don't disable inputs/options.
@@ -28193,7 +28193,7 @@ if (!document.__niwDelegatedFallback) {
         }
 
         const a = incoming || existing || {};
-        __motionPosterpackSourceAvailability = a;
+        __motionPosterPackSourceAvailability = a;
 
         const enablePathFor = src => {
             const s = String(src || '').toLowerCase();
@@ -28265,25 +28265,25 @@ if (!document.__niwDelegatedFallback) {
         }
     }
 
-    async function refreshMotionPosterpackSourceAvailability() {
+    async function refreshMotionPosterPackSourceAvailability() {
         try {
             const r = await fetch('/api/admin/config', { credentials: 'include' });
             if (!r.ok) throw new Error('Failed to load config');
             const cfgPayload = await r.json();
-            const availability = computeMotionPosterpackSourceAvailability(cfgPayload);
-            syncMotionPosterpackSourceUi({ availability });
+            const availability = computeMotionPosterPackSourceAvailability(cfgPayload);
+            syncMotionPosterPackSourceUi({ availability });
         } catch (_) {
             // Best-effort only; if this fails the picker remains usable for already-working sources.
         }
     }
 
     try {
-        window.__syncPosterpackMotionSourceAvailability = refreshMotionPosterpackSourceAvailability;
+        window.__syncPosterPackMotionSourceAvailability = refreshMotionPosterPackSourceAvailability;
     } catch (_) {
         /* ignore */
     }
 
-    async function runMotionPosterpackSearch() {
+    async function runMotionPosterPackSearch() {
         const queryEl = document.getElementById('posterpack.motion.query');
         const sourceEl = document.getElementById('posterpack.motion.source');
         const query = (queryEl?.value || '').toString().trim();
@@ -28295,7 +28295,7 @@ if (!document.__niwDelegatedFallback) {
 
         // Guardrail: prevent searching disabled sources (only when availability is known).
         try {
-            const a = __motionPosterpackSourceAvailability || {};
+            const a = __motionPosterPackSourceAvailability || {};
             if (
                 a &&
                 typeof a === 'object' &&
@@ -28324,9 +28324,9 @@ if (!document.__niwDelegatedFallback) {
         }
 
         if (!query || query.length < 2) {
-            __motionPosterpackLastResults = [];
+            __motionPosterPackLastResults = [];
             setMotionSearchStatus('', 'info');
-            renderMotionPosterpackResults([]);
+            renderMotionPosterPackResults([]);
             return;
         }
 
@@ -28358,19 +28358,19 @@ if (!document.__niwDelegatedFallback) {
                     ? filtered.filter(r => !!(r && r.posterUrl))
                     : filtered;
 
-            __motionPosterpackLastResults = filteredWithPoster;
-            __motionPosterpackSelectedIds = new Set();
+            __motionPosterPackLastResults = filteredWithPoster;
+            __motionPosterPackSelectedIds = new Set();
 
             // Reset details cache for new search (keeps UI consistent with current results)
             try {
-                __motionPosterpackDetailsByKey = new Map();
+                __motionPosterPackDetailsByKey = new Map();
             } catch (_) {
-                __motionPosterpackDetailsByKey = new Map();
+                __motionPosterPackDetailsByKey = new Map();
             }
 
             // Kick off lazy enrichment (TMDB/Plex/Jellyfin) to show cast/director without slowing typing too much.
-            __motionPosterpackSearchSeq++;
-            const seq = __motionPosterpackSearchSeq;
+            __motionPosterPackSearchSeq++;
+            const seq = __motionPosterPackSearchSeq;
             if (source === 'tmdb' || source === 'plex' || source === 'jellyfin') {
                 try {
                     const toPrefetch = filteredWithPoster.slice(0, 10);
@@ -28386,10 +28386,10 @@ if (!document.__niwDelegatedFallback) {
                 `Found ${filteredWithPoster.length} result(s) for "${query}" (${source}).`,
                 'info'
             );
-            renderMotionPosterpackResults(filteredWithPoster);
+            renderMotionPosterPackResults(filteredWithPoster);
         } catch (e) {
-            __motionPosterpackLastResults = [];
-            renderMotionPosterpackResults([]);
+            __motionPosterPackLastResults = [];
+            renderMotionPosterPackResults([]);
             host.innerHTML = `<em>Search failed: ${escapeHtmlMotion(e?.message || String(e))}</em>`;
             setMotionSearchStatus(`Search failed: ${e?.message || String(e)}`, 'error');
             showNotification(`Search failed: ${e?.message || e}`, 'error');
@@ -28405,7 +28405,7 @@ if (!document.__niwDelegatedFallback) {
         try {
             if (!Array.isArray(items) || items.length === 0) return;
             // Ignore stale searches
-            if (seq !== __motionPosterpackSearchSeq) return;
+            if (seq !== __motionPosterPackSearchSeq) return;
 
             const keys = items
                 .map(it => (it?.key || '').toString())
@@ -28414,8 +28414,8 @@ if (!document.__niwDelegatedFallback) {
 
             const missing = keys.filter(
                 k =>
-                    !(__motionPosterpackDetailsByKey instanceof Map) ||
-                    !__motionPosterpackDetailsByKey.has(k)
+                    !(__motionPosterPackDetailsByKey instanceof Map) ||
+                    !__motionPosterPackDetailsByKey.has(k)
             );
             if (missing.length === 0) return;
 
@@ -28426,7 +28426,7 @@ if (!document.__niwDelegatedFallback) {
                 while (idx < missing.length) {
                     const i = idx++;
                     const key = missing[i];
-                    if (seq !== __motionPosterpackSearchSeq) return;
+                    if (seq !== __motionPosterPackSearchSeq) return;
                     try {
                         const resp = await fetch(
                             `/api/admin/media/details?key=${encodeURIComponent(key)}`,
@@ -28434,8 +28434,8 @@ if (!document.__niwDelegatedFallback) {
                         );
                         const json = await resp.json().catch(() => null);
                         const details = resp.ok ? json?.details || null : null;
-                        if (details && __motionPosterpackDetailsByKey instanceof Map) {
-                            __motionPosterpackDetailsByKey.set(key, details);
+                        if (details && __motionPosterPackDetailsByKey instanceof Map) {
+                            __motionPosterPackDetailsByKey.set(key, details);
                         }
                     } catch (_) {
                         /* ignore */
@@ -28444,8 +28444,8 @@ if (!document.__niwDelegatedFallback) {
             };
 
             await Promise.all(new Array(CONCURRENCY).fill(0).map(() => runOne()));
-            if (seq !== __motionPosterpackSearchSeq) return;
-            renderMotionPosterpackResults(__motionPosterpackLastResults);
+            if (seq !== __motionPosterPackSearchSeq) return;
+            renderMotionPosterPackResults(__motionPosterPackLastResults);
         } catch (_) {
             /* ignore */
         }
@@ -28459,7 +28459,7 @@ if (!document.__niwDelegatedFallback) {
         };
     }
 
-    function initPosterpackMotionModeUi() {
+    function initPosterPackMotionModeUi() {
         const motionRadio = document.getElementById('posterpack.mode.motion');
         const standardRadio = document.getElementById('posterpack.mode.standard');
         const queryEl = document.getElementById('posterpack.motion.query');
@@ -28468,11 +28468,11 @@ if (!document.__niwDelegatedFallback) {
 
         if (motionRadio && !motionRadio.__bound) {
             motionRadio.__bound = true;
-            motionRadio.addEventListener('change', syncPosterpackModeUi);
+            motionRadio.addEventListener('change', syncPosterPackModeUi);
         }
         if (standardRadio && !standardRadio.__bound) {
             standardRadio.__bound = true;
-            standardRadio.addEventListener('change', syncPosterpackModeUi);
+            standardRadio.addEventListener('change', syncPosterPackModeUi);
         }
 
         // Robust mode change handler (covers label clicks + any late bindings)
@@ -28482,8 +28482,8 @@ if (!document.__niwDelegatedFallback) {
                 const t = e.target;
                 if (!t) return;
                 if (t.name === 'posterpack.mode') {
-                    syncPosterpackModeUi();
-                    setPosterpackModeActive(getPosterpackMode());
+                    syncPosterPackModeUi();
+                    setPosterPackModeActive(getPosterPackMode());
                 }
             });
         }
@@ -28494,13 +28494,13 @@ if (!document.__niwDelegatedFallback) {
                 // Only auto-search when the picker is visible
                 const sec = document.getElementById('posterpack-motion-section');
                 if (!sec || sec.hidden || sec.style.display === 'none') return;
-                runMotionPosterpackSearch();
+                runMotionPosterPackSearch();
             }, 250);
             queryEl.addEventListener('input', debounced);
             queryEl.addEventListener('keydown', e => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    runMotionPosterpackSearch();
+                    runMotionPosterPackSearch();
                 }
             });
         }
@@ -28528,13 +28528,13 @@ if (!document.__niwDelegatedFallback) {
                 // Update disabled/enabled state + hint when user switches.
                 try {
                     if (
-                        __motionPosterpackSourceAvailability &&
-                        typeof __motionPosterpackSourceAvailability === 'object' &&
-                        Object.keys(__motionPosterpackSourceAvailability).length > 0
+                        __motionPosterPackSourceAvailability &&
+                        typeof __motionPosterPackSourceAvailability === 'object' &&
+                        Object.keys(__motionPosterPackSourceAvailability).length > 0
                     ) {
-                        syncMotionPosterpackSourceUi({ reason: 'change' });
+                        syncMotionPosterPackSourceUi({ reason: 'change' });
                     } else {
-                        refreshMotionPosterpackSourceAvailability();
+                        refreshMotionPosterPackSourceAvailability();
                     }
                 } catch (_) {
                     /* ignore */
@@ -28543,10 +28543,10 @@ if (!document.__niwDelegatedFallback) {
                 // Re-run search with the new source if user already typed something
                 try {
                     const q = (queryEl?.value || '').toString().trim();
-                    if (q && q.length >= 2) runMotionPosterpackSearch();
+                    if (q && q.length >= 2) runMotionPosterPackSearch();
                     else {
-                        __motionPosterpackLastResults = [];
-                        renderMotionPosterpackResults([]);
+                        __motionPosterPackLastResults = [];
+                        renderMotionPosterPackResults([]);
                         setMotionSearchStatus('', 'info');
                     }
                 } catch (_) {
@@ -28560,7 +28560,7 @@ if (!document.__niwDelegatedFallback) {
             searchBtn.__bound = true;
             searchBtn.addEventListener('click', e => {
                 e.preventDefault();
-                runMotionPosterpackSearch();
+                runMotionPosterPackSearch();
             });
         }
 
@@ -28575,22 +28575,22 @@ if (!document.__niwDelegatedFallback) {
                 const btn = e.target.closest('button');
                 if (!btn || btn.id !== 'posterpack.motion.searchBtn') return;
                 e.preventDefault();
-                runMotionPosterpackSearch();
+                runMotionPosterPackSearch();
             });
         }
 
-        renderMotionPosterpackSelected();
-        syncPosterpackModeUi();
-        setPosterpackModeActive(getPosterpackMode());
+        renderMotionPosterPackSelected();
+        syncPosterPackModeUi();
+        setPosterPackModeActive(getPosterPackMode());
 
         // Initial availability sync (disables sources that are disabled in config)
-        refreshMotionPosterpackSourceAvailability();
+        refreshMotionPosterPackSourceAvailability();
 
         // Safety net: some panels render late; re-sync shortly after.
-        setTimeout(syncPosterpackModeUi, 0);
-        setTimeout(syncPosterpackModeUi, 500);
-        setTimeout(() => setPosterpackModeActive(getPosterpackMode()), 0);
-        setTimeout(() => setPosterpackModeActive(getPosterpackMode()), 500);
+        setTimeout(syncPosterPackModeUi, 0);
+        setTimeout(syncPosterPackModeUi, 500);
+        setTimeout(() => setPosterPackModeActive(getPosterPackMode()), 0);
+        setTimeout(() => setPosterPackModeActive(getPosterPackMode()), 500);
     }
 
     // Global fallback wiring: on some navigations (#local deep-links, dropdown tab switches,
@@ -28605,7 +28605,7 @@ if (!document.__niwDelegatedFallback) {
                 const btn = e.target?.closest?.('#posterpack\\.motion\\.searchBtn');
                 if (!btn) return;
                 e.preventDefault();
-                runMotionPosterpackSearch();
+                runMotionPosterPackSearch();
             });
 
             document.addEventListener('keydown', e => {
@@ -28613,15 +28613,15 @@ if (!document.__niwDelegatedFallback) {
                 if (!t || t.id !== 'posterpack.motion.query') return;
                 if (e.key !== 'Enter') return;
                 e.preventDefault();
-                runMotionPosterpackSearch();
+                runMotionPosterPackSearch();
             });
 
             document.addEventListener('change', e => {
                 const t = e.target;
                 if (!t || t.name !== 'posterpack.mode') return;
                 try {
-                    syncPosterpackModeUi();
-                    setPosterpackModeActive(getPosterpackMode());
+                    syncPosterPackModeUi();
+                    setPosterPackModeActive(getPosterPackMode());
                 } catch (_) {
                     /* cosmetic */
                 }
@@ -28644,7 +28644,7 @@ if (!document.__niwDelegatedFallback) {
             if (/\/backgrounds\/?$/.test(p) || /\/(?:^|.*\/)backgrounds(\/|$)/.test(p))
                 return 'backgrounds';
             if (/\/motion\/?$/.test(p) || /\/(?:^|.*\/)motion(\/|$)/.test(p)) return 'motion';
-            // Posterpack uploads should always target 'complete' (manual)
+            // PosterPack uploads should always target 'complete' (manual)
             if (/\/(?:^|.*\/)posterpacks(\/|$)/.test(p)) return 'complete';
             if (/\/complete\/?$/.test(p) || /\/(?:^|.*\/)complete(\/|$)/.test(p)) return 'complete';
             return 'posters';
@@ -29749,7 +29749,7 @@ if (!document.__niwDelegatedFallback) {
             });
     }
 
-    function generatePosterpack() {
+    function generatePosterPack() {
         const generateBtn = document.getElementById('btn-generate-posterpack');
         if (generateBtn) {
             generateBtn.disabled = true;
@@ -29757,22 +29757,22 @@ if (!document.__niwDelegatedFallback) {
         }
 
         // Motion posterpack mode: generate one ZIP under motion/
-        if (getPosterpackMode() === 'motion') {
-            const queue = Array.isArray(__motionPosterpackQueue)
-                ? __motionPosterpackQueue.slice(0)
+        if (getPosterPackMode() === 'motion') {
+            const queue = Array.isArray(__motionPosterPackQueue)
+                ? __motionPosterPackQueue.slice(0)
                 : [];
             if (queue.length === 0) {
                 showNotification('Add up to 5 movies/series to the queue first', 'warning');
                 if (generateBtn) {
                     generateBtn.disabled = false;
-                    generateBtn.innerHTML = '<i class="fas fa-archive"></i> Generate Posterpack';
+                    generateBtn.innerHTML = '<i class="fas fa-archive"></i> Generate PosterPack';
                 }
                 return;
             }
 
             // Clear selection/queue immediately so user can prepare the next batch
             // while generation runs.
-            clearMotionPosterpackSelectionUi();
+            clearMotionPosterPackSelectionUi();
 
             (async () => {
                 const ok = [];
@@ -29907,7 +29907,7 @@ if (!document.__niwDelegatedFallback) {
                 } finally {
                     if (generateBtn) {
                         generateBtn.disabled = false;
-                        updatePosterpackGenerateButtonLabel();
+                        updatePosterPackGenerateButtonLabel();
                     }
                 }
             })();
@@ -29916,8 +29916,8 @@ if (!document.__niwDelegatedFallback) {
 
         // Standard mode: if items are selected via the picker, generate posterpacks for those items.
         // The selection queue can include mixed sources; we fan out into one job per source.
-        const queued = Array.isArray(__motionPosterpackQueue)
-            ? __motionPosterpackQueue.slice(0)
+        const queued = Array.isArray(__motionPosterPackQueue)
+            ? __motionPosterPackQueue.slice(0)
             : [];
         if (queued.length > 0) {
             const inferSourceFromKey = k => {
@@ -29947,7 +29947,7 @@ if (!document.__niwDelegatedFallback) {
                 showNotification('No valid selected items to generate', 'warning');
                 if (generateBtn) {
                     generateBtn.disabled = false;
-                    updatePosterpackGenerateButtonLabel();
+                    updatePosterPackGenerateButtonLabel();
                 }
                 return;
             }
@@ -29976,7 +29976,7 @@ if (!document.__niwDelegatedFallback) {
                         if (!res.ok || !data?.success || !data?.jobId) {
                             const msg = data?.error || data?.message || `HTTP ${res.status}`;
                             try {
-                                console.warn('[Posterpack] Job start failed', {
+                                console.warn('[PosterPack] Job start failed', {
                                     sourceType: src,
                                     status: res.status,
                                     response: data,
@@ -30040,7 +30040,7 @@ if (!document.__niwDelegatedFallback) {
                 } finally {
                     if (generateBtn) {
                         generateBtn.disabled = false;
-                        updatePosterpackGenerateButtonLabel();
+                        updatePosterPackGenerateButtonLabel();
                     }
                 }
             })();
@@ -30050,7 +30050,7 @@ if (!document.__niwDelegatedFallback) {
 
         // Get posterpack configuration
         const source = document.getElementById('posterpack.source')?.value || 'plex';
-        // Resolve selected library IDs for plex/jellyfin (from Posterpack section; empty = all)
+        // Resolve selected library IDs for plex/jellyfin (from PosterPack section; empty = all)
         let libraryIds = [];
         if (source === 'plex') {
             const mvSel =
@@ -30106,9 +30106,9 @@ if (!document.__niwDelegatedFallback) {
             compression: 'balanced',
             yearFilter: commonYearFilter,
             // Build filter set from in-section controls; when empty, default to no narrowing
-            filtersPlex: source === 'plex' ? getPosterpackFilterObject('plex') : undefined,
+            filtersPlex: source === 'plex' ? getPosterPackFilterObject('plex') : undefined,
             filtersJellyfin:
-                source === 'jellyfin' ? getPosterpackFilterObject('jellyfin') : undefined,
+                source === 'jellyfin' ? getPosterPackFilterObject('jellyfin') : undefined,
         };
 
         const config = {
@@ -30134,7 +30134,7 @@ if (!document.__niwDelegatedFallback) {
             showNotification('Select one or more libraries first', 'warning');
             if (generateBtn) {
                 generateBtn.disabled = false;
-                generateBtn.innerHTML = '<i class="fas fa-archive"></i> Generate Posterpack';
+                generateBtn.innerHTML = '<i class="fas fa-archive"></i> Generate PosterPack';
             }
             return;
         }
@@ -30143,7 +30143,7 @@ if (!document.__niwDelegatedFallback) {
             showNotification('Select a RomM platform first', 'warning');
             if (generateBtn) {
                 generateBtn.disabled = false;
-                generateBtn.innerHTML = '<i class="fas fa-archive"></i> Generate Posterpack';
+                generateBtn.innerHTML = '<i class="fas fa-archive"></i> Generate PosterPack';
             }
             return;
         }
@@ -30173,13 +30173,13 @@ if (!document.__niwDelegatedFallback) {
             .finally(() => {
                 if (generateBtn) {
                     generateBtn.disabled = false;
-                    generateBtn.innerHTML = '<i class="fas fa-archive"></i> Generate Posterpack';
+                    generateBtn.innerHTML = '<i class="fas fa-archive"></i> Generate PosterPack';
                 }
             });
     }
 
-    async function previewPosterpackSelection() {
-        if (getPosterpackMode && getPosterpackMode() === 'motion') {
+    async function previewPosterPackSelection() {
+        if (getPosterPackMode && getPosterPackMode() === 'motion') {
             showNotification('Preview is not available for motion posterpacks', 'info');
             return;
         }
@@ -30251,7 +30251,7 @@ if (!document.__niwDelegatedFallback) {
                 });
         }
 
-        // Resolve library IDs same as generate (Posterpack section picks; empty = all)
+        // Resolve library IDs same as generate (PosterPack section picks; empty = all)
         let libraryIds = [];
         if (source === 'plex') {
             // Check if Plex is enabled before making API calls
@@ -30339,9 +30339,9 @@ if (!document.__niwDelegatedFallback) {
             options: {
                 yearFilter,
                 // No mediaType/limit for Plex/Jellyfin; server handles sensible defaults
-                filtersPlex: source === 'plex' ? getPosterpackFilterObject('plex') : undefined,
+                filtersPlex: source === 'plex' ? getPosterPackFilterObject('plex') : undefined,
                 filtersJellyfin:
-                    source === 'jellyfin' ? getPosterpackFilterObject('jellyfin') : undefined,
+                    source === 'jellyfin' ? getPosterPackFilterObject('jellyfin') : undefined,
             },
         };
 
@@ -30396,8 +30396,8 @@ if (!document.__niwDelegatedFallback) {
 
     function handleSourceSelection(e) {
         // In motion mode, we don't use source/libraries; keep the UI in motion layout.
-        if (getPosterpackMode && getPosterpackMode() === 'motion') {
-            syncPosterpackModeUi();
+        if (getPosterPackMode && getPosterPackMode() === 'motion') {
+            syncPosterPackModeUi();
             return;
         }
         const source = e.target.value;
@@ -30482,7 +30482,7 @@ if (!document.__niwDelegatedFallback) {
 
         if (showRomm) {
             try {
-                ensureRommPosterpackPlatforms().catch(() => {
+                ensureRommPosterPackPlatforms().catch(() => {
                     /* best-effort */
                 });
             } catch (_) {
@@ -30524,7 +30524,7 @@ if (!document.__niwDelegatedFallback) {
             // Only fetch libraries and filters if Plex is enabled
             if (plexEnabled) {
                 try {
-                    loadPosterpackServerFilterOptions().catch(() => {});
+                    loadPosterPackServerFilterOptions().catch(() => {});
                 } catch (_) {
                     /* server filter options are optional; ignore */
                 }
@@ -30532,13 +30532,13 @@ if (!document.__niwDelegatedFallback) {
                 try {
                     Promise.resolve(fetchPlexLibraries(false, true)).finally(() => {
                         try {
-                            populatePosterpackLibraries('plex');
+                            populatePosterPackLibraries('plex');
                         } catch (_) {
                             /* populate fallback failed; another retry will occur */
                         }
                     });
                 } catch (_) {
-                    populatePosterpackLibraries('plex');
+                    populatePosterPackLibraries('plex');
                 }
             }
             // If still empty shortly after, copy from main selects as a last resort for instant UX
@@ -30553,10 +30553,10 @@ if (!document.__niwDelegatedFallback) {
                         mvSel.options.length === 0 &&
                         shSel.options.length === 0
                     ) {
-                        if (typeof populatePosterpackLibraries === 'function') {
+                        if (typeof populatePosterPackLibraries === 'function') {
                             // Call with internal copy fallback via kind detection
                             try {
-                                populatePosterpackLibraries('plex');
+                                populatePosterPackLibraries('plex');
                             } catch (_) {
                                 /* last-resort populate is optional */
                             }
@@ -30579,7 +30579,7 @@ if (!document.__niwDelegatedFallback) {
                 /* export dedupeNumberWrappers failed (diagnostic only) */
             }
             try {
-                loadPosterpackServerFilterOptions().catch(() => {});
+                loadPosterPackServerFilterOptions().catch(() => {});
             } catch (_) {
                 /* display preview summary interval update failed (visual only) */
             }
@@ -30604,19 +30604,19 @@ if (!document.__niwDelegatedFallback) {
             try {
                 Promise.resolve(fetchJellyfinLibraries(false, true)).finally(() => {
                     try {
-                        populatePosterpackLibraries('jellyfin');
+                        populatePosterPackLibraries('jellyfin');
                     } catch (_) {
                         /* preview update nudge failed (non-critical) */
                     }
                 });
             } catch (_) {
-                populatePosterpackLibraries('jellyfin');
+                populatePosterPackLibraries('jellyfin');
             }
         }
     }
 
     let __ppRommPlatformsLoaded = false;
-    async function ensureRommPosterpackPlatforms(force = false) {
+    async function ensureRommPosterPackPlatforms(force = false) {
         if (__ppRommPlatformsLoaded && !force) return;
         const sel = document.getElementById('pp-romm.platform');
         if (!sel) return;
@@ -30674,7 +30674,7 @@ if (!document.__niwDelegatedFallback) {
         __ppRommPlatformsLoaded = true;
     }
 
-    // getLocalPosterpackFilters removed (Local source removed from Posterpack UI)
+    // getLocalPosterPackFilters removed (Local source removed from PosterPack UI)
 
     async function loadLocalFilterOptions() {
         // Deduplicate concurrent loads but allow refreshing on each open
@@ -30943,9 +30943,9 @@ if (!document.__niwDelegatedFallback) {
                 try {
                     if (
                         !genresList.length &&
-                        typeof loadPosterpackServerFilterOptions === 'function'
+                        typeof loadPosterPackServerFilterOptions === 'function'
                     ) {
-                        await Promise.resolve(loadPosterpackServerFilterOptions()).catch(() => {});
+                        await Promise.resolve(loadPosterPackServerFilterOptions()).catch(() => {});
                         const srvGenresSel = document.getElementById('pp-server.genres');
                         if (srvGenresSel && srvGenresSel.options && srvGenresSel.options.length) {
                             const srvList = Array.from(srvGenresSel.options)
@@ -30983,7 +30983,7 @@ if (!document.__niwDelegatedFallback) {
         window.__ppLocalFiltersInFlight = null;
     }
 
-    function populatePosterpackLibraries(kind) {
+    function populatePosterPackLibraries(kind) {
         // Reuse global maps if available; otherwise fetch via existing admin endpoints
 
         const copyFromMainIfEmpty = source => {
@@ -31023,7 +31023,7 @@ if (!document.__niwDelegatedFallback) {
                 window[key] = true;
                 if (typeof showNotification === 'function') {
                     showNotification(
-                        `No ${src} libraries found for Posterpack selection`,
+                        `No ${src} libraries found for PosterPack selection`,
                         'warning'
                     );
                 }
@@ -31291,8 +31291,8 @@ if (!document.__niwDelegatedFallback) {
         else if (kind === 'jellyfin') fetchAndFillJf();
     }
 
-    function getPosterpackFilterObject(kind) {
-        // Read from Posterpack section inputs; empty fields mean no narrowing.
+    function getPosterPackFilterObject(kind) {
+        // Read from PosterPack section inputs; empty fields mean no narrowing.
         // Server posterpack filters now use multiselects (hidden selects) mirroring Plex/JF style.
         const read = id => (document.getElementById(id)?.value || '').trim();
         const bool = id => !!document.getElementById(id)?.checked;
@@ -31343,7 +31343,7 @@ if (!document.__niwDelegatedFallback) {
     }
 
     // Populate posterpack server multiselect filter options (ratings/genres/qualities)
-    async function loadPosterpackServerFilterOptions() {
+    async function loadPosterPackServerFilterOptions() {
         if (window.__ppSrvFiltersInFlight) return window.__ppSrvFiltersInFlight;
         window.__ppSrvFiltersInFlight = (async () => {
             try {
@@ -31359,7 +31359,7 @@ if (!document.__niwDelegatedFallback) {
                     /* jellyfin fetch-and-fill is best-effort */
                 }
 
-                // Gather selected Posterpack Jellyfin libraries if available, else fallback to discovered/all
+                // Gather selected PosterPack Jellyfin libraries if available, else fallback to discovered/all
                 const readSelected = id =>
                     Array.from(document.getElementById(id)?.selectedOptions || []).map(
                         o => o.value
@@ -31679,14 +31679,14 @@ if (!document.__niwDelegatedFallback) {
                                     progress: job.progress,
                                     logsTail: tail,
                                 };
-                                console.warn('[Posterpack] Job failed', debug);
+                                console.warn('[PosterPack] Job failed', debug);
                             } catch (_) {
                                 // ignore
                             }
                         }
 
                         const ok = job.status === 'completed';
-                        const title = ok ? 'Posterpack ready' : 'Posterpack failed';
+                        const title = ok ? 'PosterPack ready' : 'PosterPack failed';
                         const count = job?.results?.totalGenerated;
                         const totalMsg =
                             typeof count === 'number'
@@ -32166,7 +32166,7 @@ if (!document.__niwDelegatedFallback) {
                         showNotification('Selected items deleted successfully', 'success');
                         selectedFiles.clear();
                         refreshDirectorySafe(true);
-                        // Re-evaluate Posterpack filters visibility after clearing selection
+                        // Re-evaluate PosterPack filters visibility after clearing selection
                         try {
                             const sourceSelect = document.getElementById('posterpack.source');
                             if (sourceSelect) handleSourceSelection({ target: sourceSelect });
@@ -33102,7 +33102,7 @@ if (!document.__niwDelegatedFallback) {
             }
         });
 
-        // --- Eigene Posterpacks Upload (Drag & Drop) ---
+        // --- Eigene PosterPacks Upload (Drag & Drop) ---
         var dropzone = document.getElementById('pu-dropzone');
         var fileInput = document.getElementById('pu-fileInput');
         var uploadStatus = document.getElementById('pu-uploadStatus');
@@ -33154,8 +33154,8 @@ if (!document.__niwDelegatedFallback) {
 
                 if (res.ok && data.success !== false) {
                     var count = data.filesUploaded || data.totalFiles || files.length;
-                    puShowUploadStatus(count + ' Posterpack(s) hochgeladen!', 'success');
-                    puToast(count + ' Posterpack(s) erfolgreich hochgeladen');
+                    puShowUploadStatus(count + ' PosterPack(s) hochgeladen!', 'success');
+                    puToast(count + ' PosterPack(s) erfolgreich hochgeladen');
                     // Refresh film list in case new films appeared
                     setTimeout(function () { puLoadFilms(); }, 1000);
                 } else {
@@ -33242,6 +33242,7 @@ if (!document.__niwDelegatedFallback) {
     var psEnabled = false;
     var psPlaylistSet = new Set(); // lowercase lookup
     var psTrailerFilter = 'all'; // 'all', 'DE-offiziell', 'DE', 'EN-offiziell', 'EN', 'none'
+    var psSortOrder = 'az'; // 'az', 'za', 'newest'
 
     // Multi-playlist state
     var psPlaylists = {};           // {id: {name, titles, createdAt, updatedAt}}
@@ -33528,10 +33529,17 @@ if (!document.__niwDelegatedFallback) {
             }
         }
 
+        // Apply sort order
+        if (psSortOrder === 'za') {
+            filtered = filtered.slice().sort(function (a, b) { return b.name.localeCompare(a.name, 'de'); });
+        } else if (psSortOrder === 'newest') {
+            filtered = filtered.slice().sort(function (a, b) { return (b.mtime || 0) - (a.mtime || 0); });
+        }
+
         if (countEl) countEl.textContent = filtered.length + ' / ' + psAllFilms.length;
 
         if (!filtered.length) {
-            el.innerHTML = '<div class="ps-film-empty">' + (filter || psTrailerFilter !== 'all' ? 'Keine Treffer' : 'Keine Posterpacks gefunden') + '</div>';
+            el.innerHTML = '<div class="ps-film-empty">' + (filter || psTrailerFilter !== 'all' ? 'Keine Treffer' : 'Keine PosterPacks gefunden') + '</div>';
             return;
         }
 
@@ -33787,6 +33795,18 @@ if (!document.__niwDelegatedFallback) {
             psRenderAvailable();
         });
 
+        // Sort order buttons
+        var sortFilterWrap = document.querySelector('.ps-sort-filters');
+        if (sortFilterWrap) sortFilterWrap.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-ps-sort]');
+            if (!btn) return;
+            psSortOrder = btn.dataset.psSort;
+            sortFilterWrap.querySelectorAll('.ps-sort-filter-btn').forEach(function (b) {
+                b.classList.toggle('active', b.dataset.psSort === psSortOrder);
+            });
+            psRenderAvailable();
+        });
+
         // Available list — add button delegation
         var availList = document.getElementById('ps-availableList');
         if (availList) availList.addEventListener('click', function (e) {
@@ -33889,7 +33909,7 @@ if (!document.__niwDelegatedFallback) {
 })();
 
 /* =========================================================
-   Posterpack Studio (Create + Edit)
+   PosterPack Studio (Create + Edit)
    ========================================================= */
 (function () {
     'use strict';
@@ -33898,7 +33918,7 @@ if (!document.__niwDelegatedFallback) {
     var pcEditMode = null;
     var pcZipRelPath = null;
 
-    function initPosterpackStudio() {
+    function initPosterPackStudio() {
         if (pcInited) return;
         pcInited = true;
 
@@ -34019,7 +34039,7 @@ if (!document.__niwDelegatedFallback) {
                 var res = await fetch('/api/poster-selector/films', { credentials: 'same-origin' });
                 var data = await res.json();
                 var films = (data.films || []).sort(function (a, b) { return a.name.localeCompare(b.name, 'de'); });
-                var html = '<option value="">Neues Posterpack erstellen...</option>';
+                var html = '<option value="">Neues PosterPack erstellen...</option>';
                 films.forEach(function (f) {
                     html += '<option value="' + f.name.replace(/"/g, '&quot;') + '">' + f.name + ' [' + f.source + ']</option>';
                 });
@@ -34027,9 +34047,9 @@ if (!document.__niwDelegatedFallback) {
             } catch (_) {}
         }
 
-        async function loadPosterpack(packName) {
+        async function loadPosterPack(packName) {
             if (!packName) { pcEditMode = null; pcZipRelPath = null; resetForm(); updateBtn(); return; }
-            showStatus('Lade Posterpack...', 'creating');
+            showStatus('Lade PosterPack...', 'creating');
             try {
                 var res = await fetch('/api/posterpack-creator/read/' + encodeURIComponent(packName), { credentials: 'same-origin' });
                 var data = await res.json();
@@ -34108,7 +34128,7 @@ if (!document.__niwDelegatedFallback) {
 
         function setVal(id, val) { var el = document.getElementById(id); if (el) el.value = val; }
 
-        if (packSelect) packSelect.addEventListener('change', function () { loadPosterpack(packSelect.value); });
+        if (packSelect) packSelect.addEventListener('change', function () { loadPosterPack(packSelect.value); });
 
         fileFields.forEach(function (name) {
             var btn = document.getElementById('pc-' + name + 'Btn');
@@ -34139,10 +34159,10 @@ if (!document.__niwDelegatedFallback) {
             if (!createBtn) return;
             if (pcEditMode) {
                 createBtn.disabled = !(title && title.value.trim() && year && /^\d{4}$/.test(year.value.trim()));
-                createBtn.innerHTML = '<i class="fas fa-save"></i> Posterpack aktualisieren';
+                createBtn.innerHTML = '<i class="fas fa-save"></i> PosterPack aktualisieren';
             } else {
                 createBtn.disabled = !(title && title.value.trim() && year && /^\d{4}$/.test(year.value.trim()) && posterFile && posterFile.files.length);
-                createBtn.innerHTML = '<i class="fas fa-magic"></i> Posterpack erstellen';
+                createBtn.innerHTML = '<i class="fas fa-magic"></i> PosterPack erstellen';
             }
         }
 
@@ -34154,7 +34174,7 @@ if (!document.__niwDelegatedFallback) {
         if (createBtn) createBtn.addEventListener('click', async function () {
             createBtn.disabled = true;
             var isEdit = !!pcEditMode;
-            showStatus(isEdit ? 'Posterpack wird aktualisiert...' : 'Posterpack wird erstellt...', 'creating');
+            showStatus(isEdit ? 'PosterPack wird aktualisiert...' : 'PosterPack wird erstellt...', 'creating');
             try {
                 var formData = new FormData();
                 formData.append('title', document.getElementById('pc-title').value.trim());
@@ -34177,8 +34197,8 @@ if (!document.__niwDelegatedFallback) {
                 var data = await res.json();
                 if (res.ok && data.success) {
                     var msg = isEdit ? 'aktualisiert' : 'erstellt';
-                    showStatus('Posterpack "' + data.name + '" ' + msg + '!', 'success');
-                    if (window.notify) window.notify.success('Posterpack "' + data.name + '" ' + msg + '!');
+                    showStatus('PosterPack "' + data.name + '" ' + msg + '!', 'success');
+                    if (window.notify) window.notify.success('PosterPack "' + data.name + '" ' + msg + '!');
                     if (!isEdit) { resetForm(); loadPackList(); }
                 } else {
                     showStatus('Fehler: ' + (data.error || 'Unbekannt'), 'error');
@@ -34228,11 +34248,11 @@ if (!document.__niwDelegatedFallback) {
             if (!section) return;
             var observer = new MutationObserver(function () {
                 if (!section.hidden && section.classList.contains('active')) {
-                    initPosterpackStudio();
+                    initPosterPackStudio();
                 }
             });
             observer.observe(section, { attributes: true, attributeFilter: ['hidden', 'class'] });
-            if (!section.hidden) initPosterpackStudio();
+            if (!section.hidden) initPosterPackStudio();
         }, 200);
     })();
 })();

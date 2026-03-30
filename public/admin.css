@@ -6320,7 +6320,7 @@ select:not([multiple]) {
     max-width: 260px;
 }
 
-/* Posterpack: make Content Source select shrink to its content */
+/* PosterPack: make Content Source select shrink to its content */
 #posterpack-source-wrap {
     width: auto;
     min-width: 150px;
@@ -6330,7 +6330,7 @@ select:not([multiple]) {
     width: 100%;
 }
 
-/* Posterpack: compact layout */
+/* PosterPack: compact layout */
 #posterpack-lib-section {
     grid-column: 1 / -1 !important;
 }
@@ -6345,7 +6345,7 @@ select:not([multiple]) {
     margin-bottom: 12px;
     color: var(--color-text-secondary);
 }
-/* Posterpack libraries 2-column grid (Movies | Shows side by side) */
+/* PosterPack libraries 2-column grid (Movies | Shows side by side) */
 .pp-libs-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -11328,7 +11328,7 @@ body.page-logs {
         width 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* ===== Local: Posterpack Generation Mode segmented ===== */
+/* ===== Local: PosterPack Generation Mode segmented ===== */
 #panel-local #posterpack-mode-group {
     display: none;
 }
@@ -15753,7 +15753,7 @@ select:focus-visible {
     min-width: 0; /* allow text to truncate if needed */
 }
 
-/* Posterpack ZIP tiny thumbnail next to filename */
+/* PosterPack ZIP tiny thumbnail next to filename */
 .browser-item-icon.has-thumb {
     position: relative;
     width: 30px; /* fixed box so rows don't shift when poster aspect varies */
@@ -15789,14 +15789,14 @@ select:focus-visible {
     font-size: var(--font-size-xs); /* smaller than regular pills */
 }
 
-/* Posterpack asset pills */
+/* PosterPack asset pills */
 .status-pill.sp-size.sp-zip {
     opacity: 0.85;
     background: rgba(120, 120, 120, 0.12);
     border-color: rgba(120, 120, 120, 0.28);
 }
 
-/* Posterpack asset pill colors - subtle differentiation */
+/* PosterPack asset pill colors - subtle differentiation */
 .status-pill.sp-zip[data-pill='poster'] {
     background: rgba(139, 92, 246, 0.15);
     border-color: rgba(139, 92, 246, 0.3);
@@ -16079,7 +16079,7 @@ select:focus-visible {
     opacity: 0.7;
 }
 
-/* Posterpack subsection icons */
+/* PosterPack subsection icons */
 #posterpack-lib-section .form-subsection h4:before {
     content: '\f02d'; /* fa-book */
 }
@@ -17057,7 +17057,7 @@ select:focus-visible {
         font-size: 0.75rem;
     }
 
-    /* Posterpack Generation section */
+    /* PosterPack Generation section */
     #panel-local .form-grid {
         grid-template-columns: 1fr !important;
         gap: var(--space-sm) !important;
@@ -19975,7 +19975,7 @@ body.profile-edit-mode #section-display .section-header h2 span {
 .pu-upload-status.error { background: rgba(247,118,142,0.12); color: var(--color-error); }
 
 /* ================================================
-   Posterpack Studio
+   PosterPack Studio
    ================================================ */
 .pc-form { display: flex; flex-direction: column; gap: 10px; }
 .pc-field { display: flex; flex-direction: column; gap: 4px; }
@@ -20195,6 +20195,20 @@ select.pu-input optgroup { font-weight: 600; color: var(--color-text-secondary);
 .ps-trailer-filter-btn.active {
     background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.4);
     color: rgba(165, 180, 252, 0.95);
+}
+
+/* --- Sort filter buttons --- */
+.ps-sort-filter-btn {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px; cursor: pointer;
+    background: var(--color-bg-primary); border: 1px solid var(--color-border-light);
+    color: var(--color-text-muted); transition: all 0.2s; font-weight: 500;
+}
+.ps-sort-filter-btn:hover {
+    background: var(--color-bg-tertiary); color: var(--color-text-primary);
+}
+.ps-sort-filter-btn.active {
+    background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.4);
+    color: rgba(110, 231, 183, 0.95);
 }
 
 /* --- Playlist selector bar --- */

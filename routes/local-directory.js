@@ -957,7 +957,7 @@ module.exports = function createLocalDirectoryRouter({
             }
             const { includeGenerated = false, refresh = true } = req.body || {};
             try {
-                const imported = await localDirectorySource.importPosterpacks({ includeGenerated });
+                const imported = await localDirectorySource.importPosterPacks({ includeGenerated });
                 if (refresh) {
                     try {
                         await refreshPlaylistCache();
@@ -1257,7 +1257,7 @@ module.exports = function createLocalDirectoryRouter({
                     mergedOptions = { ...(options || {}), itemIds: expandedIds, platformId };
                 }
 
-                const jobId = await jobQueue.addPosterpackGenerationJob(
+                const jobId = await jobQueue.addPosterPackGenerationJob(
                     sourceType,
                     libs,
                     mergedOptions
@@ -1266,13 +1266,13 @@ module.exports = function createLocalDirectoryRouter({
                 res.json({
                     success: true,
                     jobId: jobId,
-                    message: 'Posterpack generation job started',
+                    message: 'PosterPack generation job started',
                     sourceType: sourceType,
                     libraryCount: libs.length,
                     itemCount: effectiveItemCount,
                 });
             } catch (error) {
-                logger.error('Posterpack generation error:', error);
+                logger.error('PosterPack generation error:', error);
                 res.status(500).json({ error: error.message });
             }
         })
@@ -1365,7 +1365,7 @@ module.exports = function createLocalDirectoryRouter({
             const origin = `${req.protocol}://${req.get('host')}`;
             const abs = isRelative ? new URL(pu, origin).toString() : pu;
 
-            const jobId = await jobQueue.addMotionPosterpackJob({
+            const jobId = await jobQueue.addMotionPosterPackJob({
                 key: key || null,
                 title: t,
                 year: Number.isFinite(Number(year)) ? Number(year) : null,
@@ -1423,7 +1423,7 @@ module.exports = function createLocalDirectoryRouter({
 
             const origin = `${req.protocol}://${req.get('host')}`;
             const abs = isRelative ? new URL(pu, origin).toString() : pu;
-            const jobId = await jobQueue.addMotionPosterpackJob({
+            const jobId = await jobQueue.addMotionPosterPackJob({
                 key: key || null,
                 title: t,
                 year: Number.isFinite(Number(year)) ? Number(year) : null,
@@ -2145,10 +2145,10 @@ module.exports = function createLocalDirectoryRouter({
                 });
 
                 archive.on('warning', err => {
-                    logger.warn('Posterpacks zip warning:', err);
+                    logger.warn('PosterPacks zip warning:', err);
                 });
                 archive.on('error', err => {
-                    logger.error('Posterpacks zip error:', err);
+                    logger.error('PosterPacks zip error:', err);
                     if (!res.headersSent) {
                         res.status(500).json({ error: 'download_all_failed' });
                     } else {
