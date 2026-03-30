@@ -80,6 +80,19 @@
                     poster.style.filter = 'blur(3px)';
                     poster.style.transition = 'filter 0.5s ease-out';
 
+                    // Adapt wrapper height immediately from thumbnail
+                    const thumbImg = new Image();
+                    thumbImg.onload = () => {
+                        if (wrapper && thumbImg.naturalWidth > 0 && thumbImg.naturalHeight > 0) {
+                            const ww = poster.offsetWidth;
+                            if (ww > 0) {
+                                const aspectRatio = thumbImg.naturalHeight / thumbImg.naturalWidth;
+                                wrapper.style.height = Math.round(ww * aspectRatio) + 'px';
+                            }
+                        }
+                    };
+                    thumbImg.src = thumbUrl;
+
                     // Load full quality in background + adapt wrapper height to poster aspect ratio
                     let fullImg = new Image();
                     fullImg.onload = () => {
@@ -87,7 +100,7 @@
                         poster.style.filter = 'none';
                         // Adapt wrapper height to actual poster aspect ratio (width stays fixed)
                         if (wrapper && fullImg.naturalWidth > 0 && fullImg.naturalHeight > 0) {
-                            const ww = wrapper.offsetWidth;
+                            const ww = poster.offsetWidth;
                             if (ww > 0) {
                                 const aspectRatio = fullImg.naturalHeight / fullImg.naturalWidth;
                                 wrapper.style.height = Math.round(ww * aspectRatio) + 'px';
