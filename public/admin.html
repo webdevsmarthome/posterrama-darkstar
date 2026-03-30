@@ -1824,8 +1824,8 @@
                               <div class="number-input-wrapper"><input type="number" min="0" max="60" step="1" id="cinemaTrailerPauseAfter" value="7" /><div class="number-controls" role="group"><button type="button" class="number-btn number-inc" title="Increase"><i class="fas fa-chevron-up"></i></button><button type="button" class="number-btn number-dec" title="Decrease"><i class="fas fa-chevron-down"></i></button></div></div>
                             </div>
                             <div class="form-row">
-                              <label for="cinemaNoTrailerDisplay">Anzeige ohne Trailer (Sek.)</label>
-                              <div class="number-input-wrapper"><input type="number" min="10" max="600" step="10" id="cinemaNoTrailerDisplay" value="120" /><div class="number-controls" role="group"><button type="button" class="number-btn number-inc" title="Increase"><i class="fas fa-chevron-up"></i></button><button type="button" class="number-btn number-dec" title="Decrease"><i class="fas fa-chevron-down"></i></button></div></div>
+                              <label for="cinemaNoTrailerDisplay">Anzeige mit YT-Trailer / ohne Trailer (Sek.)</label>
+                              <div class="number-input-wrapper"><input type="number" min="10" max="600" step="10" id="cinemaNoTrailerDisplay" value="180" /><div class="number-controls" role="group"><button type="button" class="number-btn number-inc" title="Increase"><i class="fas fa-chevron-up"></i></button><button type="button" class="number-btn number-dec" title="Decrease"><i class="fas fa-chevron-down"></i></button></div></div>
                             </div>
                             <div class="form-row" id="cinemaTrailerReshowRow" style="display:none;">
                               <label for="cinemaTrailerReshow">Re-show after</label>
@@ -1998,6 +1998,7 @@
             <span class="ht-switch" aria-hidden="true"></span>
             <span class="ht-text">Enabled</span>
           </label>
+          <button class="btn btn-success btn-sm btn-refresh-media-source" title="Refresh media from all sources"><i class="fas fa-sync-alt"></i><span>Refresh Media</span></button>
           <button class="btn btn-primary btn-sm" id="btn-save-plex" title="Save Plex settings"><i class="fas fa-save"></i><span>Save Settings</span></button>
         </div>
         <div class="panel-content">
@@ -2268,6 +2269,7 @@
             <span class="ht-switch" aria-hidden="true"></span>
             <span class="ht-text">Enabled</span>
           </label>
+          <button class="btn btn-success btn-sm btn-refresh-media-source" title="Refresh media from all sources"><i class="fas fa-sync-alt"></i><span>Refresh Media</span></button>
           <button class="btn btn-primary btn-sm" id="btn-save-jellyfin" title="Save Jellyfin / Emby settings"><i class="fas fa-save"></i><span>Save Settings</span></button>
         </div>
         <div class="panel-content">
@@ -2459,6 +2461,7 @@
             <span class="ht-switch" aria-hidden="true"></span>
             <span class="ht-text">Enabled</span>
           </label>
+          <button class="btn btn-success btn-sm btn-refresh-media-source" title="Refresh media from all sources"><i class="fas fa-sync-alt"></i><span>Refresh Media</span></button>
           <button class="btn btn-primary btn-sm" id="btn-save-romm" title="Save RomM settings" data-restart-required="false"><i class="fas fa-save"></i><span>Save Settings</span></button>
         </div>
         <div class="panel-content">
@@ -2537,6 +2540,7 @@
             <span class="ht-switch" aria-hidden="true"></span>
             <span class="ht-text">Enabled</span>
           </label>
+          <button class="btn btn-success btn-sm btn-refresh-media-source" title="Refresh media from all sources"><i class="fas fa-sync-alt"></i><span>Refresh Media</span></button>
           <button class="btn btn-primary btn-sm" id="btn-save-tmdb" title="Save TMDB settings"><i class="fas fa-save"></i><span>Save Settings</span></button>
         </div>
         <div class="panel-content">
@@ -2766,6 +2770,7 @@
             <span class="ht-switch" aria-hidden="true"></span>
             <span class="ht-text">Enabled</span>
           </label>
+          <button class="btn btn-success btn-sm btn-refresh-media-source" title="Refresh media from all sources"><i class="fas fa-sync-alt"></i><span>Refresh Media</span></button>
           <button class="btn btn-primary btn-sm" id="btn-save-local" title="Save local directory settings"><i class="fas fa-save"></i><span>Save Settings</span></button>
         </div>
         <div class="panel-content">

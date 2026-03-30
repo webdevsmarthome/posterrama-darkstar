@@ -1,3 +1,4 @@
+
 // Screensaver module: extracted helpers from script.js for screensaver-specific behavior
 (function initScreensaverModule() {
     // Reset pause state on page load (fresh start = not paused)
@@ -474,6 +475,102 @@
             } catch (_) { /* noop */ }
         }
 
+        function loadYouTubeAPI() {
+            return new Promise(function(resolve, reject) {
+                if (window.YT && window.YT.Player) { resolve(); return; }
+                var timeout = setTimeout(function() { reject(new Error('YT API timeout')); }, 10000);
+                if (document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+                    var check = setInterval(function() {
+                        if (window.YT && window.YT.Player) { clearInterval(check); clearTimeout(timeout); resolve(); }
+                    }, 100);
+                    return;
+                }
+                var tag = document.createElement('script');
+                tag.src = 'https://www.youtube.com/iframe_api';
+                tag.onerror = function() { clearTimeout(timeout); reject(new Error('YT API load failed')); };
+                document.getElementsByTagName('script')[0].parentNode.insertBefore(tag, document.getElementsByTagName('script')[0]);
+                window.onYouTubeIframeAPIReady = function() { clearTimeout(timeout); resolve(); };
+            });
+        }
+
+        function startYouTubeTrailer(item, videoKey) {
+            // Cancel any pending poster timers — YT trailer controls its own timing
+            clearAllTrailerTimers();
+
+            loadYouTubeAPI().then(function() {
+                try {
+                    removeTrailerOverlaySync();
+
+                    trailerEl = document.createElement('div');
+                    trailerEl.className = 'ss-trailer-overlay';
+                    currentTrailerKey = 'yt-' + videoKey;
+
+                    // Create iframe element BEFORE YT.Player (Chromium autoplay policy)
+                    var iframeEl = document.createElement('iframe');
+                    iframeEl.id = 'ss-yt-trailer-' + Date.now();
+                    iframeEl.allow = 'autoplay; encrypted-media; picture-in-picture';
+                    iframeEl.setAttribute('allowfullscreen', '');
+                    trailerEl.appendChild(iframeEl);
+                    document.body.appendChild(trailerEl);
+
+                    var cfg = window.appConfig || {};
+                    // noTrailerDisplaySeconds = max display time for YT trailer posters (default 180s)
+                    var ytMaxMs = (Number(cfg.noTrailerDisplaySeconds) || 180) * 1000;
+
+                    // Safety fallback: if YT.PlayerState.ENDED never fires, force next poster
+                    trailerEndTimer = setTimeout(function() {
+                        trailerEndTimer = null;
+                        removeTrailerOverlayFade();
+                        scheduleNextPoster(0);
+                    }, ytMaxMs);
+
+                    new window.YT.Player(iframeEl, {
+                        videoId: videoKey,
+                        playerVars: {
+                            autoplay: 1, mute: 1, controls: 0, modestbranding: 1,
+                            rel: 0, showinfo: 0, iv_load_policy: 3, playsinline: 1,
+                            origin: window.location.origin
+                        },
+                        events: {
+                            onReady: function(event) {
+                                event.target.playVideo();
+                                setTimeout(function() {
+                                    if (trailerEl) trailerEl.classList.add('visible');
+                                }, 1000);
+                                // Unmute with retries (Chromium kiosk works at 0.5s, Safari needs user gesture)
+                                var tryUnmute = function() {
+                                    try { event.target.unMute(); event.target.setVolume(100); } catch(_) {}
+                                };
+                                setTimeout(tryUnmute, 500);
+                                setTimeout(tryUnmute, 1500);
+                                setTimeout(tryUnmute, 3000);
+                            },
+                            onError: function() {
+                                if (trailerEndTimer) { clearTimeout(trailerEndTimer); trailerEndTimer = null; }
+                                removeTrailerOverlayFade();
+                                scheduleNextPoster(ytMaxMs);
+                            },
+                            onStateChange: function(event) {
+                                if (event.data === window.YT.PlayerState.ENDED) {
+                                    // Trailer finished — cancel safety timer, immediately next poster
+                                    if (trailerEndTimer) { clearTimeout(trailerEndTimer); trailerEndTimer = null; }
+                                    removeTrailerOverlayFade();
+                                    scheduleNextPoster(0);
+                                }
+                            }
+                        }
+                    });
+                } catch (_) {
+                    if (trailerEndTimer) { clearTimeout(trailerEndTimer); trailerEndTimer = null; }
+                    removeTrailerOverlayFade();
+                    scheduleNextPoster(180000);
+                }
+            }).catch(function() {
+                var ytMaxMs = (Number((window.appConfig || {}).noTrailerDisplaySeconds) || 180) * 1000;
+                scheduleNextPoster(ytMaxMs);
+            });
+        }
+
         function createTrailerOverlay(item) {
             try {
                 // Clear everything from previous item
@@ -497,7 +594,7 @@
                     return;
                 }
 
-                const trailerUrl = item?.trailerUrl;
+                let trailerUrl = item?.trailerUrl;
                 const hasLocalTrailer = trailerUrl && (
                     trailerUrl.startsWith('/trailers/') ||
                     trailerUrl.startsWith('/local-posterpack?') ||
@@ -510,7 +607,29 @@
                         startTrailerPlayback(item);
                     }, delayMs);
                 } else {
-                    scheduleNextPoster(noTrailerMs);
+                    // Lazy-fetch trailer from TMDB if no local trailer
+                    const tmdbId = item?.tmdbId || item?.tmdb_id ||
+                        (Array.isArray(item?.guids) ? item.guids.find(function(g) { return g.source === 'tmdb'; })?.id : null);
+                    if (tmdbId && cfg.showTrailer !== false) {
+                        const type = (item?.type === 'show' || item?.type === 'episode') ? 'tv' : 'movie';
+                        fetch('/get-trailer?tmdbId=' + tmdbId + '&type=' + type + '&_=' + Date.now(), { cache: 'no-cache' })
+                            .then(function(r) { return r.ok ? r.json() : null; })
+                            .then(function(d) {
+                                if (d && d.success && d.trailer && d.trailer.key) {
+                                    item.trailerUrl = 'https://www.youtube.com/watch?v=' + d.trailer.key;
+                                    // Start YouTube trailer after delay
+                                    trailerDelayTimer = setTimeout(function() {
+                                        trailerDelayTimer = null;
+                                        startYouTubeTrailer(item, d.trailer.key);
+                                    }, delayMs);
+                                } else {
+                                    scheduleNextPoster(noTrailerMs);
+                                }
+                            })
+                            .catch(function() { scheduleNextPoster(noTrailerMs); });
+                    } else {
+                        scheduleNextPoster(noTrailerMs);
+                    }
                 }
             } catch (_) { /* noop */ }
         }

@@ -1,3 +1,4 @@
+
 'use strict';
 /**
  * Cinema Display Mode
@@ -1516,9 +1517,38 @@
             return;
         }
 
+        // --- Priorität 2: Lazy-Fetch von TMDB wenn keine trailerUrl vorhanden ---
+        let resolvedTrailerUrl = directTrailerUrl;
+        if (!resolvedTrailerUrl) {
+            const tmdbId = media.tmdbId || media.tmdb_id ||
+                (Array.isArray(media.guids) ? media.guids.find(g => g.source === 'tmdb')?.id : null);
+            if (tmdbId) {
+                const type = (media.type === 'show' || media.type === 'episode') ? 'tv' : 'movie';
+                try {
+                    const resp = await fetch(`/get-trailer?tmdbId=${tmdbId}&type=${type}&_=${Date.now()}`, { cache: 'no-cache' });
+                    if (resp.ok) {
+                        const d = await resp.json();
+                        if (d.success && d.trailer?.key) {
+                            resolvedTrailerUrl = `https://www.youtube.com/watch?v=${d.trailer.key}`;
+                            media.trailerUrl = resolvedTrailerUrl; // cache for next time
+                            log('Trailer: Lazy-fetched from TMDB', { title: media.title, key: d.trailer.key });
+                        }
+                    }
+                } catch (err) {
+                    log('Trailer: TMDB lazy-fetch failed', { error: err.message });
+                }
+            }
+        }
+
+        if (!resolvedTrailerUrl) {
+            removeTrailerOverlay();
+            startRotation();
+            return;
+        }
+
         // --- Fallback: YouTube (nur wenn explizite YouTube-URL und kein lokaler Trailer) ---
         let videoId = null;
-        const ytMatch = directTrailerUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        const ytMatch = resolvedTrailerUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
         if (ytMatch) videoId = ytMatch[1];
 
         if (!videoId) {
@@ -1679,11 +1709,11 @@
                                 });
                                 if (trailerEl) trailerEl.classList.add('visible'); // PATCH18: 1s Delay, kein Lade-Spinner
                             }, 1100);
-                            // PATCH-AUTOPLAY: Verzögertes Unmute nach 2s — Safari/Chromium blockiert Autoplay mit Ton
+                            // PATCH-AUTOPLAY: Verzögertes Unmute nach 0.5s — stumm starten für Autoplay-Policy
                             if (!shouldMute) {
                                 setTimeout(() => {
                                     try { event.target.unMute(); event.target.setVolume(100); } catch(_) {}
-                                }, 2000);
+                                }, 500);
                             }
                         } else {
                             warn('Trailer trailerEl is NULL in onReady callback');

@@ -18325,7 +18325,33 @@ window.COLOR_PRESETS = COLOR_PRESETS;
             }
         });
 
-        // OPERATIONS: Refresh Media
+        // OPERATIONS: Refresh Media (shared handler for both buttons)
+        async function handleRefreshMedia(btn) {
+            try {
+                btn.classList.add('btn-loading');
+                const r = await fetch('/api/admin/refresh-media', { method: 'POST', credentials: 'include' });
+                const j = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(j?.error || 'Refresh failed');
+                invalidateMediaItemsCache();
+                window.notify?.toast({ type: 'success', title: 'Media refreshed', message: j?.message || 'Sources reloaded', duration: 3500 });
+                try { await refreshOverviewLastSync(); } catch (_) {}
+            } catch (e) {
+                window.notify?.toast({ type: 'error', title: 'Refresh failed', message: e?.message || 'Unable to refresh media', duration: 5000 });
+            } finally {
+                btn.classList.remove('btn-loading');
+            }
+        }
+
+        // Refresh buttons in each source panel header
+        document.querySelectorAll('.btn-refresh-media-source').forEach(btn => {
+            if (!btn.querySelector('.spinner')) {
+                const sp = document.createElement('span'); sp.className = 'spinner';
+                btn.insertBefore(sp, btn.firstChild);
+            }
+            btn.addEventListener('click', () => handleRefreshMedia(btn));
+        });
+
+        // Original button in Operations section
         const btnRefreshMedia = document.getElementById('btn-refresh-media');
         if (btnRefreshMedia) {
             if (!btnRefreshMedia.querySelector('.spinner')) {
@@ -18333,42 +18359,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                 sp.className = 'spinner';
                 btnRefreshMedia.insertBefore(sp, btnRefreshMedia.firstChild);
             }
-            btnRefreshMedia.addEventListener('click', async () => {
-                try {
-                    btnRefreshMedia.classList.add('btn-loading');
-                    const r = await fetch('/api/admin/refresh-media', {
-                        method: 'POST',
-                        credentials: 'include',
-                    });
-                    const j = await r.json().catch(() => ({}));
-                    if (!r.ok) throw new Error(j?.error || 'Refresh failed');
-
-                    // Invalidate media items cache so next dashboard load fetches fresh counts
-                    invalidateMediaItemsCache();
-
-                    window.notify?.toast({
-                        type: 'success',
-                        title: 'Media refreshed',
-                        message: j?.message || 'Sources reloaded',
-                        duration: 3500,
-                    });
-                    // Update "Last sync" values on the Media Sources overview immediately
-                    try {
-                        await refreshOverviewLastSync();
-                    } catch (_) {
-                        /* non-fatal */
-                    }
-                } catch (e) {
-                    window.notify?.toast({
-                        type: 'error',
-                        title: 'Refresh failed',
-                        message: e?.message || 'Unable to refresh media',
-                        duration: 5000,
-                    });
-                } finally {
-                    btnRefreshMedia.classList.remove('btn-loading');
-                }
-            });
+            btnRefreshMedia.addEventListener('click', () => handleRefreshMedia(btnRefreshMedia));
         }
 
         // MQTT: Republish discovery

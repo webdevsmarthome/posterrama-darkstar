@@ -13,6 +13,8 @@ class TMDBSource {
         this.isDebug = isDebug;
         this.baseUrl = 'https://api.themoviedb.org/3';
         this.imageBaseUrl = 'https://image.tmdb.org/t/p/';
+        this.language = sourceConfig.language || 'de-DE';
+        this.region = sourceConfig.region || 'DE';
 
         // Initialize caches
         this.genreCache = new Map(); // Cache for genre mappings
@@ -126,7 +128,7 @@ class TMDBSource {
             const response = await executeWithRetry(
                 () =>
                     fetch(
-                        `${this.baseUrl}${endpoint}?api_key=${this.source.apiKey}&language=en-US`
+                        `${this.baseUrl}${endpoint}?api_key=${this.source.apiKey}&language=${this.language}`
                     ),
                 {
                     source: 'tmdb',
@@ -341,10 +343,13 @@ class TMDBSource {
             const itemsPerPage = 20; // TMDB returns max 20 per page
             const pagesToFetch = Math.ceil(count / itemsPerPage);
 
+            // Language and region params for localized results
+            const langRegionParams = `&language=${this.language}&region=${this.region}`;
+
             // Special handling for latest endpoint (returns single item)
             if (this.source.category === 'latest' || this.source.category === 'tv_latest') {
                 const endpoint = this.getEndpoint(type, 1);
-                const url = `${this.baseUrl}${endpoint}&api_key=${this.source.apiKey}`;
+                const url = `${this.baseUrl}${endpoint}&api_key=${this.source.apiKey}${langRegionParams}`;
 
                 try {
                     const data = await this.cachedApiRequest(url);
@@ -360,7 +365,7 @@ class TMDBSource {
                 // Fetch multiple pages for other endpoints
                 for (let page = 1; page <= pagesToFetch && page <= 500; page++) {
                     const endpoint = this.getEndpoint(type, page);
-                    const url = `${this.baseUrl}${endpoint}&api_key=${this.source.apiKey}`;
+                    const url = `${this.baseUrl}${endpoint}&api_key=${this.source.apiKey}${langRegionParams}`;
 
                     try {
                         const data = await this.cachedApiRequest(url);
@@ -614,7 +619,7 @@ class TMDBSource {
      * @returns {string} The watch region code.
      */
     getWatchRegion() {
-        return this.source.watchRegion || 'US';
+        return this.source.watchRegion || this.region || 'DE';
     }
 
     /**
