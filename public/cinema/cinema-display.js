@@ -740,42 +740,39 @@
                 detailsRow.appendChild(certEl);
             }
 
-            if (detailsRow.children.length > 0) {
-                movieInfoDiv.appendChild(detailsRow);
-                hasMovieInfo = true;
-            }
-
-            // Genre
+            // Genre (as detail item with same styling)
             if (meta.showGenre && currentMedia.genres && currentMedia.genres.length > 0) {
-                const genreEl = document.createElement('div');
-                genreEl.className = 'cinema-movie-genres';
+                const genreEl = document.createElement('span');
+                genreEl.className = 'cinema-detail-item genre';
                 const genreText = Array.isArray(currentMedia.genres)
-                    ? currentMedia.genres.slice(0, 3).join(' • ')
+                    ? currentMedia.genres.slice(0, 3).join(', ')
                     : currentMedia.genres;
                 genreEl.textContent = genreText;
-                movieInfoDiv.appendChild(genreEl);
-                hasMovieInfo = true;
+                detailsRow.appendChild(genreEl);
             }
 
-            // Director
+            // Director (as detail item with same styling)
             if (meta.showDirector && currentMedia.director) {
-                const dirEl = document.createElement('div');
-                dirEl.className = 'cinema-movie-director';
+                const dirEl = document.createElement('span');
+                dirEl.className = 'cinema-detail-item director';
                 const dirName =
                     typeof currentMedia.director === 'object'
                         ? currentMedia.director.name
                         : currentMedia.director;
-                dirEl.innerHTML = `<span class="label">Director:</span> ${dirName}`;
-                movieInfoDiv.appendChild(dirEl);
-                hasMovieInfo = true;
+                dirEl.textContent = dirName;
+                detailsRow.appendChild(dirEl);
             }
 
-            // Studio
+            // Studio (as detail item with same styling)
             if (meta.showStudioLogo && currentMedia.studio) {
-                const studioEl = document.createElement('div');
-                studioEl.className = 'cinema-movie-studio';
-                studioEl.innerHTML = `<span class="label">Studio:</span> ${currentMedia.studio}`;
-                movieInfoDiv.appendChild(studioEl);
+                const studioEl = document.createElement('span');
+                studioEl.className = 'cinema-detail-item studio';
+                studioEl.textContent = currentMedia.studio;
+                detailsRow.appendChild(studioEl);
+            }
+
+            if (detailsRow.children.length > 0) {
+                movieInfoDiv.appendChild(detailsRow);
                 hasMovieInfo = true;
             }
 
@@ -3424,6 +3421,47 @@
         }
     }
 
+    // ===== Normalize Aspect Ratio to PosterPack Studio Standards =====
+    const CINEMA_ASPECT_RATIOS = [
+        { value: 1.33, label: '1.33:1 (4:3)' },
+        { value: 1.66, label: '1.66:1' },
+        { value: 1.78, label: '1.78:1 (16:9)' },
+        { value: 1.85, label: '1.85:1' },
+        { value: 2.00, label: '2.00:1 (Univisium)' },
+        { value: 2.10, label: '2.10:1' },
+        { value: 2.20, label: '2.20:1' },
+        { value: 2.35, label: '2.35:1 (Scope)' },
+        { value: 2.39, label: '2.39:1 (Anamorphic)' },
+        { value: 2.76, label: '2.76:1 (Ultra Panavision)' },
+    ];
+
+    function normalizeToCinemaAspectRatio(raw) {
+        if (!raw) return null;
+        const str = String(raw);
+        // Already a PosterPack Studio label? Return as-is
+        if (CINEMA_ASPECT_RATIOS.some(r => r.label === str)) return str;
+        // Parse numeric value from formats like "2.39:1", "2.39", "16:9"
+        let num;
+        const colonMatch = str.match(/^([\d.]+)\s*:\s*([\d.]+)/);
+        if (colonMatch) {
+            num = parseFloat(colonMatch[1]) / parseFloat(colonMatch[2]);
+        } else {
+            num = parseFloat(str);
+        }
+        if (!num || isNaN(num)) return str;
+        // Find closest PosterPack Studio standard
+        let best = CINEMA_ASPECT_RATIOS[0];
+        let bestDiff = Math.abs(num - best.value);
+        for (let i = 1; i < CINEMA_ASPECT_RATIOS.length; i++) {
+            const diff = Math.abs(num - CINEMA_ASPECT_RATIOS[i].value);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                best = CINEMA_ASPECT_RATIOS[i];
+            }
+        }
+        return best.label;
+    }
+
     // ===== Map Media Properties to Cinema Format =====
     function mapMediaToCinemaFormat(media) {
         if (!media) return null;
@@ -3434,8 +3472,19 @@
         let audioCodec = media.audioCodec || null;
         let audioChannels = media.audioChannels || null;
         let aspectRatio = media.aspectRatio || null;
-        const hasHDR = media.hasHDR || false;
-        const hasDolbyVision = media.hasDolbyVision || false;
+        // Fallback: hasHDR from 'hdr' field (PosterPack metadata uses 'hdr' string like 'HDR10', 'SDR')
+        const hdrVal = media.hdr || '';
+        const hasHDR = media.hasHDR || (hdrVal && hdrVal !== 'SDR') || false;
+        const hasDolbyVision = media.hasDolbyVision || (typeof hdrVal === 'string' && hdrVal.toLowerCase().includes('dolby vision')) || false;
+
+        // Fallback: director from directors array (PosterPack metadata uses 'directors' array)
+        const director = media.director || (Array.isArray(media.directors) && media.directors.length > 0 ? media.directors[0] : null);
+
+        // Fallback: studio from studios array (PosterPack metadata uses 'studios' array)
+        const studio = media.studio || (Array.isArray(media.studios) && media.studios.length > 0 ? media.studios[0] : null);
+
+        // Fallback: genres from genre field (some sources use singular 'genre')
+        const genres = media.genres || media.genre || null;
 
         // Fallback: Map resolution from Plex qualityLabel or videoStreams (for non-session media)
         if (!resolution) {
@@ -3502,6 +3551,11 @@
             }
         }
 
+        // Normalize aspect ratio to nearest PosterPack Studio standard
+        if (aspectRatio) {
+            aspectRatio = normalizeToCinemaAspectRatio(aspectRatio);
+        }
+
         return {
             ...media,
             resolution,
@@ -3510,6 +3564,9 @@
             aspectRatio,
             hasHDR,
             hasDolbyVision,
+            director,
+            studio,
+            genres,
         };
     }
 
