@@ -1,7 +1,8 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-03-30 (basierend auf Version 3.0.1j)
+**Stand:** 2026-04-23 (basierend auf Version 3.0.1p)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
+**Release-Historie:** Siehe [CHANGELOG.md](./CHANGELOG.md) fuer die versionierte Uebersicht aller Aenderungen seit v3.0.1.
 
 ---
 
@@ -68,6 +69,10 @@
 | 57 | Trailer-Info Cleanup bei Loeschung | routes/poster-updater.js | Beim Loeschen eines Films wird der Eintrag aus trailer-info.json entfernt |
 | 58 | PosterPack Branding | 26 Dateien | Einheitliche Schreibweise "PosterPack" statt "Posterpack" |
 | 59 | Playlist Editor Sortierung | routes/poster-selector.js, admin.html, admin.js, admin.css | Sortier-Buttons (A–Z, Z–A, Neueste) fuer verfuegbare PosterPacks im Playlist Editor |
+| 60 | Cinema Footer Metadaten | lib/media-aggregator.js, public/cinema/cinema-display.js, public/cinema/cinema-display.css | Genre/Regisseur/Studio in Detail-Zeile, Aspect-Ratio-Normalisierung (10 Cinema-Formate), HDR/Dolby-Vision-Erkennung aus PosterPack-`hdr`-Feld |
+| 61 | Cinema Footer Dual-Row | public/cinema/cinema-display.css | Vertikaler Separator vor zweiter Footer-Zeile im Dual-Row-Modus entfernt |
+| 62 | Media Flag Icons | public/icons/aspectratio, audio, mpaa, music, resolution, rottentomatoes, source, studio, videocodec | Icon-Sets fuer Metadaten-Anzeige im Cinema Footer |
+| 63 | ZIP-Metadata-Durchreichung | lib/media-aggregator.js | genres, director, studio, resolution, audioCodec, aspectRatio, hdr werden aus ZIP-`metadata.json` an das Media-Item durchgereicht |
 
 ---
 
