@@ -6,6 +6,21 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1v] – 2026-04-24
+
+Migration: bestehende Filmliste-Einträge bekommen ihre TMDB-IDs nachträglich als `[tmdb:NNNN]`-Hint eingetragen.
+
+### Neu
+- **`scripts/backfill-tmdb-hints.js`** — One-Shot-Migration: liest `poster-updater/filmliste.txt`, scannt für Einträge ohne Hint die ZIP-`metadata.json`-Dateien (lokal, kein API-Call) und ergänzt die gefundene `tmdb_id` als Suffix. Für Einträge ohne ZIP fragt es `ProviderIds.Tmdb` aus den konfigurierten Emby/Jellyfin-Servern ab (2-stufiger Fallback). Dry-Run-Default, automatisches Backup, `--execute` für Schreiben.
+
+### Ergebnis auf dieser Installation
+- 1184 Einträge per ZIP-metadata-Scan ergänzt (keine API-Calls nötig).
+- 0 aus Emby ergänzt (alle ZIPs hatten bereits vollständige metadata.json).
+- 5 Einträge ohne Hint verbleiben — alle sind Test-/Non-Movies (`TRAILER DISK V00 (2022)`, `SOUND TRAILER V01 (2023) (2023)`, `TRAILER DISK V01 (2023)`) oder haben einen Tippfehler im Titel (`Erkan und Stefan gegen die Maechte der Finsternis (2002)` — "Maechte" statt "Mächte" + kein lokales ZIP + kein Emby-Match).
+- Resultat: **1258 von 1263 Einträgen (99.6%) haben jetzt TMDB-Hints**. Zukünftige Re-Downloads dieser Filme nutzen die authoritative TMDB-ID ohne Suche.
+
+---
+
 ## [3.0.1u] – 2026-04-24
 
 Prevention: TMDB-ID-Hint im Filmliste-Format. Verhindert künftige Entstehung von PosterPack-Duplikaten aufgrund falscher TMDB-Treffer.
