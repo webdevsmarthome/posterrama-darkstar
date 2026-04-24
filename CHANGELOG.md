@@ -6,6 +6,24 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1u] – 2026-04-24
+
+Prevention: TMDB-ID-Hint im Filmliste-Format. Verhindert künftige Entstehung von PosterPack-Duplikaten aufgrund falscher TMDB-Treffer.
+
+### Neu
+- **Filmliste-Format-Erweiterung** — Einträge können optional den Suffix `[tmdb:NNNN]` tragen: z. B. `Hamlet (2000)[tmdb:10688]`. Wird der Suffix gefunden, überspringt der Python-Downloader (`tmdb-get-posters-direct.py`) die Title+Year-Suche und nutzt die TMDB-ID direkt. Verhindert Fehltreffer bei Titel-Mehrdeutigkeiten (z. B. drei verschiedene "Hamlet"-Filme).
+- **`lib/emby-sync.js`** schreibt den TMDB-ID-Hint automatisch, wenn Emby/Jellyfin ihn als `ProviderIds.Tmdb` liefert. Für manuell per Admin-UI hinzugefügte Filme ohne bekannte ID bleibt das alte Suchverhalten.
+- **`lib/poster-updater-runner.js::appendFilms`** versteht das neue Format. Dedup basiert weiterhin auf dem Titel-Year-Teil; wenn ein bestehender Eintrag ohne Hint durch einen mit Hint ersetzt wird, ist das ein "Upgrade" (kein Duplikat).
+- **`routes/poster-updater.js`** — GET `/films` liefert weiterhin die Titel ohne Suffix (UI-freundlich); DELETE `/films/:name` matcht per Title-Year-Basis.
+
+### Geändert
+- **`poster-updater/tmdb-get-posters-direct.py`** — Parst `[tmdb:N]`-Hint, verifiziert via `GET /movie/{id}`, fällt auf Title+Year-Suche zurück falls Hint ungültig.
+
+### Betroffener Prevention-Case
+- Emby (LightStar) hatte `Hamlet (2000)` mit korrekter TMDB-ID 10688. Der Python-Downloader suchte bisher nach "Hamlet 2000" in TMDB, traf dabei aber TMDB-ID 10264 (der 1990er Zeffirelli-Hamlet), was zu einem falsch benannten ZIP führte. Mit dem Hint wird 10688 jetzt direkt verwendet.
+
+---
+
 ## [3.0.1t] – 2026-04-24
 
 Erweiterung des Dedup-Scripts um einen `--normalize-title`-Modus: TMDB-Title wird zusätzlich zur Jahreszahl als Single-Source-of-Truth für den kanonischen Dateinamen verwendet.

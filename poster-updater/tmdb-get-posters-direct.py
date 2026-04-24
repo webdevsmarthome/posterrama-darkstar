@@ -66,6 +66,17 @@ if not os.path.exists(FILMLISTE_PATH):
 with open(FILMLISTE_PATH, 'r', encoding='utf-8') as f:
     films = [line.strip() for line in f.readlines() if line.strip()]
 
+# Format-Erweiterung: "Titel (Jahr)[tmdb:NNNN]" — die TMDB-ID-Hinweis-Syntax
+# wird vom emby-sync geschrieben und erlaubt dem Downloader, die Suche zu
+# überspringen und direkt die korrekte TMDB-ID zu verwenden (Prevention gegen
+# falsche Mehrdeutigkeits-Treffer der TMDB-Suche).
+TMDB_HINT_RE = re.compile(r'^(.+?)\s*\[tmdb:(\d+)\]\s*$')
+def parse_filmliste_entry(line):
+    m = TMDB_HINT_RE.match(line)
+    if m:
+        return m.group(1).strip(), int(m.group(2))
+    return line.strip(), None
+
 print(f"\n🎬 {len(films)} Filme gefunden (FULL IMAGES)")
 
 def api_call(endpoint, params={}):
@@ -94,31 +105,42 @@ def download_image(img_path, local_path):
 erfolgreich = 0
 uebersprungen = 0
 fehler = 0
-for i, film in enumerate(films, 1):
-    print(f"\n🔄 [{i}/{len(films)}] {film}")
-    
+for i, raw_film in enumerate(films, 1):
+    # Parse optional [tmdb:NNNN] hint
+    film, tmdb_hint = parse_filmliste_entry(raw_film)
+    print(f"\n🔄 [{i}/{len(films)}] {film}" + (f"  (TMDB-Hint: {tmdb_hint})" if tmdb_hint else ""))
+
     year_match = re.search(r'\((\d{4})\)', film)
     year = year_match.group(1) if year_match else ""
     clean_title = re.sub(r'\s*\(\d{4}\)', '', film).strip()
-    
+
     zip_name = f"{clean_title} ({year}).zip"
     zip_path = os.path.join(OUTPUT_DIR, zip_name)
-    
+
     if os.path.exists(zip_path):
         print(f"   ⏭️  ZIP vorhanden: {zip_name}")
         uebersprungen += 1
         continue
-    
-    search = api_call('search/movie', {'query': clean_title, 'year': year})
-    if not search or not search.get('results'):
-        # Retry without year filter (sometimes year mismatch prevents results)
-        search = api_call('search/movie', {'query': clean_title})
+
+    movie_id = None
+    if tmdb_hint:
+        # Direkt die gehintete ID verwenden — keine Suche → keine falsche Treffer
+        movie_id = tmdb_hint
+        verify = api_call(f'movie/{movie_id}')
+        if not verify or not verify.get('id'):
+            print(f"   ⚠️  TMDB-Hint {tmdb_hint} nicht auflösbar, Fallback auf Suche")
+            movie_id = None
+
+    if not movie_id:
+        search = api_call('search/movie', {'query': clean_title, 'year': year})
         if not search or not search.get('results'):
-            print(f"   ❌ Kein TMDB-Treffer fuer: '{clean_title}' ({year})")
-            fehler += 1
-            continue
-    
-    movie_id = search['results'][0]['id']
+            # Retry without year filter (sometimes year mismatch prevents results)
+            search = api_call('search/movie', {'query': clean_title})
+            if not search or not search.get('results'):
+                print(f"   ❌ Kein TMDB-Treffer fuer: '{clean_title}' ({year})")
+                fehler += 1
+                continue
+        movie_id = search['results'][0]['id']
     
     # CORE DATA + FULL IMAGES
     details = api_call(f'movie/{movie_id}')

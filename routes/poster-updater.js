@@ -58,7 +58,9 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
                 runner.getExistingZips(),
             ]);
             const trailerInfo = readTrailerInfo();
-            const result = films.map(name => {
+            const result = films.map(raw => {
+                // Strip optional "[tmdb:N]"-Hint für UI-Anzeige und Datei-Vergleiche
+                const name = runner.stripTmdbHint(raw);
                 const hasTrailer = trailerFileExists(name);
                 return {
                     name,
@@ -118,7 +120,12 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
         try {
             const result = await runner.withFileLock(async () => {
                 const films = await runner.readFilmList();
-                const idx = films.findIndex(f => f === name);
+                // Matching auf Title-Year-Basis (Hint wird ignoriert), damit auch
+                // "Film (Jahr)[tmdb:N]"-Einträge per DELETE /films/:name gefunden werden.
+                const normalizedTarget = runner.stripTmdbHint(name).normalize('NFC');
+                const idx = films.findIndex(
+                    f => runner.stripTmdbHint(f).normalize('NFC') === normalizedTarget
+                );
                 if (idx === -1) return { success: false };
                 films.splice(idx, 1);
                 await runner.writeFilmList(films);
