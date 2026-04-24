@@ -8,6 +8,7 @@ This folder contains Posterrama’s developer documentation.
 - **Scripts overview:** `SCRIPTS-OVERVIEW.md`
 - **Deployment:** `DEPLOYMENT-GUIDE.md`
 - **Monitor Power Watcher (Darkstar-Fork, Pi-spezifisch):** `MONITOR-POWER-WATCHER.md`
+- **Kiosk Performance Tuning (Darkstar-Fork, Pi-spezifisch):** `KIOSK-PERFORMANCE.md`
 - **Production readiness checklist:** `API-PRODUCTION-READINESS.md`
 - **OpenAPI workflow:** `OPENAPI-WORKFLOW.md`
 - **Architecture diagrams:** `ARCHITECTURE-DIAGRAMS.md`

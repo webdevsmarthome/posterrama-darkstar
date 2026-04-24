@@ -6,6 +6,20 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1q] – 2026-04-24
+
+Pi-Kiosk-Performance-Tuning + Erweiterung des Monitor Power Watchers um einen Next-Poster-Trigger. Keine Code-Änderungen an Posterrama selbst — alle Anpassungen sind System-Config auf dem lokalen Pi, dokumentiert im Repo.
+
+### Neu
+- **Kiosk Performance Tuning** (`docs/KIOSK-PERFORMANCE.md`) — 1920×1080@60Hz (statt 4K@60Hz) mit Hardware-Upscaling durch den Dell-Monitor; vier Chromium-Flags für GPU-Beschleunigung (`--ignore-gpu-blocklist`, `--enable-gpu-rasterization`, `--enable-zero-copy`, `--canvas-oop-rasterization`); Chromium-Launcher als separates Script `posterrama-kiosk.sh`, damit Flag-Änderungen ohne Re-Login wirken. Ergebnis: Trailer und Fade-Transitions im Cinema-Modus ruckelfrei.
+- **Next-Poster-Trigger im Monitor Power Watcher** (`docs/MONITOR-POWER-WATCHER.md`) — Nach `SIGCONT` (Monitor an) schickt der Watcher zusätzlich einen virtuellen ArrowRight-Tastendruck per `wtype` an Chromium. Der Cinema-Keyboard-Handler ruft `window.__posterramaPlayback.next()` auf, der beim Einfrieren sichtbare alte Frame wird nie gezeigt.
+
+### Geändert
+- `docs/INDEX.md` — Verweis auf neues Kiosk-Performance-Dokument.
+- `docs/MONITOR-POWER-WATCHER.md` — neue Voraussetzung `wtype`, Beschreibung des Next-Poster-Schritts im Off→On-Zyklus.
+
+---
+
 ## [3.0.1p] – 2026-04-23
 
 Release des Darkstar-Forks. Fasst die Entwicklungen seit dem letzten getaggten Upstream-Release `v3.0.1` zusammen — insgesamt 31 Commits über die Sub-Versionen `3.0.1a` bis `3.0.1p`.

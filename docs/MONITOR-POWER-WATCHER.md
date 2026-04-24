@@ -40,7 +40,7 @@ Der CRTC-Zustand bleibt inkonsistent, ein Reboot ist dann erforderlich. **Nicht 
 2. Initial per `ddcutil getvcp D6` den Power-State erfasst; falls Monitor beim Start bereits aus ist, sofort SIGSTOP.
 3. Danach alle 7 s pollt. Bei Zustandswechsel:
    - `on → off`: `kill -STOP` an `pgrep -u <uid> '^chromium$'`
-   - `off → on`: `kill -CONT` an dieselbe Menge
+   - `off → on`: `kill -CONT` an dieselbe Menge, **plus** 300 ms später ein virtueller ArrowRight-Tastendruck via `wtype -k Right`. Dadurch wird in `cinema-display.js` der Keyboard-Handler getriggert (`window.__posterramaPlayback.next()`) → sofort neues Poster. Ohne diesen Schritt wäre beim Wieder-Einschalten kurz das eingefrorene alte Poster sichtbar.
 4. Beim Beenden (TERM/INT/HUP/EXIT) immer `SIGCONT` an alle `^chromium$`-Prozesse — Cleanup-Trap verhindert, dass Chromium eingefroren zurückbleibt, wenn der Service stirbt.
 
 **Wichtiges Detail**: Das Pattern `^chromium$` (nicht `-f chromium`) matched nur auf den Prozessnamen (`comm`), nicht auf die komplette Kommandozeile. Sonst würden Shell-Scripts, die das Wort "chromium" irgendwo im Body haben (z. B. Diagnose-Snippets), versehentlich mit eingefroren.
@@ -72,10 +72,11 @@ WantedBy=default.target
 
 ### 3. Voraussetzungen
 
-- Paket `ddcutil` installiert (`sudo apt install ddcutil`).
+- Pakete `ddcutil` und `wtype` installiert (`sudo apt install ddcutil wtype`).
 - Kernelmodul `i2c_dev` geladen.
 - `/dev/i2c-*` existieren (auf Pi 4 mit VC4-KMS automatisch).
 - User in Gruppen `i2c` und `video`.
+- Wayland-Compositor muss `wlr-virtual-keyboard-unstable-v1`-Protokoll unterstützen (labwc tut es).
 
 Vom Dell U2720Q antwortet `ddcutil getvcp D6` mit:
 
@@ -89,8 +90,8 @@ Die *Unterscheidung* ist das Signal — nicht der numerische Wert selbst. Andere
 ## Setup
 
 ```bash
-# 1. ddcutil installieren (einmalig)
-sudo apt install ddcutil
+# 1. ddcutil + wtype installieren (einmalig)
+sudo apt install ddcutil wtype
 
 # 2. Script und Unit ablegen (siehe oben)
 
