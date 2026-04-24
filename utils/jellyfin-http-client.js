@@ -472,6 +472,7 @@ class JellyfinHttpClient extends BaseHttpClient {
         recursive = true,
         fields = [],
         sortBy = [],
+        sortOrder = '',
         limit = 100,
         startIndex = 0,
     }) {
@@ -493,6 +494,10 @@ class JellyfinHttpClient extends BaseHttpClient {
 
             if (sortBy.length > 0) {
                 params.append('SortBy', sortBy.join(','));
+            }
+
+            if (sortOrder) {
+                params.append('SortOrder', sortOrder);
             }
 
             const response = await this.http.get(`/Items?${params}`);

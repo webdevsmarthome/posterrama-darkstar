@@ -1,0 +1,29 @@
+{
+    "Items": [
+        {
+            "Name": "Avatar",
+            "Id": "light-avatar-1",
+            "ProductionYear": 2009,
+            "ProviderIds": { "Imdb": "tt0499549", "Tmdb": "19995" },
+            "DateCreated": "2025-01-08T09:23:00.000Z",
+            "Type": "Movie"
+        },
+        {
+            "Name": "Oppenheimer",
+            "Id": "light-oppenheimer-1",
+            "ProductionYear": 2023,
+            "ProviderIds": { "Imdb": "tt15398776", "Tmdb": "872585" },
+            "DateCreated": "2026-03-01T14:00:00.000Z",
+            "Type": "Movie"
+        },
+        {
+            "Name": "Inception",
+            "Id": "light-inception-1",
+            "ProductionYear": 2010,
+            "ProviderIds": { "Imdb": "tt1375666", "Tmdb": "27205" },
+            "DateCreated": "2024-05-05T00:00:00.000Z",
+            "Type": "Movie"
+        }
+    ],
+    "TotalRecordCount": 3
+}

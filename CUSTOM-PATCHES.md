@@ -58,6 +58,7 @@
 | 46 | Tagline Fetcher | poster-updater/fetch-taglines.py, tmdb-get-posters-direct.py | Laedt fehlende Taglines von TMDB (DE bevorzugt, EN Fallback) und fuegt sie in ZIPs ein |
 | 47 | Metadata-Extras Fetcher | poster-updater/fetch-metadata-extras.py, tmdb-get-posters-direct.py | Certification (FSK), Director, Studio von TMDB in alle ZIPs |
 | 48 | PosterPack Studio erweitert | routes/posterpack-creator.js, admin.html, admin.js | Neue Felder: Regisseur, Studio, Aufloesung, Audio, Seitenverhaeltnis, HDR |
+| 49 | Emby-Sync + Auto-Playlist + Ignore-Liste | lib/emby-sync.js, lib/poster-updater-runner.js, routes/emby-sync.js, routes/poster-updater.js (Refactor auf Runner), routes/poster-selector.js (Auto-Playlist-Schutz), utils/jellyfin-http-client.js (sortOrder), config.json/example/schema (embySync-Block + LightStar), admin.html/js/css, .env (JELLYFIN_API_KEY_LIGHTSTAR) | Regelmäßiger Abgleich beider Emby-Server, automatischer PosterPack-/Trailer-Download für neue Filme, Ignore-Liste im Admin-UI, Auto-Playlist "Die letzten 20 hinzugefügten Filme" |
 | 49 | Media-Aggregator erweitert | lib/media-aggregator.js | Director, Studio, Resolution, Audio, AspectRatio, HDR aus ZIP-Metadata durchreichen |
 | 50 | Config-Public Fix | routes/config-public.js | config.config statt config fuer Raw-Werte (uiScaling, showRottenTomatoes etc. wurden ignoriert) |
 | 51 | style.css background Fix | public/style.css | background-image statt background Shorthand (verhinderte background-size:contain) |

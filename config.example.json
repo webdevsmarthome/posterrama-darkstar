@@ -290,6 +290,24 @@
         "apiKey": "your-api-key-here",
         "genreFilter": ""
     },
+    "embySync": {
+        "enabled": true,
+        "intervalMinutes": 360,
+        "initialDelaySeconds": 60,
+        "movieLimitPerRun": 500,
+        "autoPlaylist": {
+            "enabled": true,
+            "id": "auto_recent_20",
+            "name": "Die letzten 20 hinzugefügten Filme",
+            "limit": 20,
+            "autoActivate": true
+        },
+        "downloads": {
+            "posterPack": true,
+            "trailer": true
+        },
+        "ignoredMovies": []
+    },
     "streamingSources": [],
     "siteServer": {
         "enabled": true,

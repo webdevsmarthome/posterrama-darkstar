@@ -20348,3 +20348,73 @@ select.pu-input optgroup { font-weight: 600; color: var(--color-text-secondary);
 .ps-dragging { opacity: 0.3; background: var(--color-bg-tertiary); }
 .ps-drop-above { box-shadow: 0 -2px 0 0 var(--color-secondary) inset; }
 .ps-drop-below { box-shadow: 0 2px 0 0 var(--color-secondary) inset; }
+
+/* ============================================================
+   Emby-Sync Section (Darkstar-Fork Patch 49)
+   ============================================================ */
+#section-emby-sync .es-status-row {
+    display: flex; justify-content: space-between; gap: 8px;
+    padding: 4px 0; font-size: 0.9rem;
+    border-bottom: 1px solid var(--color-border-light);
+}
+#section-emby-sync .es-status-row:last-child { border-bottom: none; }
+#section-emby-sync .es-label { color: var(--color-text-muted); font-weight: 500; }
+#section-emby-sync #es-running.running { color: #f2b630; font-weight: 600; }
+#section-emby-sync #es-running.idle { color: var(--color-text-muted); }
+
+#section-emby-sync .emby-sync-report-tabs {
+    display: flex; gap: 4px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--color-border-light); padding-bottom: 6px;
+}
+#section-emby-sync .es-tab {
+    padding: 4px 10px; font-size: 0.85rem; font-family: inherit;
+    background: transparent; color: var(--color-text-muted);
+    border: 1px solid transparent; border-radius: 4px;
+    cursor: pointer; transition: all 0.15s;
+}
+#section-emby-sync .es-tab:hover {
+    color: var(--color-text-primary); background: var(--color-bg-tertiary);
+}
+#section-emby-sync .es-tab.active {
+    color: var(--color-text-primary);
+    background: var(--color-bg-tertiary);
+    border-color: var(--color-border-light);
+}
+
+#section-emby-sync .emby-sync-report-body {
+    max-height: 340px; overflow-y: auto;
+    background: var(--color-bg-primary); border: 1px solid var(--color-border-light);
+    border-radius: 4px; padding: 8px;
+}
+#section-emby-sync .emby-sync-report-body .es-entry {
+    padding: 4px 6px; border-bottom: 1px solid var(--color-border-light);
+    font-size: 0.85rem; font-family: monospace;
+}
+#section-emby-sync .emby-sync-report-body .es-entry:last-child { border-bottom: none; }
+#section-emby-sync .emby-sync-report-body .es-entry-meta {
+    color: var(--color-text-muted); font-size: 0.75rem; margin-left: 8px;
+}
+
+#section-emby-sync .ignore-list-form .ignore-input-row {
+    display: flex; gap: 6px;
+}
+#section-emby-sync .ignore-list-table table {
+    width: 100%; border-collapse: collapse; font-size: 0.85rem;
+}
+#section-emby-sync .ignore-list-table th,
+#section-emby-sync .ignore-list-table td {
+    padding: 6px 8px; text-align: left;
+    border-bottom: 1px solid var(--color-border-light);
+}
+#section-emby-sync .ignore-list-table th {
+    font-weight: 600; color: var(--color-text-muted); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.4px;
+}
+#section-emby-sync .ignore-list-table .es-remove-btn {
+    padding: 2px 8px; font-size: 0.8rem; cursor: pointer;
+    background: transparent; color: var(--color-text-muted);
+    border: 1px solid var(--color-border-light); border-radius: 3px;
+}
+#section-emby-sync .ignore-list-table .es-remove-btn:hover {
+    color: #e74c3c; border-color: #e74c3c;
+}

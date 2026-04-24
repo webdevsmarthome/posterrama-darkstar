@@ -229,6 +229,7 @@
       </a>
       <a href="#" class="nav-item" data-nav="operations"><i class="fas fa-screwdriver-wrench"></i><span>Operations</span></a>
       <a href="#" class="nav-item" data-nav="poster-updater"><i class="fas fa-film"></i><span>Poster Updater</span></a>
+      <a href="#" class="nav-item" data-nav="emby-sync"><i class="fas fa-sync-alt"></i><span>Emby-Sync</span></a>
       <a href="#" class="nav-item" data-nav="posterpack-studio"><i class="fas fa-magic"></i><span>PosterPack Studio</span></a>
       <a href="#" class="nav-item" data-nav="poster-selector"><i class="fas fa-th-list"></i><span>Playlist Editor</span></a>
     </nav>
@@ -4175,6 +4176,97 @@
         </div>
       </section>
 
+    </section>
+
+    <!-- Emby Sync Section (Darkstar-Fork Patch 49) -->
+    <section id="section-emby-sync" class="app-section" hidden>
+      <section class="panel operations-panel" style="border: none; background: transparent; box-shadow: none;">
+        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; display: flex; align-items: center;">
+            <span style="display: inline-flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--color-text-primary); padding: 6px 16px; border-radius: 20px; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.3px;">
+              <i class="fas fa-sync-alt" style="opacity: 0.8;"></i>
+              Emby-Sync
+            </span>
+          </h2>
+        </div>
+        <div class="panel-content" style="padding: 0;">
+          <div class="content-grid" style="gap: 12px;">
+
+            <!-- Left column: Status + Trigger + Report -->
+            <div class="ops-col">
+              <!-- Status Card -->
+              <section class="perf-card" aria-label="Status">
+                <h3><i class="fas fa-heartbeat"></i> Status</h3>
+                <div class="emby-sync-status" id="es-statusBlock" style="margin-top: 12px;">
+                  <div class="es-status-row"><span class="es-label">Scheduler:</span> <span id="es-scheduled">–</span></div>
+                  <div class="es-status-row"><span class="es-label">Intervall:</span> <span id="es-interval">–</span></div>
+                  <div class="es-status-row"><span class="es-label">Letzter Lauf:</span> <span id="es-lastRun">–</span></div>
+                  <div class="es-status-row"><span class="es-label">Nächster Lauf:</span> <span id="es-nextRun">–</span></div>
+                  <div class="es-status-row"><span class="es-label">Aktuell laufend:</span> <span id="es-running">–</span></div>
+                </div>
+                <div style="margin-top: 14px;">
+                  <button class="btn btn-success btn-sm" id="es-triggerBtn">
+                    <i class="fas fa-play"></i> Jetzt synchronisieren
+                  </button>
+                  <span class="es-trigger-hint" id="es-triggerHint" style="margin-left: 8px; opacity: 0.7; font-size: 0.85rem;"></span>
+                </div>
+              </section>
+
+              <!-- Report Viewer -->
+              <section class="perf-card" aria-label="Letzter Report">
+                <h3><i class="fas fa-clipboard-list"></i> Letzter Sync-Report</h3>
+                <div class="emby-sync-report-meta" id="es-reportMeta" style="margin-top: 12px; font-size: 0.85rem; opacity: 0.8;"></div>
+                <div class="emby-sync-report-tabs" id="es-reportTabs" style="margin-top: 12px;">
+                  <button class="es-tab active" data-es-tab="added">Hinzugefügt (<span id="es-countAdded">0</span>)</button>
+                  <button class="es-tab" data-es-tab="skipped">Übersprungen (<span id="es-countSkipped">0</span>)</button>
+                  <button class="es-tab" data-es-tab="ignored">Ignoriert (<span id="es-countIgnored">0</span>)</button>
+                  <button class="es-tab" data-es-tab="errors">Fehler (<span id="es-countErrors">0</span>)</button>
+                </div>
+                <div class="emby-sync-report-body" id="es-reportBody" style="margin-top: 10px;">
+                  <div style="opacity: 0.6; font-size: 0.9rem;">Lade Report...</div>
+                </div>
+              </section>
+            </div>
+
+            <!-- Right column: Ignore List Editor -->
+            <div class="ops-col">
+              <section class="perf-card" aria-label="Ignore-Liste">
+                <h3><i class="fas fa-ban"></i> Ignore-Liste</h3>
+                <p style="margin: 8px 0; font-size: 0.85rem; opacity: 0.75;">
+                  Filme auf dieser Liste werden beim Sync übersprungen — kein PosterPack-Download, kein Trailer.
+                </p>
+                <div class="ignore-list-form" id="es-ignoreForm" style="margin-top: 14px;">
+                  <div style="margin-bottom: 8px;">
+                    <label style="margin-right: 10px;"><input type="radio" name="es-ignoreType" value="title" checked> Titel + Jahr</label>
+                    <label style="margin-right: 10px;"><input type="radio" name="es-ignoreType" value="imdb"> IMDB-ID</label>
+                    <label><input type="radio" name="es-ignoreType" value="tmdb"> TMDB-ID</label>
+                  </div>
+                  <div class="ignore-input-row ignore-input-title" style="display: flex; gap: 6px;">
+                    <input type="text" class="pu-input" id="es-ignoreTitle" placeholder="Filmtitel" style="flex: 2;">
+                    <input type="text" class="pu-input" id="es-ignoreYear" placeholder="Jahr" style="flex: 1; max-width: 90px;">
+                  </div>
+                  <div class="ignore-input-row ignore-input-imdb" style="display: none;">
+                    <input type="text" class="pu-input" id="es-ignoreImdb" placeholder="tt1234567" style="width: 100%;">
+                  </div>
+                  <div class="ignore-input-row ignore-input-tmdb" style="display: none;">
+                    <input type="text" class="pu-input" id="es-ignoreTmdb" placeholder="12345" style="width: 100%;">
+                  </div>
+                  <div style="margin-top: 6px;">
+                    <input type="text" class="pu-input" id="es-ignoreReason" placeholder="Grund (optional)" style="width: 100%;">
+                  </div>
+                  <div style="margin-top: 10px;">
+                    <button class="btn btn-primary btn-sm" id="es-ignoreAddBtn"><i class="fas fa-plus"></i> Zur Ignore-Liste hinzufügen</button>
+                  </div>
+                </div>
+                <div class="ignore-list-table" id="es-ignoreTable" style="margin-top: 16px;">
+                  <div style="opacity: 0.6; font-size: 0.9rem;">Lade...</div>
+                </div>
+              </section>
+            </div>
+
+          </div>
+        </div>
+      </section>
     </section>
 
     <!-- Playlist Editor Section -->

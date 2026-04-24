@@ -1,0 +1,37 @@
+{
+    "Items": [
+        {
+            "Name": "Avatar",
+            "Id": "dark-avatar-1",
+            "ProductionYear": 2009,
+            "ProviderIds": { "Imdb": "tt0499549", "Tmdb": "19995" },
+            "DateCreated": "2024-11-15T09:23:00.000Z",
+            "Type": "Movie"
+        },
+        {
+            "Name": "Dune",
+            "Id": "dark-dune-1",
+            "ProductionYear": 2021,
+            "ProviderIds": { "Imdb": "tt1160419", "Tmdb": "438631" },
+            "DateCreated": "2026-02-10T12:00:00.000Z",
+            "Type": "Movie"
+        },
+        {
+            "Name": "Das Kanu des Manitu",
+            "Id": "dark-kanu-1",
+            "ProductionYear": 2025,
+            "ProviderIds": { "Imdb": "tt30000001" },
+            "DateCreated": "2026-04-20T18:00:00.000Z",
+            "Type": "Movie"
+        },
+        {
+            "Name": "Matrix",
+            "Id": "dark-matrix-1",
+            "ProductionYear": 1999,
+            "ProviderIds": { "Imdb": "tt0133093", "Tmdb": "603" },
+            "DateCreated": "2024-01-01T00:00:00.000Z",
+            "Type": "Movie"
+        }
+    ],
+    "TotalRecordCount": 4
+}

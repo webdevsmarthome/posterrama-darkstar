@@ -105,6 +105,7 @@ class Config {
             this._tmdbSource = this.config.tmdbSource;
             this._streamingSources = this.config.streamingSources;
             this._mqtt = this.config.mqtt;
+            this._embySync = this.config.embySync;
             this._clientDebugViewer = this.config.clientDebugViewer;
             this._siteServer = this.config.siteServer;
             this._burnInPrevention = this.config.burnInPrevention;
@@ -250,6 +251,15 @@ class Config {
     set streamingSources(value) {
         this._streamingSources = value;
         if (this.config) this.config.streamingSources = value;
+    }
+
+    // Emby-Sync settings (Darkstar-Fork feature)
+    get embySync() {
+        return this._embySync || this.config?.embySync || null;
+    }
+    set embySync(value) {
+        this._embySync = value;
+        if (this.config) this.config.embySync = value;
     }
 
     // MQTT settings

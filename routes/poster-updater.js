@@ -4,73 +4,21 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const fsp = fs.promises;
-const { spawn } = require('child_process');
 
-const FILMLISTE_PATH = path.join(__dirname, '..', 'poster-updater', 'filmliste.txt');
-const SCRIPT_PATH = path.join(__dirname, '..', 'poster-updater', 'tmdb-get-posters-direct.py');
-const SCRIPT_DIR = path.dirname(SCRIPT_PATH);
-const OUTPUT_DIR = path.join(__dirname, '..', 'media', 'complete', 'tmdb-export');
-const TRAILER_DIR = path.join(__dirname, '..', 'media', 'trailers');
+const runner = require('../lib/poster-updater-runner');
+
+const PROJECT_ROOT = path.join(__dirname, '..');
+const OUTPUT_DIR = path.join(PROJECT_ROOT, 'media', 'complete', 'tmdb-export');
+const TRAILER_DIR = path.join(PROJECT_ROOT, 'media', 'trailers');
 const TRAILER_INFO_PATH = path.join(TRAILER_DIR, 'trailer-info.json');
 
 module.exports = function createPosterUpdaterRouter({ logger }) {
     const router = express.Router();
 
-    // --- Module-level state ---
-    let runningProcess = null;
-    let sseClients = [];
-    let writeLock = Promise.resolve();
+    // Logger an den shared Runner durchreichen, damit emby-sync dieselben Logs bekommt
+    runner.setLogger(logger);
 
-    function withFileLock(fn) {
-        writeLock = writeLock.then(fn, fn);
-        return writeLock;
-    }
-
-    function broadcast(data) {
-        const msg = `data: ${JSON.stringify(data)}\n\n`;
-        sseClients = sseClients.filter(res => {
-            try { res.write(msg); return true; }
-            catch { return false; }
-        });
-    }
-
-    // --- Helper: read filmliste ---
-    async function readFilmList() {
-        try {
-            const content = await fsp.readFile(FILMLISTE_PATH, 'utf8');
-            return content.split('\n').map(l => l.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b, 'de'));
-        } catch (err) {
-            if (err.code === 'ENOENT') return [];
-            throw err;
-        }
-    }
-
-    // --- Helper: write filmliste ---
-    async function writeFilmList(films) {
-        const sorted = [...films].sort((a, b) => a.localeCompare(b, 'de'));
-        await fsp.writeFile(FILMLISTE_PATH, sorted.join('\n') + '\n', 'utf8');
-        return sorted;
-    }
-
-    // --- Helper: get set of existing ZIP names (without .zip extension) ---
-    async function getExistingZips() {
-        try {
-            const entries = await fsp.readdir(OUTPUT_DIR);
-            const zips = new Set();
-            for (const e of entries) {
-                if (e.toLowerCase().endsWith('.zip')) {
-                    zips.add(e.replace(/\.zip$/i, ''));
-                }
-            }
-            return zips;
-        } catch (err) {
-            if (err.code === 'ENOENT') return new Set();
-            throw err;
-        }
-    }
-
-    // ============================================================
-    // --- Trailer helpers ---
+    // --- Trailer-Info-Helfer (nur hier benötigt, bleiben lokal) ---
     function trailerFileExists(name) {
         const trailerPath = path.join(TRAILER_DIR, `${name}-trailer.mp4`);
         if (fs.existsSync(trailerPath)) return true;
@@ -78,13 +26,17 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
         try {
             const nameNFC = `${name}-trailer.mp4`.normalize('NFC');
             return fs.readdirSync(TRAILER_DIR).some(e => e.normalize('NFC') === nameNFC);
-        } catch { return false; }
+        } catch {
+            return false;
+        }
     }
 
     function readTrailerInfo() {
         try {
             return JSON.parse(fs.readFileSync(TRAILER_INFO_PATH, 'utf8'));
-        } catch { return {}; }
+        } catch {
+            return {};
+        }
     }
 
     function trailerInfoLookup(info, name) {
@@ -96,11 +48,15 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
         return null;
     }
 
+    // ============================================================
     // GET /films — list all films with ZIP and trailer status
     // ============================================================
     router.get('/films', async (req, res) => {
         try {
-            const [films, zips] = await Promise.all([readFilmList(), getExistingZips()]);
+            const [films, zips] = await Promise.all([
+                runner.readFilmList(),
+                runner.getExistingZips(),
+            ]);
             const trailerInfo = readTrailerInfo();
             const result = films.map(name => {
                 const hasTrailer = trailerFileExists(name);
@@ -108,7 +64,9 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
                     name,
                     hasZip: zips.has(name),
                     hasTrailer,
-                    trailerType: hasTrailer ? (trailerInfoLookup(trailerInfo, name) || 'unbekannt') : null,
+                    trailerType: hasTrailer
+                        ? trailerInfoLookup(trailerInfo, name) || 'unbekannt'
+                        : null,
                 };
             });
             const withZip = result.filter(f => f.hasZip).length;
@@ -141,20 +99,11 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
         const entry = `${title.trim()} (${yearStr})`;
 
         try {
-            const result = await withFileLock(async () => {
-                const films = await readFilmList();
-                const exists = films.some(f => f.toLowerCase() === entry.toLowerCase());
-                if (exists) {
-                    return { success: false, error: 'Already exists', entry };
-                }
-                films.push(entry);
-                await writeFilmList(films);
-                return { success: true, entry };
-            });
-            if (!result.success) {
-                return res.status(409).json(result);
+            const result = await runner.appendFilms([entry]);
+            if (result.added.length === 0) {
+                return res.status(409).json({ success: false, error: 'Already exists', entry });
             }
-            res.json(result);
+            res.json({ success: true, entry: result.added[0] });
         } catch (err) {
             logger.error('poster-updater: Failed to add film:', err.message);
             res.status(500).json({ success: false, error: err.message });
@@ -167,12 +116,12 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
     router.delete('/films/:name', async (req, res) => {
         const name = decodeURIComponent(req.params.name);
         try {
-            const result = await withFileLock(async () => {
-                const films = await readFilmList();
+            const result = await runner.withFileLock(async () => {
+                const films = await runner.readFilmList();
                 const idx = films.findIndex(f => f === name);
                 if (idx === -1) return { success: false };
                 films.splice(idx, 1);
-                await writeFilmList(films);
+                await runner.writeFilmList(films);
                 return { success: true };
             });
             if (!result.success) {
@@ -193,10 +142,14 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
                 const nameNormalized = name.normalize('NFC');
                 const trailerPath = path.join(TRAILER_DIR, nameNormalized + '-trailer.mp4');
                 await fsp.unlink(trailerPath);
-                logger.info(`poster-updater: Deleted trailer: ${nameNormalized}-trailer.mp4`);
+                logger.info(
+                    `poster-updater: Deleted trailer: ${nameNormalized}-trailer.mp4`
+                );
             } catch (err) {
                 if (err.code !== 'ENOENT') {
-                    logger.warn(`poster-updater: Failed to delete trailer: ${err.message}`);
+                    logger.warn(
+                        `poster-updater: Failed to delete trailer: ${err.message}`
+                    );
                 }
             }
             // Remove trailer-info.json entry
@@ -206,16 +159,22 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
                 const nameNormalized = name.normalize('NFC');
                 if (info[nameNormalized]) {
                     delete info[nameNormalized];
-                    await fsp.writeFile(TRAILER_INFO_PATH, JSON.stringify(info, null, 2) + '\n', 'utf8');
-                    logger.info(`poster-updater: Removed trailer-info entry: ${nameNormalized}`);
+                    await fsp.writeFile(
+                        TRAILER_INFO_PATH,
+                        JSON.stringify(info, null, 2) + '\n',
+                        'utf8'
+                    );
+                    logger.info(
+                        `poster-updater: Removed trailer-info entry: ${nameNormalized}`
+                    );
                 }
             } catch (err) {
                 logger.warn(`poster-updater: Failed to update trailer-info.json: ${err.message}`);
             }
             // Remove from all playlists (cinema-playlists.json + live cinema-playlist.json)
             try {
-                const playlistsPath = path.join(__dirname, '..', 'public', 'cinema-playlists.json');
-                const livePath = path.join(__dirname, '..', 'public', 'cinema-playlist.json');
+                const playlistsPath = path.join(PROJECT_ROOT, 'public', 'cinema-playlists.json');
+                const livePath = path.join(PROJECT_ROOT, 'public', 'cinema-playlist.json');
                 const raw = await fsp.readFile(playlistsPath, 'utf8');
                 const collection = JSON.parse(raw);
                 const nameNFC = name.normalize('NFC');
@@ -226,7 +185,11 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
                     if (pl.titles.length < before) changed = true;
                 }
                 if (changed) {
-                    await fsp.writeFile(playlistsPath, JSON.stringify(collection, null, 2) + '\n', 'utf8');
+                    await fsp.writeFile(
+                        playlistsPath,
+                        JSON.stringify(collection, null, 2) + '\n',
+                        'utf8'
+                    );
                     // Also update live playlist if active playlist was affected
                     const activeId = collection.activePlaylistId;
                     if (activeId && collection.playlists[activeId]) {
@@ -234,8 +197,14 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
                             const liveRaw = await fsp.readFile(livePath, 'utf8');
                             const live = JSON.parse(liveRaw);
                             live.titles = collection.playlists[activeId].titles;
-                            await fsp.writeFile(livePath, JSON.stringify(live, null, 2) + '\n', 'utf8');
-                        } catch (_) { /* best effort */ }
+                            await fsp.writeFile(
+                                livePath,
+                                JSON.stringify(live, null, 2) + '\n',
+                                'utf8'
+                            );
+                        } catch (_) {
+                            /* best effort */
+                        }
                     }
                     logger.info(`poster-updater: Removed "${name}" from playlists`);
                 }
@@ -252,55 +221,21 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
     });
 
     // ============================================================
-    // POST /run — start the Python script
+    // POST /run — start the Python script (PosterPack download)
     // ============================================================
     router.post('/run', (req, res) => {
-        if (runningProcess) {
-            return res.status(409).json({ success: false, error: 'Script is already running' });
+        const result = runner.spawnPosterPackJob();
+        if (!result.started) {
+            if (result.reason === 'already-running') {
+                return res
+                    .status(409)
+                    .json({ success: false, error: 'Script is already running' });
+            }
+            return res
+                .status(500)
+                .json({ success: false, error: result.error || 'spawn failed' });
         }
-
-        try {
-            // Build a clean env: remove TMDB_API_KEY from posterrama's process.env
-            // so that the Python script's load_dotenv() picks up the correct key
-            // from poster-updater/.env (load_dotenv does NOT override existing vars).
-            const scriptEnv = { ...process.env, PYTHONUNBUFFERED: '1' };
-            delete scriptEnv.TMDB_API_KEY;
-
-            const proc = spawn('python3', [SCRIPT_PATH, '--yes'], {
-                cwd: SCRIPT_DIR,
-                env: scriptEnv,
-            });
-            runningProcess = proc;
-            logger.info('poster-updater: Script started, pid=' + proc.pid);
-            broadcast({ type: 'started', pid: proc.pid });
-
-            proc.stdout.on('data', chunk => {
-                const text = chunk.toString('utf8');
-                broadcast({ type: 'stdout', text });
-            });
-
-            proc.stderr.on('data', chunk => {
-                const text = chunk.toString('utf8');
-                broadcast({ type: 'stderr', text });
-            });
-
-            proc.on('close', code => {
-                logger.info('poster-updater: Script finished, code=' + code);
-                broadcast({ type: 'done', code });
-                runningProcess = null;
-            });
-
-            proc.on('error', err => {
-                logger.error('poster-updater: Script spawn error:', err.message);
-                broadcast({ type: 'error', message: err.message });
-                runningProcess = null;
-            });
-
-            res.json({ success: true, message: 'Script started', pid: proc.pid });
-        } catch (err) {
-            logger.error('poster-updater: Failed to start script:', err.message);
-            res.status(500).json({ success: false, error: err.message });
-        }
+        res.json({ success: true, message: 'Script started', pid: result.pid });
     });
 
     // ============================================================
@@ -310,22 +245,23 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
+            Connection: 'keep-alive',
             'X-Accel-Buffering': 'no',
         });
-
-        // Send initial state
-        res.write(`data: ${JSON.stringify({ type: 'connected', running: !!runningProcess })}\n\n`);
-        sseClients.push(res);
-
-        // Heartbeat every 30s
+        res.write(
+            `data: ${JSON.stringify({ type: 'connected', running: runner.isPosterRunning() })}\n\n`
+        );
+        runner.subscribePoster(res);
         const hb = setInterval(() => {
-            try { res.write(': heartbeat\n\n'); } catch { clearInterval(hb); }
+            try {
+                res.write(': heartbeat\n\n');
+            } catch {
+                clearInterval(hb);
+            }
         }, 30000);
-
         req.on('close', () => {
             clearInterval(hb);
-            sseClients = sseClients.filter(c => c !== res);
+            runner.unsubscribePoster(res);
         });
     });
 
@@ -333,105 +269,63 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
     // POST /run/stop — kill running script
     // ============================================================
     router.post('/run/stop', (req, res) => {
-        if (!runningProcess) {
+        const result = runner.stopPosterPackJob();
+        if (!result.stopped) {
             return res.status(409).json({ success: false, error: 'No script is running' });
         }
-        try {
-            runningProcess.kill('SIGTERM');
-            // Force kill after 5s if still alive
-            const pid = runningProcess.pid;
-            setTimeout(() => {
-                if (runningProcess && runningProcess.pid === pid) {
-                    try { runningProcess.kill('SIGKILL'); } catch { /* already dead */ }
-                }
-            }, 5000);
-            res.json({ success: true, message: 'Stop signal sent' });
-        } catch (err) {
-            res.status(500).json({ success: false, error: err.message });
-        }
+        res.json({ success: true, message: 'Stop signal sent' });
     });
 
     // ============================================================
-    // TRAILER DOWNLOAD — separate process + SSE
+    // TRAILER DOWNLOAD
     // ============================================================
-    const TRAILER_SCRIPT_PATH = path.join(__dirname, '..', 'poster-updater', 'download-trailers.py');
-    let trailerProcess = null;
-    let trailerSseClients = [];
-
-    function trailerBroadcast(data) {
-        const msg = `data: ${JSON.stringify(data)}\n\n`;
-        trailerSseClients = trailerSseClients.filter(res => {
-            try { res.write(msg); return true; }
-            catch { return false; }
-        });
-    }
-
     router.post('/trailers/run', (req, res) => {
-        if (trailerProcess) {
-            return res.status(409).json({ success: false, error: 'Trailer-Download läuft bereits' });
+        const result = runner.spawnTrailerJob();
+        if (!result.started) {
+            if (result.reason === 'already-running') {
+                return res
+                    .status(409)
+                    .json({ success: false, error: 'Trailer-Download läuft bereits' });
+            }
+            return res
+                .status(500)
+                .json({ success: false, error: result.error || 'spawn failed' });
         }
-        try {
-            const scriptEnv = { ...process.env, PYTHONUNBUFFERED: '1' };
-            delete scriptEnv.TMDB_API_KEY;
-            const proc = spawn('python3', [TRAILER_SCRIPT_PATH], {
-                cwd: SCRIPT_DIR,
-                env: scriptEnv,
-            });
-            trailerProcess = proc;
-            logger.info('poster-updater: Trailer download started, pid=' + proc.pid);
-            trailerBroadcast({ type: 'started', pid: proc.pid });
-            proc.stdout.on('data', chunk => trailerBroadcast({ type: 'stdout', text: chunk.toString('utf8') }));
-            proc.stderr.on('data', chunk => trailerBroadcast({ type: 'stderr', text: chunk.toString('utf8') }));
-            proc.on('close', code => {
-                logger.info('poster-updater: Trailer download finished, code=' + code);
-                trailerBroadcast({ type: 'done', code });
-                trailerProcess = null;
-            });
-            proc.on('error', err => {
-                logger.error('poster-updater: Trailer download error:', err.message);
-                trailerBroadcast({ type: 'error', message: err.message });
-                trailerProcess = null;
-            });
-            res.json({ success: true, message: 'Trailer download started', pid: proc.pid });
-        } catch (err) {
-            res.status(500).json({ success: false, error: err.message });
-        }
+        res.json({ success: true, message: 'Trailer download started', pid: result.pid });
     });
 
     router.get('/trailers/run/status', (req, res) => {
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
+            Connection: 'keep-alive',
             'X-Accel-Buffering': 'no',
         });
-        res.write(`data: ${JSON.stringify({ type: 'connected', running: !!trailerProcess })}\n\n`);
-        trailerSseClients.push(res);
+        res.write(
+            `data: ${JSON.stringify({ type: 'connected', running: runner.isTrailerRunning() })}\n\n`
+        );
+        runner.subscribeTrailer(res);
         const hb = setInterval(() => {
-            try { res.write(': heartbeat\n\n'); } catch { clearInterval(hb); }
+            try {
+                res.write(': heartbeat\n\n');
+            } catch {
+                clearInterval(hb);
+            }
         }, 30000);
         req.on('close', () => {
             clearInterval(hb);
-            trailerSseClients = trailerSseClients.filter(c => c !== res);
+            runner.unsubscribeTrailer(res);
         });
     });
 
     router.post('/trailers/run/stop', (req, res) => {
-        if (!trailerProcess) {
-            return res.status(409).json({ success: false, error: 'Kein Trailer-Download läuft' });
+        const result = runner.stopTrailerJob();
+        if (!result.stopped) {
+            return res
+                .status(409)
+                .json({ success: false, error: 'Kein Trailer-Download läuft' });
         }
-        try {
-            trailerProcess.kill('SIGTERM');
-            const pid = trailerProcess.pid;
-            setTimeout(() => {
-                if (trailerProcess && trailerProcess.pid === pid) {
-                    try { trailerProcess.kill('SIGKILL'); } catch { /* already dead */ }
-                }
-            }, 5000);
-            res.json({ success: true, message: 'Stop signal sent' });
-        } catch (err) {
-            res.status(500).json({ success: false, error: err.message });
-        }
+        res.json({ success: true, message: 'Stop signal sent' });
     });
 
     return router;

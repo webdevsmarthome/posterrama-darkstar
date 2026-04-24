@@ -322,6 +322,8 @@ module.exports = function createPosterSelectorRouter({ logger, wsHub }) {
                 return res.status(404).json({ success: false, error: 'Playlist nicht gefunden' });
             }
 
+            const isAutoPlaylist = collection.playlists[id].auto === true;
+
             // Update name if provided
             if (name !== undefined) {
                 const trimmed = String(name).trim().substring(0, 50);
@@ -337,16 +339,25 @@ module.exports = function createPosterSelectorRouter({ logger, wsHub }) {
                 collection.playlists[id].name = trimmed;
             }
 
-            // Update titles if provided
+            // Update titles if provided — NICHT erlaubt für Auto-Playlists
+            // (die werden vom Sync-Service selbst verwaltet)
+            let titlesChanged = false;
             if (Array.isArray(titles)) {
-                collection.playlists[id].titles = titles;
+                if (isAutoPlaylist) {
+                    logger.info(
+                        `poster-selector: Ignoriere titles-Update für Auto-Playlist "${id}"`
+                    );
+                } else {
+                    collection.playlists[id].titles = titles;
+                    titlesChanged = true;
+                }
             }
 
             collection.playlists[id].updatedAt = new Date().toISOString();
             await writePlaylists(collection);
 
             // If this is the active playlist, sync to live file
-            if (id === collection.activePlaylistId && Array.isArray(titles)) {
+            if (id === collection.activePlaylistId && titlesChanged) {
                 await syncActiveToLive(collection);
             }
 
@@ -366,6 +377,15 @@ module.exports = function createPosterSelectorRouter({ logger, wsHub }) {
             const collection = await readPlaylists();
             if (!collection.playlists[id]) {
                 return res.status(404).json({ success: false, error: 'Playlist nicht gefunden' });
+            }
+
+            // Auto-Playlists (z. B. "Die letzten 20 hinzugefügten Filme") sind
+            // geschützt — sie werden vom Emby-Sync-Service regeneriert.
+            if (collection.playlists[id].auto === true) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Auto-Playlists können nicht gelöscht werden',
+                });
             }
 
             delete collection.playlists[id];

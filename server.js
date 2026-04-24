@@ -4003,6 +4003,14 @@ app.use('/trailers', express.static(path.join(__dirname, 'media', 'trailers'), {
 const createPosterSelectorRouter = require('./routes/poster-selector');
 app.use('/api/poster-selector', isAuthenticated, createPosterSelectorRouter({ logger, wsHub }));
 
+// === EMBY SYNC ROUTES (Darkstar-Fork) ===
+const createEmbySyncRouter = require('./routes/emby-sync');
+app.use(
+    '/api/emby-sync',
+    isAuthenticated,
+    createEmbySyncRouter({ logger, config, wsHub, writeConfig })
+);
+
 // === POSTERPACK CREATOR ROUTES ===
 const createPosterPackCreatorRouter = require('./routes/posterpack-creator');
 app.use('/api/posterpack-creator', isAuthenticated, createPosterPackCreatorRouter({ logger, refreshPlaylistCache }));
@@ -7517,6 +7525,14 @@ if (require.main === module) {
                 await configBackupsRouter.scheduleConfigBackups();
             } catch (e) {
                 logger.warn('Failed to initialize config backup scheduler:', e?.message || e);
+            }
+
+            // Schedule Emby-Sync (Darkstar-Fork feature)
+            try {
+                const { scheduleEmbySync } = require('./lib/emby-sync');
+                scheduleEmbySync({ logger, config, wsHub });
+            } catch (e) {
+                logger.warn('Failed to initialize emby-sync scheduler:', e?.message || e);
             }
 
             // Set up automatic cache cleanup - use configurable interval

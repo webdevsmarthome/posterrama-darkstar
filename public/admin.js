@@ -3620,6 +3620,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                 'section-performance': 'performance',
                 'section-operations': 'operations',
                 'section-poster-updater': 'poster-updater',
+                'section-emby-sync': 'emby-sync',
                 'section-poster-selector': 'poster-selector',
                 'section-posterpack-studio': 'posterpack-studio',
             };
@@ -3698,6 +3699,9 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                 pageHeader.style.display = 'none';
             } else if (id === 'section-poster-updater') {
                 // Hide the big page header for Poster Updater (compact panel)
+                pageHeader.style.display = 'none';
+            } else if (id === 'section-emby-sync') {
+                // Hide the big page header for Emby-Sync (compact panel)
                 pageHeader.style.display = 'none';
             } else if (id === 'section-poster-selector') {
                 // Hide the big page header for Poster Selector (compact panel)
@@ -11067,6 +11071,9 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                     refreshApiKeyStatus();
                 } else if (nav === 'poster-updater') {
                     showSection('section-poster-updater');
+                } else if (nav === 'emby-sync') {
+                    showSection('section-emby-sync');
+                    if (typeof initEmbySync === 'function') initEmbySync();
                 } else if (nav === 'poster-selector') {
                     showSection('section-poster-selector');
                 } else if (nav === 'posterpack-studio') {
@@ -33182,6 +33189,307 @@ if (!document.__niwDelegatedFallback) {
         puLoadFilms();
         puConnectSSE();
         puConnectTrailerSSE();
+    }
+
+    // ============================================================
+    // Emby-Sync (Darkstar-Fork Patch 49)
+    // ============================================================
+    var esInitialized = false;
+    var esStatusPollTimer = null;
+    var esCurrentReport = null;
+    var esCurrentTab = 'added';
+
+    async function esApiFetch(url, opts) {
+        opts = opts || {};
+        var res = await fetch(url, Object.assign({ credentials: 'same-origin' }, opts, {
+            headers: Object.assign(
+                { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                opts.headers || {}
+            ),
+        }));
+        var body = null;
+        try { body = await res.json(); } catch (_) { /* may be empty */ }
+        if (!res.ok) {
+            var msg = (body && body.error) || ('HTTP ' + res.status);
+            var err = new Error(msg);
+            err.status = res.status;
+            err.body = body;
+            throw err;
+        }
+        return body;
+    }
+
+    function esFormatRelative(iso) {
+        if (!iso) return '–';
+        try {
+            var then = new Date(iso).getTime();
+            var diff = Math.floor((Date.now() - then) / 1000);
+            if (diff < 0) {
+                var ahead = -diff;
+                if (ahead < 60) return 'in ' + ahead + 's';
+                if (ahead < 3600) return 'in ' + Math.floor(ahead / 60) + 'min';
+                if (ahead < 86400) return 'in ' + Math.floor(ahead / 3600) + 'h';
+                return 'in ' + Math.floor(ahead / 86400) + 'd';
+            }
+            if (diff < 60) return 'vor ' + diff + 's';
+            if (diff < 3600) return 'vor ' + Math.floor(diff / 60) + 'min';
+            if (diff < 86400) return 'vor ' + Math.floor(diff / 3600) + 'h';
+            return 'vor ' + Math.floor(diff / 86400) + 'd';
+        } catch (_) { return iso; }
+    }
+
+    function esSetText(id, text) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+
+    async function esLoadStatus() {
+        try {
+            var s = await esApiFetch('/api/emby-sync/status');
+            esSetText('es-scheduled', s.scheduled ? (s.enabled ? 'aktiv' : 'deaktiviert') : 'inaktiv');
+            esSetText('es-interval', (s.intervalMinutes || 360) + ' Minuten');
+            esSetText('es-lastRun', s.lastRun ? (esFormatRelative(s.lastRun) + ' (' + s.lastRun + ')') : 'noch nie');
+            esSetText('es-nextRun', s.nextRun ? (esFormatRelative(s.nextRun) + ' (' + s.nextRun + ')') : '–');
+            var runEl = document.getElementById('es-running');
+            if (runEl) {
+                runEl.textContent = s.running ? 'JA (läuft)' : 'nein';
+                runEl.className = s.running ? 'running' : 'idle';
+            }
+            var btn = document.getElementById('es-triggerBtn');
+            if (btn) btn.disabled = !!s.running;
+        } catch (err) {
+            esSetText('es-scheduled', 'Fehler: ' + err.message);
+        }
+    }
+
+    function esRenderReport() {
+        var meta = document.getElementById('es-reportMeta');
+        var body = document.getElementById('es-reportBody');
+        if (!meta || !body) return;
+
+        if (!esCurrentReport) {
+            meta.innerHTML = '<em>Noch kein Report verfügbar. Starte einen Sync.</em>';
+            body.innerHTML = '';
+            esSetText('es-countAdded', '0');
+            esSetText('es-countSkipped', '0');
+            esSetText('es-countIgnored', '0');
+            esSetText('es-countErrors', '0');
+            return;
+        }
+
+        var r = esCurrentReport;
+        var serversStr = Object.keys(r.servers || {})
+            .map(function (n) { return n + ': ' + r.servers[n]; })
+            .join(' · ');
+        meta.innerHTML =
+            '<div>Start: ' + (r.startedAt || '–') + ' (Trigger: ' + (r.trigger || '–') + ')</div>' +
+            '<div>Ende: ' + (r.finishedAt || 'noch offen') + '</div>' +
+            '<div>Server: ' + (serversStr || '–') + '</div>' +
+            '<div>Filme insgesamt: ' + (r.totalMovies || 0) +
+            ' · vorhandene ZIPs: ' + (r.existingZips || 0) +
+            (r.result === 'all-offline' ? ' · <strong>Alle Server offline (stumm übersprungen)</strong>' : '') +
+            '</div>' +
+            (r.autoPlaylist ? '<div>Auto-Playlist: ' +
+                (r.autoPlaylist.changed ? 'aktualisiert (' + (r.autoPlaylist.titleCount || 0) + ' Filme, activated=' + !!r.autoPlaylist.activated + ')' : 'unverändert') +
+                '</div>' : '');
+
+        esSetText('es-countAdded', String((r.added || []).length));
+        esSetText('es-countSkipped', String((r.skipped || []).length));
+        esSetText('es-countIgnored', String((r.ignored || []).length));
+        esSetText('es-countErrors', String((r.errors || []).length));
+
+        var list = r[esCurrentTab] || [];
+        if (list.length === 0) {
+            body.innerHTML = '<div style="opacity: 0.6; font-size: 0.9rem;">Keine Einträge in diesem Tab.</div>';
+            return;
+        }
+        body.innerHTML = list.map(function (entry) {
+            var key = entry.key || entry.canonicalKey || JSON.stringify(entry);
+            var meta = [];
+            if (entry.reason) meta.push(entry.reason);
+            if (entry.imdbId) meta.push('IMDB ' + entry.imdbId);
+            if (entry.tmdbId) meta.push('TMDB ' + entry.tmdbId);
+            if (entry.servers) meta.push(entry.servers.join(','));
+            if (entry.dateCreated) meta.push(entry.dateCreated);
+            if (entry.where) meta.push(entry.where);
+            if (entry.message) meta.push(entry.message);
+            return '<div class="es-entry">' +
+                '<span>' + (key.replace ? key.replace(/</g, '&lt;') : key) + '</span>' +
+                (meta.length > 0 ? '<span class="es-entry-meta">' + meta.join(' · ') + '</span>' : '') +
+                '</div>';
+        }).join('');
+    }
+
+    async function esLoadReport() {
+        try {
+            var r = await esApiFetch('/api/emby-sync/last-report');
+            esCurrentReport = r;
+        } catch (err) {
+            if (err.status === 404) {
+                esCurrentReport = null;
+            } else {
+                esCurrentReport = null;
+            }
+        }
+        esRenderReport();
+    }
+
+    async function esLoadIgnored() {
+        var tableEl = document.getElementById('es-ignoreTable');
+        if (!tableEl) return;
+        try {
+            var res = await esApiFetch('/api/emby-sync/ignored');
+            var items = res.items || [];
+            if (items.length === 0) {
+                tableEl.innerHTML = '<div style="opacity: 0.6; font-size: 0.9rem;">Ignore-Liste ist leer.</div>';
+                return;
+            }
+            var html = '<table><thead><tr><th>Typ</th><th>Wert</th><th>Grund</th><th></th></tr></thead><tbody>';
+            items.forEach(function (rule, idx) {
+                var type = '';
+                var value = '';
+                if (rule.title && rule.year) { type = 'Titel'; value = rule.title + ' (' + rule.year + ')'; }
+                else if (rule.imdbId) { type = 'IMDB'; value = rule.imdbId; }
+                else if (rule.tmdbId) { type = 'TMDB'; value = String(rule.tmdbId); }
+                html += '<tr>' +
+                    '<td>' + type + '</td>' +
+                    '<td>' + (value.replace ? value.replace(/</g, '&lt;') : value) + '</td>' +
+                    '<td>' + ((rule.reason || '').replace ? (rule.reason || '').replace(/</g, '&lt;') : (rule.reason || '')) + '</td>' +
+                    '<td><button class="es-remove-btn" data-es-remove="' + idx + '"><i class="fas fa-times"></i></button></td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table>';
+            tableEl.innerHTML = html;
+            tableEl.querySelectorAll('[data-es-remove]').forEach(function (btn) {
+                btn.addEventListener('click', async function () {
+                    var idx = btn.getAttribute('data-es-remove');
+                    try {
+                        await esApiFetch('/api/emby-sync/ignored/' + idx, { method: 'DELETE' });
+                        esLoadIgnored();
+                    } catch (err) {
+                        alert('Fehler: ' + err.message);
+                    }
+                });
+            });
+        } catch (err) {
+            tableEl.innerHTML = '<div style="color:#e74c3c;">Fehler: ' + err.message + '</div>';
+        }
+    }
+
+    function initEmbySync() {
+        // Poll status regardless, even if not yet initialized
+        esLoadStatus();
+        esLoadReport();
+        esLoadIgnored();
+
+        if (esStatusPollTimer) clearInterval(esStatusPollTimer);
+        esStatusPollTimer = setInterval(function () {
+            var sec = document.getElementById('section-emby-sync');
+            if (sec && !sec.hidden) {
+                esLoadStatus();
+            } else {
+                clearInterval(esStatusPollTimer);
+                esStatusPollTimer = null;
+            }
+        }, 10000);
+
+        if (esInitialized) return;
+        esInitialized = true;
+
+        // Trigger button
+        var triggerBtn = document.getElementById('es-triggerBtn');
+        if (triggerBtn) {
+            triggerBtn.addEventListener('click', async function () {
+                try {
+                    triggerBtn.disabled = true;
+                    var hint = document.getElementById('es-triggerHint');
+                    if (hint) hint.textContent = 'Startet...';
+                    await esApiFetch('/api/emby-sync/run', { method: 'POST' });
+                    if (hint) hint.textContent = 'Sync läuft im Hintergrund';
+                    setTimeout(function () {
+                        esLoadStatus();
+                        esLoadReport();
+                    }, 1500);
+                    // Also refresh after ~30s when typical sync has finished
+                    setTimeout(function () {
+                        esLoadStatus();
+                        esLoadReport();
+                        var hint2 = document.getElementById('es-triggerHint');
+                        if (hint2) hint2.textContent = '';
+                    }, 30000);
+                } catch (err) {
+                    alert('Fehler: ' + err.message);
+                    triggerBtn.disabled = false;
+                }
+            });
+        }
+
+        // Report tabs
+        document.querySelectorAll('#es-reportTabs .es-tab').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                document.querySelectorAll('#es-reportTabs .es-tab').forEach(function (t) {
+                    t.classList.remove('active');
+                });
+                tab.classList.add('active');
+                esCurrentTab = tab.getAttribute('data-es-tab');
+                esRenderReport();
+            });
+        });
+
+        // Ignore form radio toggle
+        document.querySelectorAll('input[name="es-ignoreType"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                var v = radio.value;
+                var titleRow = document.querySelector('#section-emby-sync .ignore-input-title');
+                var imdbRow = document.querySelector('#section-emby-sync .ignore-input-imdb');
+                var tmdbRow = document.querySelector('#section-emby-sync .ignore-input-tmdb');
+                if (titleRow) titleRow.style.display = v === 'title' ? 'flex' : 'none';
+                if (imdbRow) imdbRow.style.display = v === 'imdb' ? 'block' : 'none';
+                if (tmdbRow) tmdbRow.style.display = v === 'tmdb' ? 'block' : 'none';
+            });
+        });
+
+        // Add ignore button
+        var addBtn = document.getElementById('es-ignoreAddBtn');
+        if (addBtn) {
+            addBtn.addEventListener('click', async function () {
+                var radio = document.querySelector('input[name="es-ignoreType"]:checked');
+                var type = radio ? radio.value : 'title';
+                var payload = {};
+                if (type === 'title') {
+                    var t = document.getElementById('es-ignoreTitle').value.trim();
+                    var y = document.getElementById('es-ignoreYear').value.trim();
+                    if (!t || !y) { alert('Titel und Jahr erforderlich'); return; }
+                    payload.title = t;
+                    payload.year = parseInt(y, 10);
+                } else if (type === 'imdb') {
+                    var imdb = document.getElementById('es-ignoreImdb').value.trim();
+                    if (!imdb) { alert('IMDB-ID erforderlich'); return; }
+                    payload.imdbId = imdb;
+                } else if (type === 'tmdb') {
+                    var tmdb = document.getElementById('es-ignoreTmdb').value.trim();
+                    if (!tmdb) { alert('TMDB-ID erforderlich'); return; }
+                    payload.tmdbId = tmdb;
+                }
+                var reason = document.getElementById('es-ignoreReason').value.trim();
+                if (reason) payload.reason = reason;
+                try {
+                    await esApiFetch('/api/emby-sync/ignored', {
+                        method: 'POST',
+                        body: JSON.stringify(payload),
+                    });
+                    // Reset form
+                    document.getElementById('es-ignoreTitle').value = '';
+                    document.getElementById('es-ignoreYear').value = '';
+                    document.getElementById('es-ignoreImdb').value = '';
+                    document.getElementById('es-ignoreTmdb').value = '';
+                    document.getElementById('es-ignoreReason').value = '';
+                    esLoadIgnored();
+                } catch (err) {
+                    alert('Fehler: ' + err.message);
+                }
+            });
+        }
     }
 
     function puOpenDeleteModal(name) {

@@ -6,6 +6,22 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1r] – 2026-04-24
+
+Neues Emby-Sync-Feature: automatischer Abgleich der beiden Emby-Server (DarkStar, LightStar) mit den vorhandenen PosterPacks, automatischer Download fehlender PosterPacks + Trailer, Ignore-Liste und Auto-Playlist "Die letzten 20 hinzugefügten Filme".
+
+### Neu
+- **Emby-Sync Hintergrund-Service** (`lib/emby-sync.js`, `routes/emby-sync.js`) — pollt alle 6h beide Emby-Server in Reihenfolge (DarkStar → LightStar, 2s-Online-Check), sammelt neue Filme (sortiert nach DateCreated), merged Duplikate zwischen Servern und triggert fehlende PosterPack- und Trailer-Downloads über die bestehende Python-Pipeline. Wenn beide Server offline: stumm übersprungen, keine Fehlerflut. Manueller Trigger via `POST /api/emby-sync/run`, Status und Report via `GET /api/emby-sync/status` und `GET /api/emby-sync/last-report`.
+- **Ignore-Liste** (`config.json:embySync.ignoredMovies`) — Filme, die vom Abgleich ausgeschlossen werden sollen. CRUD via `/api/emby-sync/ignored` (GET/POST/DELETE). Drei Matching-Modi: Titel+Jahr, IMDB-ID, TMDB-ID.
+- **Auto-Playlist "Die letzten 20 hinzugefügten Filme"** — wird vom Sync-Service erzeugt und gepflegt (sortiert nach Emby-DateCreated, nur Filme mit vorhandenem PosterPack-ZIP). Beim ersten Sync wird sie als aktive Playlist gesetzt (idempotent via `initiallyActivated`-Flag — verdrängt keine vom User manuell gewählte Playlist bei späteren Läufen). Vor User-Löschung geschützt (`DELETE /playlists/auto_recent_20` liefert 403), `titles`-Updates werden ignoriert, nur `name` ist editierbar.
+- **Admin-UI "Emby-Sync"** (`public/admin.html`, `admin.js`, `admin.css`) — eigener Sidebar-Menüpunkt mit Status-Anzeige, manuellem Trigger-Button, Report-Tabs (Hinzugefügt / Übersprungen / Ignoriert / Fehler) und Ignore-Liste-Editor (Add-Form für Titel+Jahr / IMDB / TMDB + Remove-Button pro Zeile).
+
+### Geändert
+- **Refactor `routes/poster-updater.js`** → Shared Singleton `lib/poster-updater-runner.js`. Vorher waren `runningProcess`, `writeLock` und SSE-Clients modul-scoped und daher von außerhalb nicht teilbar. Jetzt teilen sich poster-updater und emby-sync denselben Lock und dieselben SSE-Clients. Kein paralleler Spawn derselben Python-Jobs mehr möglich.
+- `utils/jellyfin-http-client.js:getItems()` — neuer optionaler Parameter `sortOrder` (Ascending/Descending), damit Emby-Sync nach DateCreated-desc sortieren kann. Backwards-compatible.
+- `routes/poster-selector.js` — Guards für Auto-Playlists: DELETE → 403, PUT strippt `titles`-Updates für `auto:true` Playlists.
+- Neue `.env`-Variable: `JELLYFIN_API_KEY_LIGHTSTAR` für den zweiten Emby-Server.
+
 ## [3.0.1q] – 2026-04-24
 
 Pi-Kiosk-Performance-Tuning + Erweiterung des Monitor Power Watchers um einen Next-Poster-Trigger. Keine Code-Änderungen an Posterrama selbst — alle Anpassungen sind System-Config auf dem lokalen Pi, dokumentiert im Repo.

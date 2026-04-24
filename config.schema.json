@@ -2601,6 +2601,86 @@
             "minItems": 1,
             "maxItems": 12,
             "default": ["media-items", "active-devices", "now-playing", "system-health"]
+        },
+        "embySync": {
+            "description": "Darkstar-Fork: Emby/Jellyfin film sync with automatic PosterPack + trailer downloads and an auto-playlist for the latest additions.",
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Master switch for the emby-sync scheduler."
+                },
+                "intervalMinutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10080,
+                    "default": 360,
+                    "description": "Sync cycle interval in minutes (default 6h)."
+                },
+                "initialDelaySeconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3600,
+                    "default": 60,
+                    "description": "Delay after server start before the first sync."
+                },
+                "movieLimitPerRun": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 10000,
+                    "default": 500,
+                    "description": "Max movies to fetch per library per server per run (sorted newest first)."
+                },
+                "autoPlaylist": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": { "type": "boolean", "default": true },
+                        "id": { "type": "string", "default": "auto_recent_20" },
+                        "name": {
+                            "type": "string",
+                            "default": "Die letzten 20 hinzugefügten Filme"
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 200,
+                            "default": 20
+                        },
+                        "autoActivate": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "If true, set this playlist as active on first creation (idempotent via initiallyActivated flag)."
+                        }
+                    },
+                    "additionalProperties": true
+                },
+                "downloads": {
+                    "type": "object",
+                    "properties": {
+                        "posterPack": { "type": "boolean", "default": true },
+                        "trailer": { "type": "boolean", "default": true }
+                    },
+                    "additionalProperties": true
+                },
+                "ignoredMovies": {
+                    "description": "Movies to skip. Each rule matches if imdbId OR tmdbId OR (title+year) equals the Emby record.",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": { "type": "string" },
+                            "year": { "type": "integer", "minimum": 1800, "maximum": 2100 },
+                            "imdbId": { "type": "string" },
+                            "tmdbId": { "type": ["string", "integer"] },
+                            "reason": { "type": "string" }
+                        },
+                        "additionalProperties": true
+                    },
+                    "default": []
+                }
+            },
+            "additionalProperties": true
         }
     },
     "required": [
