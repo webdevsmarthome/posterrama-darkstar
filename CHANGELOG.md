@@ -6,6 +6,22 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1s] – 2026-04-24
+
+Neues One-Shot-Maintenance-Script `scripts/dedup-posterpacks.js`, das Dubletten-PosterPacks mit gleicher TMDB-ID aber unterschiedlichem Jahr im Dateinamen bereinigt (TMDB als Single-Source-of-Truth für die Release-Jahreszahl).
+
+### Neu
+- **`scripts/dedup-posterpacks.js`** — scannt alle ZIPs in `media/complete/{manual,plex-export,jellyfin-emby-export,tmdb-export,romm-export}/`, gruppiert nach `tmdb_id` aus `metadata.json`, fragt TMDB nach dem authoritativen Release-Jahr und entfernt/benennt ZIPs mit abweichendem Jahr. Aktualisiert atomar Sidecars (`*.poster.json`), Playlists (`cinema-playlists.json` + `cinema-playlist.json`), `poster-updater/filmliste.txt`, Trailer-Dateien (`media/trailers/*.mp4`) und `trailer-info.json`. Dry-Run-Default, explizites `--execute` erforderlich.
+
+### Ergebnis auf dieser Installation
+- 1391 ZIPs gescannt, 203 TMDB-IDs mit ≥2 ZIPs, 21 korrigiert (18 Löschungen + 3 Umbenennungen), 387 bereits korrekt.
+- Playlist-Einträge: 22 konsolidiert, Filmliste: 21 Einträge aktualisiert, Trailer-Info: 17 Keys angepasst.
+
+### Hinweis
+- 185 TMDB-IDs haben weiterhin Duplikate, allerdings rein wegen **Titel-Varianten** (Kommas, Doppelpunkte, Umlaute vs. Transliteration, Untertitel) bei gleichem Jahr. Das ist aktuell außer Scope; eine Title-Normalisierung wäre ein separater Patch.
+
+---
+
 ## [3.0.1r] – 2026-04-24
 
 Neues Emby-Sync-Feature: automatischer Abgleich der beiden Emby-Server (DarkStar, LightStar) mit den vorhandenen PosterPacks, automatischer Download fehlender PosterPacks + Trailer, Ignore-Liste und Auto-Playlist "Die letzten 20 hinzugefügten Filme".
