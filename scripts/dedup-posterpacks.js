@@ -4,30 +4,34 @@
 /**
  * dedup-posterpacks.js
  *
- * Bereinigt ZIP-PosterPacks, die aufgrund falscher Jahreszahlen als Duplikate
- * im Dateisystem existieren (gleiche TMDB-ID, unterschiedliche Jahre im
- * Dateinamen). TMDB wird als Single-Source-of-Truth für die Jahreszahl
- * verwendet (per Default-Release-Datum).
+ * Bereinigt ZIP-PosterPacks, die aufgrund falscher Jahreszahlen und/oder
+ * unterschiedlicher Titel-Schreibweisen als Duplikate im Dateisystem
+ * existieren. TMDB wird als Single-Source-of-Truth für den kanonischen
+ * Namen verwendet.
  *
  * Vorgehen:
  *  1. Alle ZIPs in media/complete/{manual,plex-export,jellyfin-emby-export,
  *     tmdb-export,romm-export}/ scannen und per metadata.json die tmdb_id
  *     extrahieren.
  *  2. Gruppieren nach tmdb_id.
- *  3. Für jede Gruppe einmal TMDB API (/movie/{id}) abfragen → Release-Year.
+ *  3. Für jede Gruppe einmal TMDB API (/movie/{id}, de-DE mit en-US-Fallback)
+ *     abfragen → {title, release_year}.
  *  4. Für jeden ZIP:
- *       - Aus dem Dateinamen Title-Präfix + Jahr extrahieren.
- *       - Wenn Jahr == TMDB-Jahr → ZIP bleibt unverändert.
- *       - Sonst ist das Ziel "{Title-Präfix} ({TMDB-Jahr}).zip":
- *           * Existiert bereits eine Datei mit diesem Ziel-Namen → ZIP LÖSCHEN.
- *           * Sonst → ZIP UMBENENNEN (und Sidecar + Playlists + Filmliste +
- *             Trailer mit anpassen).
- *  5. Report am Ende.
+ *       - Year-Modus (Default): target = "{aktueller Title-Präfix} ({TMDB-Jahr})"
+ *       - Title-Modus (--normalize-title): target = "{TMDB-Title} ({TMDB-Jahr})"
+ *     Dann:
+ *       - Wenn basename == target → ZIP bleibt (Kanonischer Winner).
+ *       - Sonst wenn target.zip schon in gleichem Dir existiert → DELETE.
+ *       - Sonst → RENAME zu target (größtes ZIP bevorzugt).
+ *  5. Sidecars, Playlists, Filmliste, Trailer werden mit umgestellt.
+ *  6. Report am Ende.
  *
  * Nutzung:
- *   node scripts/dedup-posterpacks.js              # Dry-Run (keine Änderungen)
- *   node scripts/dedup-posterpacks.js --execute    # Ausführen
- *   node scripts/dedup-posterpacks.js --execute --verbose
+ *   node scripts/dedup-posterpacks.js                         # Dry-Run Year-Only
+ *   node scripts/dedup-posterpacks.js --execute               # Execute Year-Only
+ *   node scripts/dedup-posterpacks.js --normalize-title       # Dry-Run Year+Title
+ *   node scripts/dedup-posterpacks.js --normalize-title --execute
+ *   Zusätzlich: --verbose
  */
 
 const fs = require('fs');
@@ -53,6 +57,7 @@ const TRAILER_INFO_PATH = path.join(TRAILER_DIR, 'trailer-info.json');
 
 const DRY_RUN = !process.argv.includes('--execute');
 const VERBOSE = process.argv.includes('--verbose');
+const NORMALIZE_TITLE = process.argv.includes('--normalize-title');
 
 function log(...args) {
     console.log(...args);
@@ -95,9 +100,9 @@ async function loadTmdbKey() {
     throw new Error('No valid TMDB_API_KEY found (neither config.json:tmdbSource.apiKey nor .env)');
 }
 
-function tmdbFetchMovie(tmdbId) {
+function tmdbFetchMovie(tmdbId, language = 'de-DE') {
     return new Promise((resolve, reject) => {
-        const url = `https://api.themoviedb.org/3/movie/${encodeURIComponent(tmdbId)}?api_key=${TMDB_KEY}&language=de-DE`;
+        const url = `https://api.themoviedb.org/3/movie/${encodeURIComponent(tmdbId)}?api_key=${TMDB_KEY}&language=${language}`;
         https
             .get(url, res => {
                 let data = '';
@@ -122,6 +127,20 @@ function tmdbFetchMovie(tmdbId) {
             })
             .on('error', reject);
     });
+}
+
+/**
+ * Sanitize string for safe filesystem use. On Linux only `/` and NUL are
+ * actually forbidden; we keep colons, commas, Unicode etc. (already present
+ * in existing filenames). NFC-normalisieren für stabile String-Vergleiche.
+ */
+function sanitizeFilename(s) {
+    if (!s) return '';
+    return String(s)
+        .normalize('NFC')
+        .replace(/[\x00/]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
 // Rate-limited TMDB query: 20 req/s should be safe (free tier is 40/s)
@@ -185,6 +204,14 @@ async function scanAllZips() {
                 vlog(`[zip-err] ${full}: ${e.message}`);
             }
 
+            let size = 0;
+            try {
+                const st = await fsp.stat(full);
+                size = st.size;
+            } catch (_) {
+                /* ignore */
+            }
+
             items.push({
                 dir,
                 basename,
@@ -192,6 +219,7 @@ async function scanAllZips() {
                 titlePrefix,
                 yearInName,
                 tmdbId,
+                size,
             });
         }
     }
@@ -201,19 +229,32 @@ async function scanAllZips() {
 // ------------------------------------------------------------------
 // Dedup plan
 // ------------------------------------------------------------------
-function buildPlan(items, tmdbYearById) {
-    // Baue Set aller aktuell existierenden Basenames → verhindert Umbenenn-Kollisionen
-    const existingBasenames = new Set(items.map(it => it.basename));
-
+function buildPlan(items, tmdbYearById, tmdbTitleById = {}) {
     // Für Kollisions-Erkennung bei Renames: existing ZIPs pro (Verzeichnis, basename)
     const existingByDirBase = new Map();
     for (const it of items) {
         existingByDirBase.set(`${it.dir}|${it.basename}`, it);
     }
 
-    const actions = []; // { type: 'delete'|'rename'|'keep', item, targetBasename? }
+    const actions = [];
 
-    for (const it of items) {
+    // Im --normalize-title-Modus: pro Gruppe (dir, tmdb_id) die größte ZIP als
+    // "rename-target-candidate" wählen, damit beim Rename die reichste ZIP
+    // erhalten bleibt. Ohne den Modus: Reihenfolge wie gescannt.
+    const groupOrder = items.slice();
+    if (NORMALIZE_TITLE) {
+        // Items in jeder (dir, tmdbId)-Gruppe absteigend nach size sortieren,
+        // innerhalb der Gesamt-items-Liste. Stable-Sort-Äquivalent.
+        groupOrder.sort((a, b) => {
+            if (a.dir !== b.dir) return a.dir.localeCompare(b.dir);
+            const at = String(a.tmdbId || '');
+            const bt = String(b.tmdbId || '');
+            if (at !== bt) return at.localeCompare(bt);
+            return b.size - a.size; // größte zuerst
+        });
+    }
+
+    for (const it of groupOrder) {
         if (!it.tmdbId) {
             actions.push({ type: 'keep', item: it, reason: 'no-tmdb-id' });
             continue;
@@ -223,14 +264,38 @@ function buildPlan(items, tmdbYearById) {
             actions.push({ type: 'keep', item: it, reason: 'no-tmdb-year' });
             continue;
         }
-        if (it.yearInName === tmdbYear) {
-            actions.push({ type: 'keep', item: it, reason: 'year-already-matches-tmdb' });
+
+        // Title-Teil des Ziel-Namens bestimmen
+        let titlePart = it.titlePrefix;
+        let reasonTag = `year-mismatch-tmdb-says-${tmdbYear}`;
+        if (NORMALIZE_TITLE) {
+            const tmdbTitle = tmdbTitleById[it.tmdbId];
+            if (tmdbTitle) {
+                const sanitized = sanitizeFilename(tmdbTitle);
+                if (sanitized && sanitized.length > 0) {
+                    titlePart = sanitized;
+                    reasonTag = `canonical-tmdb-name`;
+                }
+            } else {
+                // Kein TMDB-Titel verfügbar → keep Title-Präfix aus Filename
+                actions.push({ type: 'keep', item: it, reason: 'no-tmdb-title' });
+                continue;
+            }
+        }
+
+        const target = `${titlePart} (${tmdbYear})`;
+        if (target === it.basename) {
+            actions.push({
+                type: 'keep',
+                item: it,
+                reason: NORMALIZE_TITLE ? 'already-canonical' : 'year-already-matches-tmdb',
+            });
             continue;
         }
-        const target = `${it.titlePrefix} (${tmdbYear})`;
+
         const targetKey = `${it.dir}|${target}`;
         if (existingByDirBase.has(targetKey)) {
-            // Target existiert bereits — diesen ZIP löschen, die Target-Datei behalten
+            // Target existiert bereits — diesen ZIP löschen
             actions.push({
                 type: 'delete',
                 item: it,
@@ -238,15 +303,12 @@ function buildPlan(items, tmdbYearById) {
                 keepInstead: target,
             });
         } else {
-            // Umbenennen
             actions.push({
                 type: 'rename',
                 item: it,
                 targetBasename: target,
-                reason: `year-mismatch-tmdb-says-${tmdbYear}`,
+                reason: reasonTag,
             });
-            // Reserviere den Target-Namen, damit später kein anderer ZIP dorthin
-            // umbenannt wird und kollidiert.
             existingByDirBase.set(targetKey, { ...it, basename: target });
         }
     }
@@ -518,44 +580,58 @@ async function main() {
         `  → ${byTmdb.size} distinct tmdb_ids (${withoutId} ZIPs ohne tmdb_id werden nicht angefasst)`
     );
 
-    // Welche tmdb_ids müssen wir tatsächlich bei TMDB abfragen?
-    // Alle, denn auch nicht-duplizierte ZIPs könnten ein falsches Jahr haben.
-    // Aber: 1183 API-Calls sind viel. Pragmatisch: nur TMDB-IDs mit entweder
-    // (a) mehreren ZIPs ODER (b) einer Gruppe mit uneinigen Jahren abfragen.
-    // Tatsächlich reicht (a) für die Dedup-Aufgabe. Für (c) "einzelner ZIP mit
-    // falschem Jahr" würden wir nichts dedupen, nur umbenennen — das ist
-    // Scope-Creep. Wir beschränken uns auf Gruppen mit >= 2 ZIPs.
+    // Welche tmdb_ids müssen wir abfragen?
+    //   Year-Only-Modus: nur Gruppen mit ≥2 ZIPs (wo sich Duplikate bilden können)
+    //   Title-Normalize:  alle IDs mit ≥2 ZIPs (gleichen Scope — einzelne ZIPs
+    //                     mit "nicht-kanonischem" Titel sind außer Scope)
     const candidateIds = [...byTmdb.entries()]
         .filter(([, list]) => list.length >= 2)
         .map(([id]) => id);
     log(`  → ${candidateIds.length} tmdb_ids haben ≥2 ZIPs (Dedup-Kandidaten)`);
-    log(`[dedup-posterpacks] TMDB-API abfragen (${candidateIds.length} Calls, parallel=8)...`);
+    log(
+        `[dedup-posterpacks] TMDB-API abfragen (${candidateIds.length} IDs, parallel=8, mode=${NORMALIZE_TITLE ? 'year+title' : 'year-only'})...`
+    );
 
     const tmdbYearById = {};
+    const tmdbTitleById = {};
     const fns = candidateIds.map(id => async () => {
-        const data = await tmdbFetchMovie(id);
-        if (data && data.release_date && /^\d{4}/.test(data.release_date)) {
-            tmdbYearById[id] = parseInt(data.release_date.slice(0, 4), 10);
+        // Primary fetch: de-DE
+        const dataDe = await tmdbFetchMovie(id, 'de-DE');
+        if (dataDe && dataDe.release_date && /^\d{4}/.test(dataDe.release_date)) {
+            tmdbYearById[id] = parseInt(dataDe.release_date.slice(0, 4), 10);
         } else {
             tmdbYearById[id] = null;
+        }
+        // Title preference: de-DE title, fallback original/en-US
+        if (dataDe && dataDe.title && dataDe.title.trim()) {
+            tmdbTitleById[id] = dataDe.title.trim();
+        } else {
+            const dataEn = await tmdbFetchMovie(id, 'en-US');
+            if (dataEn && dataEn.title && dataEn.title.trim()) {
+                tmdbTitleById[id] = dataEn.title.trim();
+            } else if (dataDe && dataDe.original_title) {
+                tmdbTitleById[id] = dataDe.original_title.trim();
+            } else {
+                tmdbTitleById[id] = null;
+            }
         }
     });
     const results = await rateLimited(fns, 8);
     const errs = results.filter(r => !r.ok);
     if (errs.length > 0) {
-        log(`  ⚠ ${errs.length} TMDB-Fetches fehlgeschlagen (werden behandelt als no-year)`);
+        log(`  ⚠ ${errs.length} TMDB-Fetches fehlgeschlagen`);
         if (VERBOSE) errs.slice(0, 10).forEach(e => log(`    - ${e.error.message}`));
     }
     const withYear = Object.values(tmdbYearById).filter(Boolean).length;
-    log(`  → ${withYear}/${candidateIds.length} IDs mit Release-Year bekommen`);
+    const withTitle = Object.values(tmdbTitleById).filter(Boolean).length;
+    log(`  → ${withYear}/${candidateIds.length} IDs mit Release-Year`);
+    log(`  → ${withTitle}/${candidateIds.length} IDs mit Title`);
 
-    // Plan nur für Items in den candidate-Gruppen bauen
-    // (andere Items lassen wir in Ruhe — schonender)
     const candidateItems = items.filter(it => candidateIds.includes(it.tmdbId));
     log(
         `[dedup-posterpacks] Plan bauen für ${candidateItems.length} ZIPs in Duplikats-Gruppen...`
     );
-    const plan = buildPlan(candidateItems, tmdbYearById);
+    const plan = buildPlan(candidateItems, tmdbYearById, tmdbTitleById);
     const counts = plan.reduce(
         (acc, a) => ({ ...acc, [a.type]: (acc[a.type] || 0) + 1 }),
         {}

@@ -6,6 +6,24 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1t] – 2026-04-24
+
+Erweiterung des Dedup-Scripts um einen `--normalize-title`-Modus: TMDB-Title wird zusätzlich zur Jahreszahl als Single-Source-of-Truth für den kanonischen Dateinamen verwendet.
+
+### Neu
+- **`scripts/dedup-posterpacks.js --normalize-title`** — TMDB liefert den kanonischen Titel (`de-DE` mit `en-US`-Fallback); ZIPs mit abweichenden Titel-Schreibweisen bei gleicher `tmdb_id` werden zum TMDB-Titel umbenannt oder als Duplikat gelöscht. Sanitizing für Dateisystem (NFC, `/`, NUL). Innerhalb jeder Gruppe wird die größte ZIP (reichste Metadaten/Assets) für Rename bevorzugt.
+
+### Ergebnis auf dieser Installation
+- 214 ZIPs gelöscht (Titel-Varianten wie `Banlieue 13` → `Ghettogangz`, `Ant Man` → `Ant-Man`, `Æon Flux` vs `Aeon Flux`, Komma-/Doppelpunkt-Varianten).
+- 6 ZIPs umbenannt (z. B. `Ocean's 13` statt `Ocean’s 13` mit Typo-Apostroph, `E.T. - Der Außerirdische` statt `Ausserirdische`).
+- 300 Playlist-Einträge, 220 Filmliste-Einträge, 211 Trailer-Info-Keys konsolidiert; 181 redundante Trailer gelöscht, 31 umbenannt.
+- **0 verbliebene TMDB-ID-Duplikate** (1188 distinct IDs = 1188 ZIPs, 1:1 mapping).
+
+### Hinweis für zukünftige Läufe
+- Der Python-Downloader `tmdb-get-posters-direct.py` sucht TMDB per Titel+Jahr und kann bei Mehrdeutigkeiten die falsche ID treffen (z. B. `Hamlet (2000)` → wählt TMDB 10264 = 1990er Zeffirelli statt 10688 = 2000er Almereyda). Empfohlener Prevention-Schritt (künftig): TMDB-ID-Hint aus Emby-sync direkt an den Downloader weiterreichen. Aktuell: bei wiederkehrenden Duplikaten einfach `node scripts/dedup-posterpacks.js --normalize-title --execute` erneut laufen lassen.
+
+---
+
 ## [3.0.1s] – 2026-04-24
 
 Neues One-Shot-Maintenance-Script `scripts/dedup-posterpacks.js`, das Dubletten-PosterPacks mit gleicher TMDB-ID aber unterschiedlichem Jahr im Dateinamen bereinigt (TMDB als Single-Source-of-Truth für die Release-Jahreszahl).
