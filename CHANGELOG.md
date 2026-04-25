@@ -6,6 +6,23 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1x] – 2026-04-25
+
+Pi-Setup-Resilienz: Cloudflare-Tunnel als sicherer Außenzugang, Watcher-Self-Heal-Bugfix, Bluetooth-Auto-Reconnect, Power-Cycle-Direktive in der Doku verankert.
+
+### Neu
+- **`docs/CLOUDFLARE-TUNNEL.md`** — Setup-Doku für `cloudflared` als Public-Endpoint von Posterrama. Tunnel `pr-go27` reicht `https://posterrama.example.com/` an `localhost:4000` durch, **Cloudflare Access** mit E-Mail-OTP-Login ist vorgeschaltet (Cinema/Wallart sind nicht mehr "wer-die-URL-kennt-kommt-rein"). Kein Port-Forwarding, kein Cert-Management, TLS terminiert bei Cloudflare.
+- **`docs/BLUETOOTH-AUDIO.md`** — Setup-Doku für robusten Bluetooth-Audio-Anschluss (hier: Anker Soundcore 3). Drei Schichten: bluez Trust + main.conf-Tuning (`AutoEnable`, `FastConnectable`, `ReconnectAttempts`), User-systemd-Watcher (Polling 30 s), PipeWire-Stack. Reconnect garantiert nach Lautsprecher-Standby, Power-Cycle, Reichweiten-Verlust — ohne Login.
+
+### Geändert
+- **`docs/MONITOR-POWER-WATCHER.md`** — Self-Heal-Block dokumentiert: Wenn Monitor=off und Chromium-PIDs nicht im `T`-Status, wird `SIGSTOP` jeden Tick nachgeschickt. Behebt Boot-Race, bei dem der Watcher vor Chromium startet, beim Init-Block keine Prozesse findet, und dann nie wieder reagiert (Übergang `prev=off → curr=off` triggert klassisch nichts). Zusätzlich `loginctl enable-linger`-Hinweis im Setup, weil ohne Linger der User-systemd-Manager bei reinem Power-Cycle ohne Login nicht startet.
+
+### Bekannte Gotchas
+- `Trusted=yes` allein reicht nicht für robusten Bluetooth-Reconnect — bluez triggert nur, wenn das Gerät beim Adapter-Power-On gerade advertised. BR/EDR-Geräte advertisen nur kurz nach Einschalten. Polling-Watcher als Backstop notwendig.
+- `cloudflared tunnel info` schlägt mit `sudo` fehl ("Cannot determine default origin certificate"), weil das Account-Cert in `~/.cloudflared/cert.pem` (User-Home) liegt, nicht in `/root/`. Ohne sudo aufrufen.
+
+---
+
 ## [3.0.1w] – 2026-04-24
 
 3-Schichten-Backup-Strategie: Config-Backup-Scope erweitert, NAS-Mirror-Script ergänzt, Strategie dokumentiert.

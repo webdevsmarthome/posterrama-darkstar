@@ -11,6 +11,8 @@ This folder contains Posterrama’s developer documentation.
 - **Kiosk Performance Tuning (Darkstar-Fork, Pi-spezifisch):** `KIOSK-PERFORMANCE.md`
 - **Emby-Sync Pipeline (Darkstar-Fork):** `EMBY-SYNC-PIPELINE.md`
 - **Backup-Strategie (Darkstar-Fork):** `BACKUP-STRATEGY.md`
+- **Cloudflare-Tunnel (Darkstar-Fork, Pi-spezifisch):** `CLOUDFLARE-TUNNEL.md`
+- **Bluetooth-Audio (Darkstar-Fork, Pi-spezifisch):** `BLUETOOTH-AUDIO.md`
 - **Production readiness checklist:** `API-PRODUCTION-READINESS.md`
 - **OpenAPI workflow:** `OPENAPI-WORKFLOW.md`
 - **Architecture diagrams:** `ARCHITECTURE-DIAGRAMS.md`

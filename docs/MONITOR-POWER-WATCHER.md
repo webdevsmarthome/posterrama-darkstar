@@ -41,7 +41,8 @@ Der CRTC-Zustand bleibt inkonsistent, ein Reboot ist dann erforderlich. **Nicht 
 3. Danach alle 7 s pollt. Bei Zustandswechsel:
    - `on → off`: `kill -STOP` an `pgrep -u <uid> '^chromium$'`
    - `off → on`: `kill -CONT` an dieselbe Menge, **plus** 300 ms später ein virtueller ArrowRight-Tastendruck via `wtype -k Right`. Dadurch wird in `cinema-display.js` der Keyboard-Handler getriggert (`window.__posterramaPlayback.next()`) → sofort neues Poster. Ohne diesen Schritt wäre beim Wieder-Einschalten kurz das eingefrorene alte Poster sichtbar.
-4. Beim Beenden (TERM/INT/HUP/EXIT) immer `SIGCONT` an alle `^chromium$`-Prozesse — Cleanup-Trap verhindert, dass Chromium eingefroren zurückbleibt, wenn der Service stirbt.
+4. **Self-Heal-Block (seit 3.0.1x):** Nach dem Übergangs-Check wird bei `curr=off` jeden Tick zusätzlich geprüft, ob alle gefundenen Chromium-PIDs tatsächlich `T`-Status haben. Wenn nicht, wird `stop_chromium` nachgeschickt. Loggt nur dann, wenn er nachschießen muss — kein Tick-Spam. Schützt gegen den **Boot-Race** (siehe Abschnitt unten) und gegen Chromium-Restarts während Monitor-off (z.B. nach Wayland-Crash).
+5. Beim Beenden (TERM/INT/HUP/EXIT) immer `SIGCONT` an alle `^chromium$`-Prozesse — Cleanup-Trap verhindert, dass Chromium eingefroren zurückbleibt, wenn der Service stirbt.
 
 **Wichtiges Detail**: Das Pattern `^chromium$` (nicht `-f chromium`) matched nur auf den Prozessnamen (`comm`), nicht auf die komplette Kommandozeile. Sonst würden Shell-Scripts, die das Wort "chromium" irgendwo im Body haben (z. B. Diagnose-Snippets), versehentlich mit eingefroren.
 
@@ -101,6 +102,9 @@ chmod +x ~/.local/bin/monitor-power-watch.sh
 # 4. Unit laden und starten
 systemctl --user daemon-reload
 systemctl --user enable --now monitor-power-watch.service
+
+# 5. Linger aktivieren (KRITISCH für Boot ohne Login)
+sudo loginctl enable-linger $USER
 ```
 
 ## Betrieb & Verifikation
@@ -140,6 +144,40 @@ ps -u "$(id -u)" -o stat,comm --no-headers | awk '$2=="chromium" {n[$1]++} END {
 top -b -n 2 -d 10 -p $(pgrep -d, '^chromium$' -u "$(id -u)") | \
   awk 'NR>1 && $NF=="chromium" {cpu+=$9} END {printf "CPU-Summe: %.1f%%\n", cpu}'
 ```
+
+## Self-Heal (gegen Boot-Race)
+
+**Bug-Symptom (vor 3.0.1x):** Nach Reboot mit Monitor-off läuft Chromium voll mit ~100 % CPU, obwohl der Watcher als Service `active` läuft und der DDC-Status korrekt "off" zeigt.
+
+**Root-Cause:**
+
+1. Beim Boot startet der Watcher **vor** Chromium (User-systemd-Order: Watcher als `default.target`-Wanted, Chromium-Kiosk wird erst durch labwc-`autostart` gestartet).
+2. Watcher-Init-Block ruft `stop_chromium` auf — findet aber **keine Chromium-Prozesse** (loggt: `keine Chromium-Prozesse gefunden`).
+3. `prev=off` wird gesetzt, der Watcher geht in den Loop.
+4. Chromium startet 1–3 s später durch labwc-autostart.
+5. Im Loop wird der Übergangs-Check `curr != prev` ausgewertet — `curr` und `prev` sind beide `off`, **kein Übergang**, kein erneuter SIGSTOP.
+6. Chromium läuft ungebremst weiter, bis der Monitor irgendwann angeschaltet wird (erst dann kommt der `off → on`-Übergang).
+
+**Fix (3.0.1x):** Self-Heal-Block in der Loop:
+
+```bash
+if [[ "$curr" == "off" ]]; then
+    pids=$(pgrep -u "$(id -u)" "$CHROMIUM_PATTERN" || true)
+    if [[ -n "$pids" ]]; then
+        non_stopped=$(ps -o stat= -p $pids 2>/dev/null | awk 'NF && $1 !~ /^T/' | wc -l)
+        if [[ "$non_stopped" -gt 0 ]]; then
+            log "Self-Heal: Monitor=off, aber $non_stopped Chromium-Prozess(e) laufen → SIGSTOP nachschicken"
+            stop_chromium
+        fi
+    fi
+fi
+```
+
+Greift innerhalb von 7 s nach Chromium-Start. Idempotent (kill -STOP auf bereits stopped Prozess = no-op). Loggt nur beim tatsächlichen Nachschießen.
+
+**Voraussetzung für Boot-Persistenz:** `loginctl enable-linger $USER` muss aktiv sein, sonst startet der User-systemd-Manager nur bei Login → Watcher käme bei reinem Power-Cycle ohne SSH-Login gar nicht hoch. Siehe `feedback_power_loss_resilient`-Direktive.
+
+---
 
 ## Latenz & Timing
 
