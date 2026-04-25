@@ -6,6 +6,22 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1w] – 2026-04-24
+
+3-Schichten-Backup-Strategie: Config-Backup-Scope erweitert, NAS-Mirror-Script ergänzt, Strategie dokumentiert.
+
+### Neu
+- **NAS-Mirror-Script** (`scripts/backup/backup-to-nas.sh` + Systemd-Units unter `scripts/backup/systemd/`) — Template für täglichen rsync-Mirror über SMB zu einem NAS. Stumm-Skip bei Offline, strikter `--delete`-Mirror (Point-in-Time-Recovery via NAS-Snapshots).
+- **`docs/BACKUP-STRATEGY.md`** — dokumentiert die 3-Schichten-Strategie (lokaler Config-Backup + NAS-Mirror + Snapshots), Recovery-Szenarien, Monitoring.
+
+### Geändert
+- **`utils/configBackup.js` FILE_WHITELIST erweitert** um `profiles.json`, `public/cinema-playlists.json`, `public/cinema-playlist.json`, `poster-updater/filmliste.txt`. Der eingebaute Config-Backup-Scheduler (täglich 03:30, Retention 10 Stück / 30 Tage) sichert jetzt auch den User-kuratierten Playlist-State und die Filmliste mit TMDB-Hints.
+
+### Bekannte Gotchas
+- `mount.cifs`-Option `ro=false` ist kein gültiger Parameter und wird von manchen Kernels als `ro` interpretiert → Mount wird read-only. Korrekt: `rw` explizit oder weglassen (rw ist Default).
+
+---
+
 ## [3.0.1v] – 2026-04-24
 
 Migration: bestehende Filmliste-Einträge bekommen ihre TMDB-IDs nachträglich als `[tmdb:NNNN]`-Hint eingetragen.

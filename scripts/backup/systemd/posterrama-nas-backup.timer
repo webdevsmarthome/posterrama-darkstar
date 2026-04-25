@@ -1,0 +1,12 @@
+[Unit]
+Description=Posterrama Backup to NAS — täglicher Mirror
+
+[Timer]
+# Täglich 04:00 (30 min nach dem internen config-backup um 03:30, damit
+# die aktuellen backups/config/* im NAS-Mirror auftauchen)
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

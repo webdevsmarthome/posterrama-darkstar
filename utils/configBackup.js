@@ -9,13 +9,21 @@ const ROOT = process.env.POSTERRAMA_BACKUP_ROOT
 const BACKUP_DIR = path.join(ROOT, 'backups', 'config');
 const CONFIG_FILE = path.join(ROOT, 'config.json');
 
-// Whitelisted config files at repo root
+// Whitelisted config files at repo root (or relative to it via subdir)
 const FILE_WHITELIST = [
     // Core user configuration
     'config.json',
     'device-presets.json',
     // User data mappings
     'devices.json',
+    // User profiles (wallart/cinema presets)
+    'profiles.json',
+    // Cinema playlists collection (Darkstar-Fork Custom-Patch 49 state)
+    'public/cinema-playlists.json',
+    // Live cinema playlist (active playlist, referenced by cinema clients)
+    'public/cinema-playlist.json',
+    // Poster Updater film list with TMDB-ID hints (Darkstar-Fork Custom-Patches 51/52 state)
+    'poster-updater/filmliste.txt',
     // Secrets and API keys
     '.env',
 ];

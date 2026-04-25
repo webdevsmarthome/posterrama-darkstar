@@ -10,6 +10,7 @@ This folder contains Posterrama’s developer documentation.
 - **Monitor Power Watcher (Darkstar-Fork, Pi-spezifisch):** `MONITOR-POWER-WATCHER.md`
 - **Kiosk Performance Tuning (Darkstar-Fork, Pi-spezifisch):** `KIOSK-PERFORMANCE.md`
 - **Emby-Sync Pipeline (Darkstar-Fork):** `EMBY-SYNC-PIPELINE.md`
+- **Backup-Strategie (Darkstar-Fork):** `BACKUP-STRATEGY.md`
 - **Production readiness checklist:** `API-PRODUCTION-READINESS.md`
 - **OpenAPI workflow:** `OPENAPI-WORKFLOW.md`
 - **Architecture diagrams:** `ARCHITECTURE-DIAGRAMS.md`

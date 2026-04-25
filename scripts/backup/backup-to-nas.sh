@@ -1,0 +1,119 @@
+#!/bin/bash
+#
+# backup-to-nas.sh  (Template — nach /usr/local/bin/posterrama-backup-to-nas.sh installieren)
+#
+# Täglicher Mirror des Posterrama-Verzeichnisses auf ein SMB-Share (z. B.
+# Synology-NAS). Läuft als Systemd-System-Service mit root-Rechten für den
+# CIFS-Mount. Strategie: strikter rsync-Mirror (`--delete`), Versionierung
+# übernimmt das NAS via Snapshots (z. B. Synology Snapshot Replication).
+#
+# Voraussetzungen:
+#  - cifs-utils + rsync installiert (Debian: `sudo apt install cifs-utils rsync`)
+#  - Credentials-Datei /etc/posterrama/nas-credentials (chmod 600, root:root):
+#        username=bkpuser
+#        password=***
+#  - Systemd-Unit + Timer aus scripts/backup/systemd/
+#
+# Verhalten bei NAS-Offline: stumm überspringen (journal-Log, exit 0).
+
+set -u
+
+NAS_HOST="192.168.227.171"
+NAS_SHARE="//192.168.227.171/backup"
+NAS_REMOTE_SUBDIR="posterrama"
+SRC="/home/helmut/posterrama"
+CREDS_FILE="/etc/posterrama/nas-credentials"
+MOUNT_POINT="/mnt/posterrama-nas-backup"
+
+log() {
+    logger -t posterrama-backup "$*"
+    echo "[posterrama-backup] $*"
+}
+
+cleanup() {
+    mountpoint -q "$MOUNT_POINT" && umount "$MOUNT_POINT" 2>/dev/null
+    rmdir "$MOUNT_POINT" 2>/dev/null
+}
+trap cleanup EXIT INT TERM
+
+# ----------------------------------------------------------------------
+# Online-Check (stumm überspringen wenn NAS nicht erreichbar)
+# ----------------------------------------------------------------------
+if ! ping -c 1 -W 3 "$NAS_HOST" >/dev/null 2>&1; then
+    log "NAS $NAS_HOST nicht erreichbar (ping) — Backup übersprungen"
+    exit 0
+fi
+if ! timeout 3 bash -c "</dev/tcp/$NAS_HOST/445" 2>/dev/null; then
+    log "NAS SMB-Port 445 nicht erreichbar — Backup übersprungen"
+    exit 0
+fi
+
+# ----------------------------------------------------------------------
+# Credentials-Check
+# ----------------------------------------------------------------------
+if [ ! -f "$CREDS_FILE" ]; then
+    log "Credentials-Datei $CREDS_FILE fehlt — Backup abgebrochen"
+    exit 1
+fi
+if [ "$(stat -c '%a' "$CREDS_FILE")" != "600" ]; then
+    log "Warnung: Credentials-Datei hat unsichere Permissions (sollte 600 sein)"
+fi
+
+# ----------------------------------------------------------------------
+# Mount
+# ----------------------------------------------------------------------
+mkdir -p "$MOUNT_POINT"
+# WICHTIG: `rw` explizit setzen; `ro=false` ist KEIN gültiger CIFS-Parameter
+# und wird von manchen mount.cifs-Versionen als `ro` interpretiert.
+if ! mount -t cifs "$NAS_SHARE" "$MOUNT_POINT" \
+    -o "credentials=$CREDS_FILE,uid=root,gid=root,iocharset=utf8,vers=3.0,rw,hard,retrans=5,actimeo=30,echo_interval=30" \
+    2>/dev/null; then
+    log "CIFS-Mount fehlgeschlagen — Backup übersprungen"
+    exit 0
+fi
+
+# Target-Subdir sicherstellen
+mkdir -p "$MOUNT_POINT/$NAS_REMOTE_SUBDIR"
+
+# ----------------------------------------------------------------------
+# Rsync (strikter Mirror; Synology-Snapshots puffern Versionen)
+# ----------------------------------------------------------------------
+START=$(date +%s)
+log "Starte rsync zu $NAS_SHARE/$NAS_REMOTE_SUBDIR/"
+
+rsync -aH --delete --partial --timeout=600 \
+    --exclude='node_modules/' \
+    --exclude='cache/' \
+    --exclude='logs/' \
+    --exclude='coverage/' \
+    --exclude='sessions/' \
+    --exclude='image_cache/' \
+    --exclude='.nyc_output/' \
+    --exclude='__tests__/' \
+    --exclude='poster-updater/tmp_*/' \
+    --exclude='*.tmp' \
+    --exclude='*.tmp.*' \
+    --exclude='.git/' \
+    --exclude='device-updates/' \
+    --exclude='*.log' \
+    "$SRC/" "$MOUNT_POINT/$NAS_REMOTE_SUBDIR/" 2>&1 | tail -20 | \
+    while IFS= read -r line; do log "rsync: $line"; done
+
+RC=${PIPESTATUS[0]}
+END=$(date +%s)
+DURATION=$((END - START))
+
+if [ "$RC" -eq 0 ]; then
+    log "Backup fertig in ${DURATION}s"
+elif [ "$RC" -eq 24 ]; then
+    log "Backup fertig in ${DURATION}s (mit vanished files, harmlos)"
+else
+    log "rsync exit-code $RC nach ${DURATION}s — möglicherweise unvollständig"
+fi
+
+# Snapshot-Info
+if [ -d "$MOUNT_POINT/@GlobalSnap" ] || [ -d "$MOUNT_POINT/#snapshot" ]; then
+    log "INFO: NAS-Snapshots auf dem Share sind aktiv (tier-2 Versionierung)"
+fi
+
+exit 0

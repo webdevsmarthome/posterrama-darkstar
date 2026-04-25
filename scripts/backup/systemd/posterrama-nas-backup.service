@@ -1,0 +1,16 @@
+[Unit]
+Description=Posterrama Backup to NAS via SMB
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/posterrama/nas-credentials
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/posterrama-backup-to-nas.sh
+StandardOutput=journal
+StandardError=journal
+Nice=19
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target
