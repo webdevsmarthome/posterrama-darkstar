@@ -6,6 +6,29 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1y] – 2026-04-28
+
+Emby-Sync UI/Backend-Bugfixes + Log-Download-Buttons im Admin-UI.
+
+### Behoben
+- **Emby-Sync Save-Bug** (`routes/emby-sync.js`): POST `/api/emby-sync/ignored` ersetzte die Liste statt anzuhängen — jeder neue Eintrag überschrieb den vorigen. Plus: `_xxx`-Backing-Fields, `env`/`defaults`/`timeouts`/`config` der Config-Class-Instance landeten in der `config.json` (Class-Instance-Serialization-Bug). **Ursache:** `JSON.stringify(config)` auf der Config-Class-Instance serialisiert die eigenen Backing-Fields (`_embySync`, `_mediaServers`, …), aber NICHT die Getter-Properties (`embySync`, `mediaServers`, …) — Resultat: `newConfig.embySync` war `undefined`, wurde zu `{}` neu erzeugt, push() ergab REPLACE statt APPEND. **Fix:** `config.config` (das raw-Object aus loadConfig) statt der Class-Instance serialisieren, plus Self-Heal-Block der `_xxx`/`env`/`defaults`/`timeouts`/`config`-Top-Level-Keys beim Save abstrippt — alte korrupte config.json räumt sich beim ersten Save sukzessive selbst auf.
+- **Emby-Sync UI startet nicht** (`public/admin.js`): `initEmbySync()` ist in einer IIFE deklariert, der Aufrufer (Sidebar-Nav-Handler) in einer ANDEREN IIFE — `typeof initEmbySync === 'function'` war immer `false`, kein Status-Load, kein Trigger-Button-Listener, kein Add-Form-Listener. **Fix:** `window.initEmbySync = initEmbySync;` exportieren und Aufrufer auf `window.initEmbySync()` ändern.
+- **Auto-Playlist-Race-Condition** (`lib/emby-sync.js`): Neu hinzugefügte Filme erschienen nicht in der Auto-Playlist „Die letzten 20 hinzugefügten Filme", obwohl ihr ZIP wenige Sekunden nach dem Sync heruntergeladen war. **Ursache:** `updateAutoPlaylist()` lief synchron im Sync-Cycle, der ZIP-Index war zu diesem Zeitpunkt noch ohne die gerade angestoßenen Downloads. **Fix:** Zusätzlicher Post-Job-Refresh: pollt `runner.isPosterRunning()`/`isTrailerRunning()` alle 30 s, ruft nach Job-Ende + 5 s Buffer `updateAutoPlaylist` mit frischem ZIP-Set erneut auf. Max-Wait 30 min.
+- **Trailer-Downloader unverträglich mit TMDB-Hint-Format** (`poster-updater/download-trailers.py`, `poster-updater/download-trailers-youtube.py`): Patch 51 (TMDB-ID-Hint im Filmliste-Format `Titel (Jahr)[tmdb:NNN]`) wurde nur im PosterPack-Downloader (`tmdb-get-posters-direct.py`) eingebaut — die Trailer-Scripts erwarteten weiterhin reines `Titel (Jahr)` und lehnten alle Einträge mit Hint als „Format ungueltig" ab (1265/1265 Fehler bei einer 1265-Filme-Liste). **Fix:** Optionalen `[tmdb:NNN]`-Suffix vor dem Format-Match abstrippen.
+
+### Neu
+- **4 Download-Buttons im Admin-UI** für Diagnostics + Reports:
+  - **PosterPack Download → Log**: Output (stdout+stderr) des letzten/laufenden PosterPack-Jobs als `posterpack-log-YYYY-MM-DDTHH-MM-SS.txt`. In-Memory-Ringbuffer (max 5 MB pro Job) im `lib/poster-updater-runner.js`.
+  - **PosterPack Download → Liste**: Alle vorhandenen PosterPacks (sortiert über alle 5 Quellen `manual`/`plex-export`/`jellyfin-emby-export`/`tmdb-export`/`romm-export`) als `posterpacks-...txt`.
+  - **Trailer Download → Log**: Output des letzten/laufenden Trailer-Jobs als `trailer-log-...txt`.
+  - **Letzter Sync-Report → JSON**: Cache-Datei `cache/emby-sync-last-report.json` als `emby-sync-report-...json` mit korrekter Content-Disposition.
+- Endpoints (alle hinter `isAuthenticated`): `GET /api/poster-updater/run/log`, `GET /api/poster-updater/trailers/run/log`, `GET /api/poster-updater/posterpacks/list`, `GET /api/emby-sync/last-report/download`.
+
+### Bekannte Gotchas
+- Beim Wechsel auf neue Posterrama-Version sollten alte korrupte `config.json` (mit `_xxx`/`env`/`defaults`-Top-Level-Keys aus dem ehemaligen Class-Instance-Serialization-Bug) **nicht manuell gefixt werden** — der erste Save aus dem Admin-UI räumt sie automatisch via Self-Heal-Block in `routes/emby-sync.js` auf.
+
+---
+
 ## [3.0.1x] – 2026-04-25
 
 Pi-Setup-Resilienz: Cloudflare-Tunnel als sicherer Außenzugang, Watcher-Self-Heal-Bugfix, Bluetooth-Auto-Reconnect, Power-Cycle-Direktive in der Doku verankert.

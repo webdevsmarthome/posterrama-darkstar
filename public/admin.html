@@ -4126,6 +4126,8 @@
                 <div class="pu-runner-controls" style="margin-top: 12px;">
                   <button class="btn btn-success btn-sm" id="pu-runStartBtn">Download starten</button>
                   <button class="btn btn-danger btn-sm" id="pu-runStopBtn" disabled>Stopp</button>
+                  <a class="btn btn-secondary btn-sm" href="/api/poster-updater/run/log" download title="Log des letzten Runs als TXT herunterladen"><i class="fas fa-file-download"></i> Log</a>
+                  <a class="btn btn-secondary btn-sm" href="/api/poster-updater/posterpacks/list" download title="Alle vorhandenen PosterPacks (alle 5 Quellen) als sortierte TXT-Liste"><i class="fas fa-list"></i> Liste</a>
                   <span class="pu-runner-status idle" id="pu-runnerStatus">Bereit</span>
                 </div>
                 <div class="pu-stats" id="pu-runnerStats"></div>
@@ -4138,6 +4140,7 @@
                 <div class="pu-runner-controls" style="margin-top: 12px;">
                   <button class="btn btn-success btn-sm" id="pu-trailerStartBtn">Trailer herunterladen</button>
                   <button class="btn btn-danger btn-sm" id="pu-trailerStopBtn" disabled>Stopp</button>
+                  <a class="btn btn-secondary btn-sm" href="/api/poster-updater/trailers/run/log" download title="Log des letzten Trailer-Runs als TXT herunterladen"><i class="fas fa-file-download"></i> Log</a>
                   <span class="pu-runner-status idle" id="pu-trailerStatus">Bereit</span>
                 </div>
                 <div class="pu-terminal" id="pu-trailerTerminal">Warte auf Start...</div>
@@ -4214,7 +4217,10 @@
 
               <!-- Report Viewer -->
               <section class="perf-card" aria-label="Letzter Report">
-                <h3><i class="fas fa-clipboard-list"></i> Letzter Sync-Report</h3>
+                <h3>
+                  <i class="fas fa-clipboard-list"></i> Letzter Sync-Report
+                  <a class="btn btn-secondary btn-sm" href="/api/emby-sync/last-report/download" download style="margin-left: 12px; font-weight: normal;" title="Sync-Report als JSON herunterladen"><i class="fas fa-file-download"></i> JSON</a>
+                </h3>
                 <div class="emby-sync-report-meta" id="es-reportMeta" style="margin-top: 12px; font-size: 0.85rem; opacity: 0.8;"></div>
                 <div class="emby-sync-report-tabs" id="es-reportTabs" style="margin-top: 12px;">
                   <button class="es-tab active" data-es-tab="added">Hinzugefügt (<span id="es-countAdded">0</span>)</button>

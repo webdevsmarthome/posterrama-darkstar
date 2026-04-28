@@ -11,6 +11,29 @@ const express = require('express');
 
 const embySync = require('../lib/emby-sync');
 
+// Class-internal Properties + Backing-Fields, die niemals in config.json gehören.
+// Werden beim Save abgestrippt — räumt korrupte config.json sukzessive selbst auf.
+const CLASS_INTERNAL_KEYS = new Set(['env', 'defaults', 'timeouts', 'config']);
+
+/**
+ * Liefert ein sauberes raw-Config-Object aus der Config-Class-Instance:
+ * - Nimmt config.config (das raw-Object aus loadConfig) als Quelle, statt JSON.stringify(config)
+ *   was die Class-Instance mit allen Backing-Fields serialisieren würde.
+ * - Strippt _xxx-Keys (Class-Backing-Fields wie _embySync, _mediaServers).
+ * - Strippt env/defaults/timeouts/config (Class-Properties, die in alten korrupten Saves
+ *   versehentlich Top-Level gelandet sind).
+ */
+function buildCleanRawConfig(config) {
+    const source = config.config || config;
+    const raw = JSON.parse(JSON.stringify(source));
+    for (const k of Object.keys(raw)) {
+        if (k.startsWith('_') || CLASS_INTERNAL_KEYS.has(k)) {
+            delete raw[k];
+        }
+    }
+    return raw;
+}
+
 module.exports = function createEmbySyncRouter({ logger, config, wsHub, writeConfig }) {
     const router = express.Router();
 
@@ -67,6 +90,22 @@ module.exports = function createEmbySyncRouter({ logger, config, wsHub, writeCon
     });
 
     // ============================================================
+    // GET /last-report/download — wie /last-report, aber als Download mit Filename
+    router.get('/last-report/download', async (req, res) => {
+        try {
+            const report = await embySync.readLastReport();
+            const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.setHeader(
+                'Content-Disposition',
+                `attachment; filename="emby-sync-report-${ts}.json"`
+            );
+            res.send(JSON.stringify(report || { error: 'no-report-yet' }, null, 2));
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
     // GET /ignored — Liste der Ignore-Regeln
     // ============================================================
     router.get('/ignored', (req, res) => {
@@ -105,20 +144,15 @@ module.exports = function createEmbySyncRouter({ logger, config, wsHub, writeCon
         }
 
         try {
-            // Clone config, ignoredMovies-Array um die neue Regel erweitern
-            const newConfig = JSON.parse(JSON.stringify(config));
-            newConfig.embySync = newConfig.embySync || {};
-            newConfig.embySync.ignoredMovies = Array.isArray(
-                newConfig.embySync.ignoredMovies
-            )
-                ? newConfig.embySync.ignoredMovies
+            const rawConfig = buildCleanRawConfig(config);
+            rawConfig.embySync = rawConfig.embySync || {};
+            rawConfig.embySync.ignoredMovies = Array.isArray(rawConfig.embySync.ignoredMovies)
+                ? rawConfig.embySync.ignoredMovies
                 : [];
-            newConfig.embySync.ignoredMovies.push(rule);
-            await writeConfig(newConfig, config);
-            // In-Memory aktualisieren
-            config.embySync = config.embySync || {};
-            config.embySync.ignoredMovies = newConfig.embySync.ignoredMovies;
-            res.json({ success: true, items: config.embySync.ignoredMovies });
+            rawConfig.embySync.ignoredMovies.push(rule);
+            await writeConfig(rawConfig, config);
+            config.embySync = rawConfig.embySync;
+            res.json({ success: true, items: rawConfig.embySync.ignoredMovies });
         } catch (err) {
             logger.error('[EmbySync] Failed to add ignore rule:', err.message);
             res.status(500).json({ success: false, error: err.message });
@@ -135,11 +169,15 @@ module.exports = function createEmbySyncRouter({ logger, config, wsHub, writeCon
             return res.status(404).json({ success: false, error: 'Index nicht gefunden' });
         }
         try {
-            const newConfig = JSON.parse(JSON.stringify(config));
-            newConfig.embySync.ignoredMovies.splice(idx, 1);
-            await writeConfig(newConfig, config);
-            config.embySync.ignoredMovies = newConfig.embySync.ignoredMovies;
-            res.json({ success: true, items: config.embySync.ignoredMovies });
+            const rawConfig = buildCleanRawConfig(config);
+            rawConfig.embySync = rawConfig.embySync || {};
+            rawConfig.embySync.ignoredMovies = Array.isArray(rawConfig.embySync.ignoredMovies)
+                ? rawConfig.embySync.ignoredMovies
+                : [];
+            rawConfig.embySync.ignoredMovies.splice(idx, 1);
+            await writeConfig(rawConfig, config);
+            config.embySync = rawConfig.embySync;
+            res.json({ success: true, items: rawConfig.embySync.ignoredMovies });
         } catch (err) {
             logger.error('[EmbySync] Failed to remove ignore rule:', err.message);
             res.status(500).json({ success: false, error: err.message });

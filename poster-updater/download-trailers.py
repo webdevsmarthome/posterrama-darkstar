@@ -146,10 +146,25 @@ def download_trailer(youtube_url, output_path):
         return False
 
 
+# Format-Erweiterung (Patch 51): Filmliste-Einträge können einen optionalen
+# TMDB-ID-Hinweis tragen, z.B. "Hamlet (2000)[tmdb:10688]". Wir strippen den
+# Hint vor dem Format-Match — der Hint ist für die Trailer-Suche aktuell
+# nicht relevant (yt-dlp sucht per Titel), kann aber für künftige direkte
+# TMDB-Lookups genutzt werden.
+TMDB_HINT_RE = re.compile(r'^(.+?)\s*\[tmdb:(\d+)\]\s*$')
+
 # --- Hauptschleife ---
 for i, entry in enumerate(films, 1):
+    # Optionaler [tmdb:NNN]-Hint: abstrippen, ID merken (aktuell unused — siehe oben)
+    hint_match = TMDB_HINT_RE.match(entry)
+    if hint_match:
+        entry_for_match = hint_match.group(1).strip()
+        # tmdb_id_hint = int(hint_match.group(2))  # für künftige direkte Lookups
+    else:
+        entry_for_match = entry
+
     # Titel und Jahr extrahieren: "Film (2024)"
-    m = re.match(r'^(.+?)\s*\((\d{4})\)\s*$', entry)
+    m = re.match(r'^(.+?)\s*\((\d{4})\)\s*$', entry_for_match)
     if not m:
         print(f"   ⚠️  Format ungueltig: '{entry}' — erwartet: 'Titel (Jahr)'")
         fehler += 1
@@ -157,7 +172,7 @@ for i, entry in enumerate(films, 1):
 
     clean_title = unicodedata.normalize('NFC', m.group(1).strip())
     year = m.group(2)
-    entry = unicodedata.normalize('NFC', entry)
+    entry = unicodedata.normalize('NFC', entry_for_match)
     trailer_filename = f"{clean_title} ({year})-trailer.mp4"
     trailer_path = os.path.join(TRAILER_DIR, trailer_filename)
 

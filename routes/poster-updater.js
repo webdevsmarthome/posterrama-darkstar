@@ -335,5 +335,41 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
         res.json({ success: true, message: 'Stop signal sent' });
     });
 
+    // --- Log-Downloads (für Buttons im Admin-UI) ---
+    router.get('/run/log', (req, res) => {
+        const log = runner.getPosterLog();
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="posterpack-log-${ts}.txt"`);
+        res.send(log || '(noch kein PosterPack-Job gelaufen)\n');
+    });
+
+    router.get('/trailers/run/log', (req, res) => {
+        const log = runner.getTrailerLog();
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="trailer-log-${ts}.txt"`);
+        res.send(log || '(noch kein Trailer-Job gelaufen)\n');
+    });
+
+    // Liste aller verfügbaren PosterPacks (alle 5 Quellen) als TXT
+    router.get('/posterpacks/list', async (req, res) => {
+        try {
+            const zipKeys = await runner.getAllExistingZips();
+            const sorted = Array.from(zipKeys).sort((a, b) => a.localeCompare(b, 'de'));
+            const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const body =
+                `# Verfügbare PosterPacks (${sorted.length} Stück)\n` +
+                `# Stand: ${new Date().toISOString()}\n\n` +
+                sorted.join('\n') +
+                '\n';
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="posterpacks-${ts}.txt"`);
+            res.send(body);
+        } catch (err) {
+            res.status(500).json({ success: false, error: err.message });
+        }
+    });
+
     return router;
 };

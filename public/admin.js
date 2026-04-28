@@ -11073,7 +11073,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                     showSection('section-poster-updater');
                 } else if (nav === 'emby-sync') {
                     showSection('section-emby-sync');
-                    if (typeof initEmbySync === 'function') initEmbySync();
+                    if (typeof window.initEmbySync === 'function') window.initEmbySync();
                 } else if (nav === 'poster-selector') {
                     showSection('section-poster-selector');
                 } else if (nav === 'posterpack-studio') {
@@ -33491,6 +33491,8 @@ if (!document.__niwDelegatedFallback) {
             });
         }
     }
+    // Export so cross-IIFE caller (nav-click handler) can reach this function
+    window.initEmbySync = initEmbySync;
 
     function puOpenDeleteModal(name) {
         puDeleteTarget = name;

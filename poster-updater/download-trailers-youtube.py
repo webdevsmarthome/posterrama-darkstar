@@ -66,7 +66,12 @@ print(f"\n  Starte YouTube-Suche fuer {len(missing)} Filme...\n")
 
 
 def extract_title_year(name):
-    """Extrahiert Titel und Jahr aus 'Film Title (2024)'"""
+    """Extrahiert Titel und Jahr aus 'Film Title (2024)' oder 'Film Title (2024)[tmdb:NNN]'.
+    Patch 51-kompatibel: optionaler [tmdb:NNN]-Suffix wird vor dem Match abgestrippt."""
+    # Strippe optionalen TMDB-Hint
+    hint_m = re.match(r'^(.+?)\s*\[tmdb:\d+\]\s*$', name)
+    if hint_m:
+        name = hint_m.group(1).strip()
     m = re.match(r'^(.+?)\s*\((\d{4})\)\s*$', name)
     if m:
         return m.group(1).strip(), m.group(2)
