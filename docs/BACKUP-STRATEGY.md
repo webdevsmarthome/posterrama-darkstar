@@ -87,7 +87,12 @@ Jede Schicht ist unabhängig: fällt eine aus, puffern die anderen.
 
 **Verhalten bei NAS-offline:** Stumm überspringen — `logger.info`, `exit 0`. Kein Fehler-Banner, kein Admin-Alert. Log im `journalctl -u posterrama-nas-backup.service`.
 
-**Transfer-Mechanik:** `rsync -aH --delete --partial` über SMBv3-Mount. `--delete` ist scharf, weil Schicht 3 alle gelöschten Dateien per Snapshot puffert.
+**Transfer-Mechanik:** Zwei separate `rsync`-Calls über SMBv3-Mount mit `-aH --delete --partial --modify-window=2`. `--delete` ist scharf, weil Schicht 3 alle gelöschten Dateien per Snapshot puffert.
+
+- **Call 1** — alles AUSSER `media/`: regulärer mtime-basierter Sync (Configs, Code, etc.). `--modify-window=2` toleriert die 1–2-Sek-Auflösung von SMB-mtimes — verhindert dass identische Dateien wegen CIFS-Rundungsfehlern komplett neu übertragen werden.
+- **Call 2** — nur `media/` mit zusätzlichem **`--size-only`**: PosterPack-ZIPs und Trailer-MP4s sind immutable, ihre Bytes-Größe ist eindeutig. Spart auf einem 41-GB-Bestand mehrere zehn Minuten WLAN-Zeit pro inkrementellem Lauf.
+
+**Gemessen:** Vor der Optimierung dauerte ein vermeintlich inkrementeller Lauf bis zu **2 Stunden** (rsync übertrug die Mehrzahl der mp4/zip neu, weil mtime auf CIFS rundungsbedingt anders war). Mit `--modify-window=2` + `--size-only` für media/: typisch **<5 Min** für 0-Diff-Sync.
 
 **Exit-Codes:**
 - `0` — OK oder stumm-skip (NAS offline).

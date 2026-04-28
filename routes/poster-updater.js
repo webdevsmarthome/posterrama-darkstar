@@ -9,6 +9,14 @@ const runner = require('../lib/poster-updater-runner');
 
 const PROJECT_ROOT = path.join(__dirname, '..');
 const OUTPUT_DIR = path.join(PROJECT_ROOT, 'media', 'complete', 'tmdb-export');
+// Alle möglichen ZIP-Quellen (für DELETE: ZIP wird in JEDER Quelle gesucht)
+const ZIP_SOURCES = [
+    path.join(PROJECT_ROOT, 'media', 'complete', 'manual'),
+    path.join(PROJECT_ROOT, 'media', 'complete', 'plex-export'),
+    path.join(PROJECT_ROOT, 'media', 'complete', 'jellyfin-emby-export'),
+    path.join(PROJECT_ROOT, 'media', 'complete', 'tmdb-export'),
+    path.join(PROJECT_ROOT, 'media', 'complete', 'romm-export'),
+];
 const TRAILER_DIR = path.join(PROJECT_ROOT, 'media', 'trailers');
 const TRAILER_INFO_PATH = path.join(TRAILER_DIR, 'trailer-info.json');
 
@@ -134,14 +142,25 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
             if (!result.success) {
                 return res.status(404).json({ success: false, error: 'Entry not found' });
             }
-            // Also delete the corresponding ZIP file if it exists
-            try {
-                const zipPath = path.join(OUTPUT_DIR, name + '.zip');
-                await fsp.unlink(zipPath);
-                logger.info(`poster-updater: Deleted ZIP file: ${name}.zip`);
-            } catch (err) {
-                if (err.code !== 'ENOENT') {
-                    logger.warn(`poster-updater: Failed to delete ZIP file: ${err.message}`);
+            // Also delete the corresponding ZIP file in ALL 5 source-dirs
+            // (manual, plex-export, jellyfin-emby-export, tmdb-export, romm-export)
+            // — Filme können in mehreren Quellen liegen oder ihre Quelle wechseln.
+            // Sidecars (z.B. ${name}.poster.json) werden mitgelöscht.
+            const sidecarSuffixes = ['.zip', '.poster.json'];
+            for (const sourceDir of ZIP_SOURCES) {
+                for (const suffix of sidecarSuffixes) {
+                    const filePath = path.join(sourceDir, name + suffix);
+                    try {
+                        await fsp.unlink(filePath);
+                        const sourceName = path.basename(sourceDir);
+                        logger.info(`poster-updater: Deleted ${name}${suffix} from ${sourceName}/`);
+                    } catch (err) {
+                        if (err.code !== 'ENOENT') {
+                            logger.warn(
+                                `poster-updater: Failed to delete ${filePath}: ${err.message}`
+                            );
+                        }
+                    }
                 }
             }
             // Also delete the corresponding trailer if it exists

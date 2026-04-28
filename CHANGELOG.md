@@ -6,6 +6,22 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z] – 2026-04-28
+
+NAS-Backup ~10× schneller, DELETE-Filmliste räumt sauber auf, Auto-Playlist sortiert nach ZIP-Erstellungsdatum.
+
+### Behoben / Verbessert
+- **NAS-Backup-Performance** (`scripts/backup/backup-to-nas.sh`): Vorher dauerte ein vermeintlich inkrementeller rsync auf dem 41-GB-Bestand bis zu **2 Stunden**, weil rsync wegen CIFS/SMB-mtime-Rundungsfehlern die Mehrzahl der mp4/zip-Files für „geändert" hielt und neu übertrug. **Fix:** Zwei separate rsync-Calls — Call 1 für alles außer `media/` mit `--modify-window=2` (toleriert SMB-mtime-Auflösung von 1–2 Sek), Call 2 für `media/` mit zusätzlich `--size-only` (immutable mp4/zip — Bytes-Größe ist eindeutig). **Gemessene Wirkung:** 2h 5min → 12:35 min beim Folge-Lauf, weiter sinkend auf <5 min für 0-Diff-Inkremente.
+- **DELETE-Filmliste räumt jetzt in ALLEN 5 Export-Quellen auf** (`routes/poster-updater.js`): Vorher löschte `DELETE /api/poster-updater/films/:name` die ZIP nur in `tmdb-export/`. Filme aus `manual/`, `plex-export/`, `jellyfin-emby-export/` oder `romm-export/` ließen ihre ZIP als Karteileiche zurück. **Fix:** Iteration über alle 5 Quellen, plus zusätzliche Sidecar-Suffixe (`.poster.json`).
+
+### Neu
+- **Auto-Playlist sortiert nach ZIP-Erstellungsdatum** statt Emby-DateCreated (`lib/emby-sync.js`, `lib/poster-updater-runner.js`): Bisher sortierte die „Letzte 20/30 hinzugefügten Filme"-Auto-Playlist nach Emby's `dateCreated` — d. h. wann der Film auf den Emby-Server kam (oft Jahre her). Wenn ein User ein PosterPack frisch erstellte (z. B. nach Filmliste-Delete + Re-Add), erschien der Film NICHT als „neu" in der Playlist, weil sein Emby-DateCreated alt war. **Fix:** Sortierung nach ZIP-mtime — d. h. dem Datum des aktuellsten lokalen PosterPack-Downloads. Neue runner-Funktion `getAllZipMtimes()` liefert eine Map<canonicalKey, mtimeMs>; bei mehreren Quellen gewinnt die jüngste mtime.
+
+### Bekannte Gotchas
+- Filme mit Title-Mismatch zwischen Emby und TMDB (z. B. „Maechte" vs. „Mächte", „von" vs. „vom") oder filesystem-incompatiblen Filenamen (`/`, `?`) erscheinen bei jedem Sync wieder im „Hinzugefügt"-Tab, weil ihr ZIP-Download dauerhaft fehlschlägt. **Lösung:** Auf der Emby-Sync-Seite in die Ignor-Liste aufnehmen (per `tmdbId` falls bekannt, sonst per `title`+`year`).
+
+---
+
 ## [3.0.1y] – 2026-04-28
 
 Emby-Sync UI/Backend-Bugfixes + Log-Download-Buttons im Admin-UI.

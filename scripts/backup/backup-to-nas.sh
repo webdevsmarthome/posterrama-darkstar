@@ -77,11 +77,24 @@ mkdir -p "$MOUNT_POINT/$NAS_REMOTE_SUBDIR"
 
 # ----------------------------------------------------------------------
 # Rsync (strikter Mirror; Synology-Snapshots puffern Versionen)
+#
+# Zwei separate rsync-Calls:
+#  1. Alles AUSSER media/ — mit `--modify-window=2` für CIFS-mtime-Toleranz.
+#     SMB rundet mtimes auf 1–2 Sek; ohne Window würde rsync identische Files
+#     als geändert sehen und neu übertragen.
+#  2. media/ separat mit `--size-only` — die ZIPs (PosterPacks) und MP4s
+#     (Trailer) sind immutable; ihre Bytes-Größe ist eindeutig. Das spart auf
+#     einem 41-GB-Bestand mehrere zehn Minuten WLAN-Zeit pro Lauf.
+#     Theoretisches Restrisiko: eine JSON in media/ ändert sich, ohne dass
+#     ihre Bytegröße variiert — extrem unwahrscheinlich für unsere
+#     trailer-info.json / *.poster.json Strukturen.
 # ----------------------------------------------------------------------
 START=$(date +%s)
 log "Starte rsync zu $NAS_SHARE/$NAS_REMOTE_SUBDIR/"
 
-rsync -aH --delete --partial --timeout=600 \
+# Call 1: Alles außer media/
+rsync -aH --delete --partial --timeout=600 --modify-window=2 \
+    --exclude='media/' \
     --exclude='node_modules/' \
     --exclude='cache/' \
     --exclude='logs/' \
@@ -97,18 +110,28 @@ rsync -aH --delete --partial --timeout=600 \
     --exclude='device-updates/' \
     --exclude='*.log' \
     "$SRC/" "$MOUNT_POINT/$NAS_REMOTE_SUBDIR/" 2>&1 | tail -20 | \
-    while IFS= read -r line; do log "rsync: $line"; done
+    while IFS= read -r line; do log "rsync[code]: $line"; done
+RC1=${PIPESTATUS[0]}
 
-RC=${PIPESTATUS[0]}
+# Call 2: media/ — size-only-Vergleich für die unveränderlichen ZIP/MP4-Files
+mkdir -p "$MOUNT_POINT/$NAS_REMOTE_SUBDIR/media"
+rsync -aH --delete --partial --timeout=600 --modify-window=2 --size-only \
+    "$SRC/media/" "$MOUNT_POINT/$NAS_REMOTE_SUBDIR/media/" 2>&1 | tail -20 | \
+    while IFS= read -r line; do log "rsync[media]: $line"; done
+RC2=${PIPESTATUS[0]}
+
 END=$(date +%s)
 DURATION=$((END - START))
 
-if [ "$RC" -eq 0 ]; then
-    log "Backup fertig in ${DURATION}s"
-elif [ "$RC" -eq 24 ]; then
+# Worst-case RC ermitteln (24 = vanished files, harmlos)
+if [ "$RC1" -ne 0 ] && [ "$RC1" -ne 24 ]; then
+    log "rsync[code] exit-code $RC1 — möglicherweise unvollständig (Dauer ${DURATION}s)"
+elif [ "$RC2" -ne 0 ] && [ "$RC2" -ne 24 ]; then
+    log "rsync[media] exit-code $RC2 — möglicherweise unvollständig (Dauer ${DURATION}s)"
+elif [ "$RC1" -eq 24 ] || [ "$RC2" -eq 24 ]; then
     log "Backup fertig in ${DURATION}s (mit vanished files, harmlos)"
 else
-    log "rsync exit-code $RC nach ${DURATION}s — möglicherweise unvollständig"
+    log "Backup fertig in ${DURATION}s"
 fi
 
 # Snapshot-Info
