@@ -2,7 +2,19 @@
 
 Alle wichtigen Änderungen an diesem Darkstar-Fork von Posterrama werden in dieser Datei dokumentiert.
 
-Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), und dieses Projekt folgt grob [Semantic Versioning](https://semver.org/lang/de/). Fork-spezifische Patch-Versionen werden mit Buchstaben-Suffixen gekennzeichnet (`3.0.1a`, `3.0.1b`, ...).
+Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), und dieses Projekt folgt grob [Semantic Versioning](https://semver.org/lang/de/). Fork-spezifische Patch-Versionen nutzten bis `3.0.1z` Buchstaben-Suffixe; ab `3.0.1z-1` numerisch weiter — die „echten" Versionsnummern (`3.0.2`, `3.1.0`) bleiben dem Upstream-Entwickler vorbehalten.
+
+---
+
+## [3.0.1z-1] – 2026-05-14
+
+Auto-Playlist „Die letzten N hinzugefügten Filme" sortiert wieder nach **Emby `DateCreated`** statt nach ZIP-mtime.
+
+### Behoben
+- **Auto-Playlist-Sortierung** (`lib/emby-sync.js`): In `3.0.1z` wurde die Sortierung auf ZIP-mtime umgestellt, damit frisch gezogene PosterPacks oben stehen. Nebenwirkung: Alte Filme (z. B. *Mein Freund Harvey (1950)*, *Spaceballs (1987)*) tauchten ganz oben in der „letzten 30 hinzugefügten Filme"-Liste auf, sobald deren PosterPack neu geschrieben wurde — der Playlist-Name wurde irreführend. **Fix:** Sortierung zurück auf `dateCreated` (Emby-Importdatum) descending. ZIP-Existenz-Filter bleibt — Filme ohne PosterPack landen weiterhin nicht in der Playlist, damit keine leeren Slots entstehen.
+
+### Hinweis
+- Schema-Wechsel der Fork-Versionierung: Nach `3.0.1z` wird mit numerischen Suffixen weitergezählt (`-1`, `-2`, ...), um die „echten" Versionssprünge dem Upstream-Entwickler zu überlassen.
 
 ---
 
