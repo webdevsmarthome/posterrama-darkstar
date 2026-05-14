@@ -2,10 +2,15 @@
 #
 # backup-to-nas.sh  (Template — nach /usr/local/bin/posterrama-backup-to-nas.sh installieren)
 #
-# Täglicher Mirror des Posterrama-Verzeichnisses auf ein SMB-Share (z. B.
-# Synology-NAS). Läuft als Systemd-System-Service mit root-Rechten für den
+# Täglicher Mirror des Posterrama-Verzeichnisses auf ein SMB-Share (Synology-
+# oder anderes NAS). Läuft als Systemd-System-Service mit root-Rechten für den
 # CIFS-Mount. Strategie: strikter rsync-Mirror (`--delete`), Versionierung
 # übernimmt das NAS via Snapshots (z. B. Synology Snapshot Replication).
+#
+# Mehrere NAS-Kandidaten in NAS_CANDIDATES (Failover-Reihenfolge). Das erste
+# erreichbare wird genutzt — sind alle offline, wird das Backup stumm
+# übersprungen. Credentials sind für alle Kandidaten identisch (gleicher
+# Backup-User auf jedem NAS).
 #
 # Voraussetzungen:
 #  - cifs-utils + rsync installiert (Debian: `sudo apt install cifs-utils rsync`)
@@ -18,8 +23,20 @@
 
 set -u
 
-NAS_HOST="192.168.227.171"
-NAS_SHARE="//192.168.227.171/backup"
+# ----------------------------------------------------------------------
+# NAS-Ziele (in Prioritäts-Reihenfolge). Erstes erreichbares wird genutzt.
+# Format: "Name|Host" — Share-Name `backup` muss auf allen NAS identisch sein.
+# Credentials liegen einmalig in /etc/posterrama/nas-credentials und gelten
+# für alle gelisteten NAS-Hosts (gleicher Backup-User auf jedem Kandidaten).
+#
+# Lokale Anpassung: Werte vor dem Deploy nach /usr/local/bin/ anpassen.
+# Beispiel-Setup mit zwei NAS auf verschiedenen Subnetzen — Hostnames oder
+# IP-Adressen sind zulässig (mDNS `.local` setzt voraus, dass Avahi läuft).
+# ----------------------------------------------------------------------
+NAS_CANDIDATES=(
+    "Primary|nas-primary.local"
+    "Backup|nas-secondary.local"
+)
 NAS_REMOTE_SUBDIR="posterrama"
 SRC="/home/helmut/posterrama"
 CREDS_FILE="/etc/posterrama/nas-credentials"
@@ -37,16 +54,34 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # ----------------------------------------------------------------------
-# Online-Check (stumm überspringen wenn NAS nicht erreichbar)
+# Online-Check über alle Kandidaten — erstes erreichbares NAS gewinnt.
+# Wenn keines erreichbar: stumm überspringen.
 # ----------------------------------------------------------------------
-if ! ping -c 1 -W 3 "$NAS_HOST" >/dev/null 2>&1; then
-    log "NAS $NAS_HOST nicht erreichbar (ping) — Backup übersprungen"
+NAS_HOST=""
+NAS_NAME=""
+for entry in "${NAS_CANDIDATES[@]}"; do
+    cand_name="${entry%%|*}"
+    cand_host="${entry##*|}"
+    if ! ping -c 1 -W 3 "$cand_host" >/dev/null 2>&1; then
+        log "$cand_name ($cand_host) nicht erreichbar (ping) — probiere nächstes Ziel"
+        continue
+    fi
+    if ! timeout 3 bash -c "</dev/tcp/$cand_host/445" 2>/dev/null; then
+        log "$cand_name ($cand_host) SMB-Port 445 nicht erreichbar — probiere nächstes Ziel"
+        continue
+    fi
+    NAS_HOST="$cand_host"
+    NAS_NAME="$cand_name"
+    log "Backup-Ziel: $NAS_NAME ($NAS_HOST)"
+    break
+done
+
+if [ -z "$NAS_HOST" ]; then
+    log "Kein NAS aus Kandidatenliste erreichbar — Backup übersprungen"
     exit 0
 fi
-if ! timeout 3 bash -c "</dev/tcp/$NAS_HOST/445" 2>/dev/null; then
-    log "NAS SMB-Port 445 nicht erreichbar — Backup übersprungen"
-    exit 0
-fi
+
+NAS_SHARE="//$NAS_HOST/backup"
 
 # ----------------------------------------------------------------------
 # Credentials-Check
@@ -90,7 +125,7 @@ mkdir -p "$MOUNT_POINT/$NAS_REMOTE_SUBDIR"
 #     trailer-info.json / *.poster.json Strukturen.
 # ----------------------------------------------------------------------
 START=$(date +%s)
-log "Starte rsync zu $NAS_SHARE/$NAS_REMOTE_SUBDIR/"
+log "Starte rsync zu $NAS_NAME:$NAS_SHARE/$NAS_REMOTE_SUBDIR/"
 
 # Call 1: Alles außer media/
 rsync -aH --delete --partial --timeout=600 --modify-window=2 \
@@ -129,9 +164,9 @@ if [ "$RC1" -ne 0 ] && [ "$RC1" -ne 24 ]; then
 elif [ "$RC2" -ne 0 ] && [ "$RC2" -ne 24 ]; then
     log "rsync[media] exit-code $RC2 — möglicherweise unvollständig (Dauer ${DURATION}s)"
 elif [ "$RC1" -eq 24 ] || [ "$RC2" -eq 24 ]; then
-    log "Backup fertig in ${DURATION}s (mit vanished files, harmlos)"
+    log "Backup nach $NAS_NAME fertig in ${DURATION}s (mit vanished files, harmlos)"
 else
-    log "Backup fertig in ${DURATION}s"
+    log "Backup nach $NAS_NAME fertig in ${DURATION}s"
 fi
 
 # Snapshot-Info

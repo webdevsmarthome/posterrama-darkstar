@@ -6,6 +6,22 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-3] – 2026-05-14
+
+NAS-Backup-Failover: Mehrere NAS-Ziele als Kandidatenliste — erstes erreichbares gewinnt.
+
+### Neu
+- **NAS-Failover im Backup-Script** (`scripts/backup/backup-to-nas.sh`): Statt einem einzelnen `NAS_HOST` jetzt ein `NAS_CANDIDATES`-Array mit `"Name|Host"`-Einträgen. Loop prüft pro Eintrag `ping` und SMB-Port 445 (jeweils 3 s Timeout), der erste erreichbare Host wird gemountet. Wenn alle Kandidaten offline sind, exit 0 mit Log-Hinweis (kein Service-Fail). Use-Case: Primär-NAS im Wartungsfenster oder dauerhaft offline → automatisches Ausweichen auf ein Backup-NAS auf anderem Subnetz, ohne dass der Timer-Lauf scheitert. Credentials sind für alle Kandidaten identisch (gleicher Backup-User auf jedem NAS). Produktion-verifiziert mit einem 2h-43min-Lauf auf das Fallback-NAS nach Primary-Ausfall.
+
+### Geändert
+- **Systemd-Unit-Description** (`scripts/backup/systemd/posterrama-nas-backup.service`): "Backup to Synology NAS — täglicher Mirror" → "Backup to NAS via SMB". Generischer, weil das Script jetzt nicht mehr an ein einzelnes NAS gebunden ist.
+- **Log-Output** zeigt jetzt sowohl den NAS-Anzeigenamen als auch den Host: `[posterrama-backup] Backup-Ziel: Primary (nas-primary.local)` / `Backup nach Primary fertig in 9828s`.
+
+### Hinweis zur lokalen Anpassung
+Das Repo-Template enthält generische Beispiel-Werte (`Primary|nas-primary.local`, `Backup|nas-secondary.local`). Beim Deploy nach `/usr/local/bin/posterrama-backup-to-nas.sh` die `NAS_CANDIDATES`-Einträge auf die echten Hostnames/IPs der eigenen NAS-Infrastruktur anpassen. Share-Name `backup` muss auf allen Kandidaten identisch sein.
+
+---
+
 ## [3.0.1z-2] – 2026-05-14
 
 Safari-Trailer-Autoplay-Fix für lokale .mp4-Trailer + Codec-Härtung im Downloader.
