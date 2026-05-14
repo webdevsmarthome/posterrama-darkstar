@@ -6,6 +6,18 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-2] – 2026-05-14
+
+Safari-Trailer-Autoplay-Fix für lokale .mp4-Trailer + Codec-Härtung im Downloader.
+
+### Behoben
+- **Safari blockierte Autoplay lokaler Trailer** (`public/cinema/cinema-display.js`): Beim `<video>`-Element wurde `src` *vor* `muted`/`playsinline`/`autoplay` gesetzt. macOS Safari prüft beim Start des Loadings, ob das `muted`-Attribut präsent ist — wenn nicht, greift die Autoplay-Policy und das Video startet nie. Symptom: Poster fade-out, Trailer-Frame erscheint nicht, weil `onplay` nie feuert. **Fix:** Reihenfolge umgedreht (Attribute zuerst per `setAttribute`, dann Property, `src` zuletzt), expliziter `video.play()`-Call mit `.catch()` für saubere Recovery nach `NotAllowedError`, und Error-Recovery von 120 s → 2 s, damit eine kaputte Datei die Rotation nicht über Minuten anhält.
+
+### Geändert
+- **yt-dlp erzwingt H.264** (`poster-updater/download-trailers.py`): Vorher pickte yt-dlp `bestvideo[ext=mp4]` — für neuere YouTube-Videos liefert das AV1-im-mp4-Container. Safari auf Intel-Macs / vor 17.4 kann AV1 nicht decoden → schwarze Trailer ohne Error-Event. **Fix:** Format-Selector bevorzugt `vcodec^=avc1` (H.264), fällt auf `vcodec!*=av01` zurück, dann erst auf beliebiges mp4. Bestehende AV1-Trailer (266 von 1215) bleiben — sie funktionieren auf Apple Silicon + Safari 17.4+, Re-Download nur bei Bedarf.
+
+---
+
 ## [3.0.1z-1] – 2026-05-14
 
 Auto-Playlist „Die letzten N hinzugefügten Filme" sortiert wieder nach **Emby `DateCreated`** statt nach ZIP-mtime.

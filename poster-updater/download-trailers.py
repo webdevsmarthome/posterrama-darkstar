@@ -126,9 +126,21 @@ def find_trailer_url(movie_id):
 
 
 def download_trailer(youtube_url, output_path):
-    """Laedt YouTube-Video als MP4 herunter, max. 1080p."""
+    """Laedt YouTube-Video als MP4 herunter, max. 1080p, H.264-codiert.
+
+    H.264 (vcodec=avc1) statt AV1 erzwingen, damit die mp4-Trailer auf allen
+    Browsern und Geraeten abspielen — Safari (insbesondere Intel-Macs und
+    aeltere Versionen) kann AV1 nicht decoden, was zu schwarzen Trailern fuehrt.
+    Fallback-Kette: H.264-mp4 -> beliebiges mp4 ohne AV1 -> bestes mp4 -> 1080p.
+    """
     ydl_opts = {
-        'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]',
+        'format': (
+            'bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/'
+            'best[height<=1080][vcodec^=avc1][ext=mp4]/'
+            'bestvideo[height<=1080][vcodec!*=av01][ext=mp4]+bestaudio[ext=m4a]/'
+            'best[height<=1080][ext=mp4]/'
+            'best[height<=1080]'
+        ),
         'outtmpl': output_path,
         'merge_output_format': 'mp4',
         'quiet': True,

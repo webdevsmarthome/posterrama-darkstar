@@ -1453,14 +1453,22 @@
             trailerEl.className = 'cinema-trailer-overlay';
             currentTrailerKey = 'local-' + media.title;
 
-            // Video-Element
+            // Video-Element — PATCH-SAFARI-AUTOPLAY: Reihenfolge zählt!
+            // Safari prüft beim Setzen von src, ob muted-Attribut bereits gesetzt ist.
+            // Daher: Attribute zuerst setzen, src zuletzt. Zusätzlich setAttribute()
+            // statt nur Property — manche Safari-Versionen lesen das HTML-Attribut.
             const video = document.createElement('video');
             video.id = 'trailer-video-local';
-            video.src = directTrailerUrl;
+            video.muted = true;
+            video.defaultMuted = true;
+            video.setAttribute('muted', '');
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+            video.setAttribute('autoplay', '');
+            video.playsInline = true;
             video.autoplay = true;
             video.controls = false;
-            video.muted = true; // PATCH-AUTOPLAY: stumm starten
-            video.playsInline = true;
+            video.preload = 'auto';
             video.style.cssText = 'width:calc(100% + 16px);height:calc(100% + 16px);object-fit:cover;margin:-8px;border:0;';
 
             video.onplay = () => {
@@ -1495,14 +1503,40 @@
                 }
             };
             video.onerror = () => {
-                log('Trailer: Lokales Video Fehler', { title: media.title });
+                const err = video.error;
+                log('Trailer: Lokales Video Fehler', {
+                    title: media.title,
+                    code: err?.code,
+                    message: err?.message,
+                    src: directTrailerUrl,
+                });
                 removeTrailerOverlay();
-                setTimeout(() => { startRotation(); }, noTrailerMs);
+                // PATCH-SAFARI-AUTOPLAY: nach Codec/Load-Fehler schnell zur nächsten Rotation
+                // (vorher 120s — Anzeige stand fest). 2s reicht für visuellen Anschluss.
+                setTimeout(() => { showNextPoster(); startRotation(); }, 2000);
             };
 
+            // src zuletzt setzen — Safari startet das Loading hier und prüft Attribute
+            video.src = directTrailerUrl;
             trailerEl.appendChild(video);
             document.body.appendChild(trailerEl);
             setupAutohideTimer(trailerConfig);
+
+            // PATCH-SAFARI-AUTOPLAY: Expliziter play()-Call. Wenn Safari den Autoplay
+            // verweigert (NotAllowedError), wird die Promise rejected — wir können dann
+            // sauber aufräumen statt im "unsichtbarer Frame, kein Event"-Limbo zu hängen.
+            const playPromise = video.play();
+            if (playPromise && typeof playPromise.then === 'function') {
+                playPromise.catch(err => {
+                    log('Trailer: video.play() rejected — Autoplay blockiert?', {
+                        title: media.title,
+                        name: err?.name,
+                        message: err?.message,
+                    });
+                    removeTrailerOverlay();
+                    setTimeout(() => { showNextPoster(); startRotation(); }, 2000);
+                });
+            }
             return;
         }
 
