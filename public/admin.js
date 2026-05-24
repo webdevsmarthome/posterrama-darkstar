@@ -17325,16 +17325,23 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                                 modePill.remove();
                             }
 
-                            // Update meta-pills (location, profile)
+                            // Update meta-pills (location, profile, pinned playlist)
                             const metaPills = card.querySelector('.meta-pills');
                             if (metaPills) {
                                 const location = d.location || 'Unassigned';
                                 const profileId = d?.profileId || '';
                                 const profileName = profileId ? resolveProfileLabel(profileId) : '';
+                                const pinnedId = d?.pinnedPlaylistId || '';
+                                const pinnedName = pinnedId
+                                    ? typeof window.resolvePinnedPlaylistName === 'function'
+                                        ? window.resolvePinnedPlaylistName(pinnedId)
+                                        : pinnedId
+                                    : '';
 
                                 metaPills.innerHTML = `
                                     <span class="status-pill" title="Location"><i class="fas fa-location-dot"></i> ${escapeHtml(location)}</span>
                                     ${profileId ? `<span class="status-pill sp-profile" title="Profile"><i class="fas fa-id-card"></i> ${escapeHtml(profileName)}</span>` : ''}
+                                    ${pinnedId ? `<span class="status-pill sp-pinned-playlist" title="Pinned Playlist"><i class="fas fa-thumbtack"></i> ${escapeHtml(pinnedName)}</span>` : ''}
                                 `;
                             }
 

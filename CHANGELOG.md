@@ -6,6 +6,15 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-5] – 2026-05-24
+
+Hotfix für 3.0.1z-4: 📌-Pin-Badge verschwand nach 3 Sekunden wieder aus der Devices-Übersicht.
+
+### Behoben
+- **Pin-Badge persistiert jetzt** (`public/admin.js`): Der bestehende Live-Reconcile-Loop (`reconcileDeviceToolbarStatesOnce`, alle 3 s) schreibt die `.meta-pills`-Sektion komplett neu — und ignorierte beim Render-Template das in 3.0.1z-4 neu hinzugefügte 📌-Pinned-Playlist-Badge. Resultat: Badge erschien beim initialen Card-Render kurz, wurde aber beim nächsten Reconcile-Tick aus dem DOM gelöscht. **Fix:** Reconcile-Template um den Pin-Branch erweitert (analog zum Profil-Branch), inklusive `window.resolvePinnedPlaylistName`-Lookup. Beide Render-Pfade (`renderPage` für Voll-Render + `reconcileDeviceToolbarStatesOnce` für inkrementelles Live-Update) zeigen jetzt konsistent denselben Pin-Zustand.
+
+---
+
 ## [3.0.1z-4] – 2026-05-24
 
 Per-Device-Playlist-Pinning: jedes Device kann eine eigene Playlist gepinnt bekommen, die global aktivierte Playlist überschreibt sie nicht.
