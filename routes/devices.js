@@ -4,7 +4,22 @@
  */
 
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const deviceOps = require('../lib/device-operations');
+
+const PLAYLISTS_FILE = path.join(__dirname, '..', 'public', 'cinema-playlists.json');
+const LIVE_PLAYLIST_FILE = path.join(__dirname, '..', 'public', 'cinema-playlist.json');
+
+async function readJsonSafe(filePath) {
+    try {
+        const raw = await fs.promises.readFile(filePath, 'utf8');
+        return JSON.parse(raw);
+    } catch (err) {
+        if (err.code === 'ENOENT') return null;
+        throw err;
+    }
+}
 /**
  * @typedef {Object} DeviceRequestExtensions
  * @property {boolean} [deviceBypass] - Whether device bypass mode is enabled
@@ -914,6 +929,68 @@ module.exports = function createDevicesRouter({
     });
 
     /**
+     * GET /api/devices/:id/playlist
+     *
+     * Liefert für ein Device die anzuzeigende Playlist — gepinnt oder global.
+     * Wird von Cinema/Screensaver statt /cinema-playlist.json gefetched,
+     * sobald die deviceId bekannt ist.
+     *
+     * Response:
+     *   { enabled, titles, source: 'pinned'|'global', playlistId?, playlistName? }
+     */
+    router.get('/:id/playlist', async (req, res) => {
+        try {
+            const deviceId = req.params.id;
+            if (!deviceId) {
+                return res.status(400).json({ error: 'missing_device_id' });
+            }
+            const device = await deviceStore.getById(deviceId);
+            if (!device) {
+                return res.status(404).json({ error: 'device_not_found' });
+            }
+
+            const live = (await readJsonSafe(LIVE_PLAYLIST_FILE)) || {
+                enabled: false,
+                titles: [],
+            };
+            const fallback = {
+                enabled: !!live.enabled,
+                titles: Array.isArray(live.titles) ? live.titles : [],
+                source: 'global',
+            };
+
+            const pinId = device.pinnedPlaylistId || null;
+            if (!pinId) {
+                return res.json(fallback);
+            }
+
+            const collection = await readJsonSafe(PLAYLISTS_FILE);
+            const pinned = collection?.playlists?.[pinId];
+            if (!pinned) {
+                logger.warn('[Device Playlist] Pinned playlist not found, falling back to global', {
+                    deviceId,
+                    pinId,
+                });
+                return res.json(fallback);
+            }
+
+            return res.json({
+                enabled: true,
+                titles: Array.isArray(pinned.titles) ? pinned.titles : [],
+                source: 'pinned',
+                playlistId: pinId,
+                playlistName: pinned.name || pinId,
+            });
+        } catch (e) {
+            logger.error('[Device Playlist] Unexpected error', {
+                error: e.message,
+                stack: e.stack,
+            });
+            res.status(500).json({ error: 'playlist_failed' });
+        }
+    });
+
+    /**
      * @swagger
      * /api/devices/{id}:
      *   delete:
@@ -1020,6 +1097,7 @@ module.exports = function createDevicesRouter({
             const beforeDevice = await deviceStore.getById(deviceId);
             const beforeProfileId = beforeDevice?.profileId ?? null;
             const beforeOverrideWasEmpty = isEmptyOverride(beforeDevice?.settingsOverride);
+            const beforePinnedPlaylistId = beforeDevice?.pinnedPlaylistId ?? null;
             const updatedDevice = await deviceOps.processDeviceUpdate(
                 deviceStore,
                 deviceId,
@@ -1039,10 +1117,16 @@ module.exports = function createDevicesRouter({
                     isEmptyOverride(patch.settingsOverride) &&
                     !beforeOverrideWasEmpty;
 
+                const pinChanged =
+                    patch.pinnedPlaylistId !== undefined &&
+                    beforePinnedPlaylistId !== (updatedDevice?.pinnedPlaylistId ?? null);
+
                 if (profileChanged) {
                     await requestDeviceReload(deviceId, 'profile_changed');
                 } else if (overridesCleared) {
                     await requestDeviceReload(deviceId, 'overrides_cleared');
+                } else if (pinChanged) {
+                    await requestDeviceReload(deviceId, 'pin_changed');
                 }
             } catch (e) {
                 logger.warn('[Device PATCH] Reload request failed (non-fatal)', {
@@ -1062,6 +1146,10 @@ module.exports = function createDevicesRouter({
             }
 
             if (e.message === 'groups_not_supported') {
+                return res.status(400).json({ error: e.message });
+            }
+
+            if (e.message === 'invalid_pinned_playlist') {
                 return res.status(400).json({ error: e.message });
             }
 

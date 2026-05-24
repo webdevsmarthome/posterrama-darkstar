@@ -6,6 +6,25 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-4] – 2026-05-24
+
+Per-Device-Playlist-Pinning: jedes Device kann eine eigene Playlist gepinnt bekommen, die global aktivierte Playlist überschreibt sie nicht.
+
+### Neu
+- **Playlist-Pin pro Device** (`lib/device-operations.js`, `routes/devices.js`, `routes/poster-selector.js`, `public/admin.html`, `public/admin.js`, `public/admin.css`, `public/cinema/cinema-display.js`, `public/screensaver/screensaver.js`): Im Device-Record gibt es jetzt ein optionales Feld `pinnedPlaylistId`. Wird es gesetzt, zieht das Device seine Playlist über den neuen Endpoint `GET /api/devices/:id/playlist` und ignoriert globale Playlist-Wechsel. Wird das Feld auf `null` gesetzt, folgt das Device wieder der globalen aktiven Playlist.
+  - **Admin-UI:** Im Devices-Bereich neuer Menüpunkt "Pin playlist…" (mit `fa-thumbtack`-Icon). Modal-Dialog mit Dropdown aller verfügbaren Playlists (inkl. Auto-Playlists, mit `(auto)`-Suffix gekennzeichnet) + "Pin"- und "Unpin"-Buttons. Gepinnte Devices zeigen ein gelbes 📌-Badge mit dem Playlist-Namen in der Übersicht.
+  - **Backend-Validierung:** PATCH `/api/devices/:id` lehnt ungültige Playlist-IDs mit `400 invalid_pinned_playlist` ab; nur Keys aus `cinema-playlists.json` oder `null` werden akzeptiert.
+  - **WebSocket-Sync:** Pin-Wechsel triggert sofortigen Device-Reload via bestehenden `requestDeviceReload`-Pfad. Titles-Updates einer gepinnten Playlist (`PUT /playlists/:id`) benachrichtigen alle Devices mit passendem Pin via `wsHub.sendToDevice`. Bei `DELETE /playlists/:id` werden Pins betroffener Devices automatisch geleert (Fallback auf Global) — kein Confirm-Dialog, kein Block.
+  - **Robustheit:** Verweist ein Pin auf eine zwischenzeitlich gelöschte Playlist, fällt der Endpoint stillschweigend auf die globale Playlist zurück und loggt eine WARN.
+
+### Performance
+Keine zusätzliche Server-Last: Die teure Source-Aggregation (Plex/Jellyfin/ZIP-Scan, 100-200 MB Heap) bleibt 1× global. Per-Device-Resolution ist nur ein In-Memory-Title-Filter (Mikrosekunden). Poster/Trailer werden weiterhin via Express-sendfile aus `media/` ausgeliefert — der Code-Path ändert sich nicht.
+
+### Tests
+- `__tests__/devices/devices.playlist.test.js`: 7 neue Tests für `GET /api/devices/:id/playlist` (ungepinnt → global, gepinnt → korrekte Titles, Pin auf gelöschte Playlist → Fallback auf global, fehlendes Device → 404) + PATCH-Validierung (valid → 200, null → 200, invalid → 400 `invalid_pinned_playlist`).
+
+---
+
 ## [3.0.1z-3] – 2026-05-14
 
 NAS-Backup-Failover: Mehrere NAS-Ziele als Kandidatenliste — erstes erreichbares gewinnt.

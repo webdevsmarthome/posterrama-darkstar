@@ -4277,9 +4277,17 @@
 
     // PATCH: Listen for playlist changes — BroadcastChannel (same browser) + polling (cross-device)
     let _lastPlaylistHash = null;
+    function _resolvePlaylistUrl() {
+        try {
+            const id = window.PosterramaDevice?.getState?.()?.deviceId;
+            return id ? `/api/devices/${id}/playlist` : '/cinema-playlist.json';
+        } catch (_) {
+            return '/cinema-playlist.json';
+        }
+    }
     async function checkPlaylistChange() {
         try {
-            const res = await fetch('/cinema-playlist.json', { cache: 'no-cache' });
+            const res = await fetch(_resolvePlaylistUrl(), { cache: 'no-cache' });
             if (!res.ok) return;
             const text = await res.text();
             const hash = text.length + '-' + text.substring(0, 100);
@@ -4380,9 +4388,9 @@
 
             debug('Media fetch result', { count: items.length });
 
-            // PATCH16: Playlist-Modus – /cinema-playlist.json prüfen
+            // PATCH16: Playlist-Modus – Device-Pin oder globale Playlist prüfen
             try {
-                const plRes = await fetch('/cinema-playlist.json', { cache: 'no-cache' });
+                const plRes = await fetch(_resolvePlaylistUrl(), { cache: 'no-cache' });
                 if (plRes.ok) {
                     const pl = await plRes.json();
                     if (pl && pl.enabled === true && Array.isArray(pl.titles) && pl.titles.length > 0) {

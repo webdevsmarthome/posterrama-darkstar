@@ -12586,6 +12586,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                                         <div class="meta-pills" style="display:flex; gap:6px; flex-wrap:wrap;">
                                             <span class="status-pill" title="Location"><i class="fas fa-location-dot"></i> ${escapeHtml(room)}</span>
                                             ${profileId ? `<span class="status-pill sp-profile" title="Profile"><i class="fas fa-id-card"></i> ${escapeHtml(profileName)}</span>` : ''}
+                                            ${d?.pinnedPlaylistId ? `<span class="status-pill sp-pinned-playlist" title="Pinned Playlist"><i class="fas fa-thumbtack"></i> ${escapeHtml((typeof window.resolvePinnedPlaylistName === 'function' ? window.resolvePinnedPlaylistName(d.pinnedPlaylistId) : d.pinnedPlaylistId))}</span>` : ''}
                                         </div>
                                     </div>
                                 </div>`;
@@ -15401,6 +15402,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                     <div class="dropdown-divider"></div>
                     <div class="dropdown-item" data-device-action="merge"><i class="fas fa-object-group"></i> Merge selected</div>
                     <div class="dropdown-item" data-device-action="profiles"><i class="fas fa-id-card"></i> Assign profile…</div>
+                    <div class="dropdown-item" data-device-action="playlists"><i class="fas fa-thumbtack"></i> Pin playlist…</div>
                     <div class="dropdown-item" data-device-action="location"><i class="fas fa-location-dot"></i> Assign location</div>
                     <div class="dropdown-heading">Selection</div>
                     <div class="dropdown-item" data-device-action="select-all"><i class="fas fa-check-double"></i> Select all</div>
@@ -16340,6 +16342,127 @@ window.COLOR_PRESETS = COLOR_PRESETS;
             // Expose for Actions menu
             window.openAssignProfileModal = openAssignProfileModal;
 
+            // === Playlist Pin (per-device) ============================
+            async function loadPlaylistsForAssign() {
+                try {
+                    const res = await fetchJSON('/api/poster-selector/playlists');
+                    const map = (res && res.playlists) || {};
+                    state.assignablePlaylists = Object.entries(map).map(([id, pl]) => ({
+                        id,
+                        name: pl.name || id,
+                        auto: !!pl.auto,
+                    }));
+                } catch (_) {
+                    state.assignablePlaylists = [];
+                }
+            }
+
+            function resolvePinnedPlaylistName(pinId) {
+                if (!pinId) return '';
+                const list = state.assignablePlaylists || [];
+                const hit = list.find(p => p.id === pinId);
+                return hit ? hit.name : pinId;
+            }
+            window.resolvePinnedPlaylistName = resolvePinnedPlaylistName;
+
+            async function openAssignPlaylistModal() {
+                await loadPlaylistsForAssign();
+                const select = document.getElementById('assign-playlist-select');
+                if (select) {
+                    const items = state.assignablePlaylists || [];
+                    if (!items.length) {
+                        select.innerHTML =
+                            '<option value="" disabled selected>No playlists available</option>';
+                    } else {
+                        select.innerHTML = items
+                            .map(
+                                p =>
+                                    `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}${p.auto ? ' (auto)' : ''}</option>`
+                            )
+                            .join('');
+                    }
+                }
+                const modal = document.getElementById('modal-assign-playlist');
+                if (modal) __showOverlay(modal, 'modal-assign-playlist');
+            }
+            window.openAssignPlaylistModal = openAssignPlaylistModal;
+
+            document.getElementById('btn-playlist-assign')?.addEventListener('click', async () => {
+                const playlistId =
+                    document.getElementById('assign-playlist-select')?.value || '';
+                const ids = Array.from(
+                    document.querySelectorAll('#device-grid .device-card.selected')
+                ).map(c => c.getAttribute('data-id'));
+
+                if (!ids.length) {
+                    window.notify?.toast({ type: 'info', title: 'No devices selected' });
+                    return;
+                }
+                if (!playlistId) {
+                    window.notify?.toast({
+                        type: 'warning',
+                        title: 'No playlist selected',
+                        message: 'Pick a playlist to pin, or use Unpin to follow the global one.',
+                    });
+                    return;
+                }
+
+                let ok = 0;
+                for (const id of ids) {
+                    try {
+                        await fetchJSON(`/api/devices/${encodeURIComponent(id)}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pinnedPlaylistId: playlistId }),
+                        });
+                        ok++;
+                    } catch (_) {
+                        /* continue */
+                    }
+                }
+
+                window.notify?.toast({
+                    type: 'success',
+                    title: 'Playlist pinned',
+                    message: `Applied to ${ok}/${ids.length} device(s)`,
+                });
+                document.getElementById('modal-assign-playlist')?.classList.remove('open');
+                await loadDevices();
+            });
+
+            document.getElementById('btn-playlist-clear')?.addEventListener('click', async () => {
+                const ids = Array.from(
+                    document.querySelectorAll('#device-grid .device-card.selected')
+                ).map(c => c.getAttribute('data-id'));
+                if (!ids.length) {
+                    window.notify?.toast({ type: 'info', title: 'No devices selected' });
+                    return;
+                }
+                let ok = 0;
+                for (const id of ids) {
+                    try {
+                        await fetchJSON(`/api/devices/${encodeURIComponent(id)}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pinnedPlaylistId: null }),
+                        });
+                        ok++;
+                    } catch (_) {
+                        /* continue */
+                    }
+                }
+                window.notify?.toast({
+                    type: 'success',
+                    title: 'Playlist unpinned',
+                    message: `Cleared on ${ok}/${ids.length} device(s)`,
+                });
+                document.getElementById('modal-assign-playlist')?.classList.remove('open');
+                await loadDevices();
+            });
+
+            // Load playlists once at init so device cards can resolve names immediately
+            loadPlaylistsForAssign();
+
             // Load profiles on init
             loadProfiles();
             // Dropdown toggles within device toolbar and cards
@@ -16873,6 +16996,19 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                             return;
                         }
                         openAssignProfileModal();
+                    } else if (act === 'playlists') {
+                        const selected = Array.from(
+                            document.querySelectorAll('#device-grid .device-card.selected')
+                        );
+                        if (!selected.length) {
+                            window.notify?.toast({
+                                type: 'info',
+                                title: 'No devices selected',
+                                message: 'Select one or more devices first',
+                            });
+                            return;
+                        }
+                        openAssignPlaylistModal();
                     } else if (act === 'merge') {
                         const selected = Array.from(
                             document.querySelectorAll('#device-grid .device-card.selected')

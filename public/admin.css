@@ -179,6 +179,12 @@
     border-color: color-mix(in srgb, #06b6d4 35%, transparent);
     color: #22d3ee;
 }
+/* Pinned-playlist pill - warm amber/gold to differentiate from profile */
+#section-devices .status-pill.sp-pinned-playlist {
+    background: color-mix(in srgb, #f59e0b 15%, transparent);
+    border-color: color-mix(in srgb, #f59e0b 35%, transparent);
+    color: #fbbf24;
+}
 /* Profile card - use shared .profile-card styles */
 #profiles-ui .profile-card h4 {
     color: var(--color-text-primary);

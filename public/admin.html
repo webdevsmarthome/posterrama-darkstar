@@ -5473,6 +5473,34 @@
     </div>
   </div>
 
+  <!-- Assign Playlist Modal (Pin) -->
+  <div class="modal-overlay" id="modal-assign-playlist">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-assign-playlist-title">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-assign-playlist-title">
+          <i class="fas fa-thumbtack"></i>
+          Assign Playlist (Pin)
+        </div>
+        <button class="modal-close" data-close-modal><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p>Pin a specific playlist to the selected devices, or clear the pin so they follow the global active playlist.</p>
+        <div class="form-group" style="margin-top: var(--space-md);">
+          <label for="assign-playlist-select">Playlist</label>
+          <div class="select-wrap has-caret">
+            <select id="assign-playlist-select"></select>
+            <span class="select-caret" aria-hidden="true">▾</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex; gap:12px; justify-content:flex-end;">
+        <button class="btn btn-sm btn-cancel" data-close-modal><span>Cancel</span></button>
+        <button class="btn btn-sm btn-remove-accent" id="btn-playlist-clear"><i class="fas fa-ban" aria-hidden="true"></i><span>Unpin</span></button>
+        <button class="btn btn-sm btn-assign-accent" id="btn-playlist-assign"><i class="fas fa-thumbtack" aria-hidden="true"></i><span>Pin</span></button>
+      </div>
+    </div>
+  </div>
+
   <!-- Assign Preset Modal (DEPRECATED - kept for migration) -->
   <div class="modal-overlay" id="modal-assign-preset" style="display: none;">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-preset-title">

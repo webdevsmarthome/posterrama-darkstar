@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-05-14 (basierend auf Version 3.0.1z-3)
+**Stand:** 2026-05-24 (basierend auf Version 3.0.1z-4)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 **Release-Historie:** Siehe [CHANGELOG.md](./CHANGELOG.md) fuer die versionierte Uebersicht aller Aenderungen seit v3.0.1.
 
@@ -86,6 +86,7 @@
 | 61 | Cinema Footer Dual-Row | public/cinema/cinema-display.css | Vertikaler Separator vor zweiter Footer-Zeile im Dual-Row-Modus entfernt |
 | 62 | Media Flag Icons | public/icons/aspectratio, audio, mpaa, music, resolution, rottentomatoes, source, studio, videocodec | Icon-Sets fuer Metadaten-Anzeige im Cinema Footer |
 | 63 | ZIP-Metadata-Durchreichung | lib/media-aggregator.js | genres, director, studio, resolution, audioCodec, aspectRatio, hdr werden aus ZIP-`metadata.json` an das Media-Item durchgereicht |
+| 64 | Per-Device-Playlist-Pin | lib/device-operations.js, routes/devices.js, routes/poster-selector.js, public/admin.html, public/admin.js, public/admin.css, public/cinema/cinema-display.js, public/screensaver/screensaver.js | Jedes Device kann eine eigene Playlist gepinnt bekommen; globale Aktivierung überschreibt Pin nicht. Neuer Endpoint `GET /api/devices/:id/playlist`, Admin-UI "Pin playlist…" mit Dropdown + 📌-Badge |
 
 ---
 

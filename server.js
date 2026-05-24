@@ -4001,7 +4001,7 @@ app.use('/trailers', express.static(path.join(__dirname, 'media', 'trailers'), {
 
 // === POSTER SELECTOR ROUTES ===
 const createPosterSelectorRouter = require('./routes/poster-selector');
-app.use('/api/poster-selector', isAuthenticated, createPosterSelectorRouter({ logger, wsHub }));
+app.use('/api/poster-selector', isAuthenticated, createPosterSelectorRouter({ logger, wsHub, deviceStore }));
 
 // === EMBY SYNC ROUTES (Darkstar-Fork) ===
 const createEmbySyncRouter = require('./routes/emby-sync');

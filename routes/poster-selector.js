@@ -11,8 +11,78 @@ const COMPLETE_DIR = path.join(__dirname, '..', 'media', 'complete');
 const TRAILER_DIR = path.join(__dirname, '..', 'media', 'trailers');
 const TRAILER_INFO_PATH = path.join(TRAILER_DIR, 'trailer-info.json');
 
-module.exports = function createPosterSelectorRouter({ logger, wsHub }) {
+module.exports = function createPosterSelectorRouter({ logger, wsHub, deviceStore }) {
     const router = express.Router();
+
+    // --- Helper: notify devices that have a specific playlist pinned ---
+    async function notifyPinnedDevices(playlistId, { reason = 'pinned_titles_updated' } = {}) {
+        if (!deviceStore || typeof deviceStore.getAll !== 'function') return;
+        try {
+            const devices = await deviceStore.getAll();
+            const pinned = devices.filter(d => d && d.pinnedPlaylistId === playlistId);
+            for (const d of pinned) {
+                try {
+                    if (wsHub && typeof wsHub.sendToDevice === 'function') {
+                        wsHub.sendToDevice(d.id, {
+                            kind: 'command',
+                            type: 'playlist.refresh',
+                            reason,
+                        });
+                    }
+                } catch (err) {
+                    logger.debug('poster-selector: sendToDevice failed', {
+                        deviceId: d.id,
+                        error: err.message,
+                    });
+                }
+            }
+            if (pinned.length > 0) {
+                logger.info('poster-selector: Notified pinned devices', {
+                    playlistId,
+                    count: pinned.length,
+                    reason,
+                });
+            }
+        } catch (err) {
+            logger.warn('poster-selector: notifyPinnedDevices failed', { error: err.message });
+        }
+    }
+
+    // --- Helper: clear pinnedPlaylistId on devices when a playlist is deleted ---
+    async function clearPinsForDeletedPlaylist(playlistId) {
+        if (!deviceStore || typeof deviceStore.patchDevice !== 'function') return;
+        try {
+            const devices = await deviceStore.getAll();
+            const pinned = devices.filter(d => d && d.pinnedPlaylistId === playlistId);
+            for (const d of pinned) {
+                try {
+                    await deviceStore.patchDevice(d.id, { pinnedPlaylistId: null });
+                    if (wsHub && typeof wsHub.sendToDevice === 'function') {
+                        wsHub.sendToDevice(d.id, {
+                            kind: 'command',
+                            type: 'playlist.refresh',
+                            reason: 'pinned_playlist_deleted',
+                        });
+                    }
+                } catch (err) {
+                    logger.debug('poster-selector: clearPin patch failed', {
+                        deviceId: d.id,
+                        error: err.message,
+                    });
+                }
+            }
+            if (pinned.length > 0) {
+                logger.info('poster-selector: Cleared pins for deleted playlist', {
+                    playlistId,
+                    count: pinned.length,
+                });
+            }
+        } catch (err) {
+            logger.warn('poster-selector: clearPinsForDeletedPlaylist failed', {
+                error: err.message,
+            });
+        }
+    }
 
     // --- Helper: read live playlist JSON (used by displays) ---
     async function readPlaylist() {
@@ -361,6 +431,12 @@ module.exports = function createPosterSelectorRouter({ logger, wsHub }) {
                 await syncActiveToLive(collection);
             }
 
+            // Notify devices that have THIS playlist pinned — they need to refetch
+            // even if the playlist isn't the global active one.
+            if (titlesChanged) {
+                await notifyPinnedDevices(id, { reason: 'pinned_titles_updated' });
+            }
+
             res.json({ success: true, playlist: collection.playlists[id] });
         } catch (err) {
             logger.error('poster-selector: Failed to update playlist:', err.message);
@@ -387,6 +463,10 @@ module.exports = function createPosterSelectorRouter({ logger, wsHub }) {
                     error: 'Auto-Playlists können nicht gelöscht werden',
                 });
             }
+
+            // Clear pins on devices first — once the playlist is gone, the pin
+            // would resolve to nothing. Pinned devices get auto-fallback to global.
+            await clearPinsForDeletedPlaylist(id);
 
             delete collection.playlists[id];
 
