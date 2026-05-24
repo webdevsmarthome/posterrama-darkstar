@@ -2344,6 +2344,17 @@
                 }
             }
         },
+        "fanarttv": {
+            "description": "Optional fanart.tv API configuration (used by Clearlogo-Pipeline Stage 2 to fetch logos for movies TMDB has no logo for). Sign up at https://fanart.tv/get-an-api-key/ for a free project API key.",
+            "type": "object",
+            "properties": {
+                "apiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "fanart.tv project API key (free)"
+                }
+            }
+        },
         "tmdbSource": {
             "description": "Optional TMDB source configuration.",
             "type": "object",

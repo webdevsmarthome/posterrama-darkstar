@@ -32835,12 +32835,17 @@ if (!document.__niwDelegatedFallback) {
     function puRenderFilmStats(data) {
         const el = document.getElementById('pu-filmStats');
         if (!el) return;
+        const withCl = data.withClearlogo || 0;
+        const genCl = data.generatedClearlogo || 0;
+        const realCl = withCl - genCl;
         el.innerHTML =
             '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'all' ? 'active' : '') + '" data-filter="all"><span class="dot dot-total"></span> ' + data.total + ' Filme</button>' +
             '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'zip' ? 'active' : '') + '" data-filter="zip"><span class="dot dot-green"></span> ' + data.withZip + ' mit ZIP</button>' +
             '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'pending' ? 'active' : '') + '" data-filter="pending"><span class="dot dot-orange"></span> ' + data.pending + ' ausstehend</button>' +
             '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'trailer' ? 'active' : '') + '" data-filter="trailer"><span class="dot dot-green"></span> ' + (data.withTrailer || 0) + ' mit Trailer</button>' +
-            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'notrailer' ? 'active' : '') + '" data-filter="notrailer"><span class="dot dot-orange"></span> ' + ((data.withZip || 0) - (data.withTrailer || 0)) + ' ohne Trailer</button>';
+            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'notrailer' ? 'active' : '') + '" data-filter="notrailer"><span class="dot dot-orange"></span> ' + ((data.withZip || 0) - (data.withTrailer || 0)) + ' ohne Trailer</button>' +
+            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'noclearlogo' ? 'active' : '') + '" data-filter="noclearlogo" title="Filme ohne echtes Clearlogo (oder mit Text-Fallback)"><span class="dot dot-orange"></span> ' + ((data.withZip || 0) - realCl) + ' ohne echtes Clearlogo</button>' +
+            '<button class="pu-filter-btn ' + (puActiveStatusFilter === 'generatedclearlogo' ? 'active' : '') + '" data-filter="generatedclearlogo" title="Filme mit automatisch generiertem Text-Clearlogo (ideal zum manuellen Ersetzen)"><span class="dot dot-orange"></span> ' + genCl + ' mit Text-Fallback</button>';
     }
 
     function puRenderFilmList() {
@@ -32853,6 +32858,10 @@ if (!document.__niwDelegatedFallback) {
         else if (puActiveStatusFilter === 'pending') filtered = filtered.filter(f => !f.hasZip);
         else if (puActiveStatusFilter === 'trailer') filtered = filtered.filter(f => f.hasTrailer);
         else if (puActiveStatusFilter === 'notrailer') filtered = filtered.filter(f => !f.hasTrailer);
+        else if (puActiveStatusFilter === 'noclearlogo')
+            filtered = filtered.filter(f => f.hasZip && (!f.hasClearlogo || f.clearlogoSource === 'generated'));
+        else if (puActiveStatusFilter === 'generatedclearlogo')
+            filtered = filtered.filter(f => f.hasClearlogo && f.clearlogoSource === 'generated');
         if (filter) filtered = filtered.filter(f => f.name.toLowerCase().includes(filter));
 
         if (!filtered.length) {
@@ -32868,13 +32877,63 @@ if (!document.__niwDelegatedFallback) {
             } else {
                 trailerBadge = '<span class="ps-trailer-pill ps-trailer-none">Kein Trailer</span>';
             }
+            var clBadge = '';
+            if (f.hasClearlogo) {
+                var src = f.clearlogoSource || 'unknown';
+                var srcLabel = src === 'generated' ? 'Text' :
+                    src === 'tmdb' ? 'TMDB' :
+                    src === 'fanarttv' ? 'fanart' :
+                    src === 'jellyfin' ? 'Jellyfin' :
+                    src === 'plex' ? 'Plex' :
+                    src === 'manual' ? 'Manual' : 'Logo';
+                var clCls = src === 'generated' ? 'ps-clearlogo-generated' : 'ps-clearlogo-real';
+                clBadge = '<span class="ps-trailer-pill ' + clCls + '" title="Clearlogo-Quelle: ' + puEscAttr(src) + '">' + puEscHtml(srcLabel) + '</span>';
+            } else if (f.hasZip) {
+                clBadge = '<span class="ps-trailer-pill ps-trailer-none" title="Kein Clearlogo">kein Logo</span>';
+            }
+            var uploadBtn = f.hasZip
+                ? '<button class="pu-btn-clearlogo" data-pu-upload-clearlogo="' + puEscAttr(f.name) + '" title="Eigenes Clearlogo hochladen"><i class="fas fa-upload"></i></button>'
+                : '';
             return '<div class="pu-film-row">' +
                 '<span class="pu-film-dot ' + (f.hasZip ? 'has-zip' : 'pending') + '" title="' + (f.hasZip ? 'ZIP vorhanden' : 'Ausstehend') + '"></span>' +
                 '<span class="pu-film-name">' + puEscHtml(f.name) + '</span>' +
                 trailerBadge +
+                clBadge +
+                uploadBtn +
                 '<button class="pu-btn-delete" data-pu-delete="' + puEscAttr(f.name) + '" title="Entfernen"><i class="fas fa-trash-alt"></i></button>' +
                 '</div>';
         }).join('');
+    }
+
+    // Manual clearlogo upload handler: hidden file input, sends multipart upload
+    function puOpenClearlogoUpload(packName) {
+        var input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/png,image/webp';
+        input.onchange = async function () {
+            var file = input.files && input.files[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) {
+                puToast('Datei zu groß (max 5 MB)', 'error');
+                return;
+            }
+            try {
+                var form = new FormData();
+                form.append('clearlogo', file, file.name);
+                var res = await fetch('/api/posterpack-creator/clearlogo/' + encodeURIComponent(packName), {
+                    method: 'POST',
+                    body: form,
+                    credentials: 'same-origin',
+                });
+                var data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
+                puToast('Clearlogo aktualisiert: ' + packName);
+                await puLoadFilms();
+            } catch (err) {
+                puToast(err.message || 'Upload fehlgeschlagen', 'error');
+            }
+        };
+        input.click();
     }
 
     // ============================================================
@@ -33145,7 +33204,9 @@ if (!document.__niwDelegatedFallback) {
         var filmListEl = document.getElementById('pu-filmList');
         if (filmListEl) filmListEl.addEventListener('click', function (e) {
             var btn = e.target.closest('[data-pu-delete]');
-            if (btn) puOpenDeleteModal(btn.dataset.puDelete);
+            if (btn) { puOpenDeleteModal(btn.dataset.puDelete); return; }
+            var clBtn = e.target.closest('[data-pu-upload-clearlogo]');
+            if (clBtn) { puOpenClearlogoUpload(clBtn.dataset.puUploadClearlogo); return; }
         });
 
         // Delete modal

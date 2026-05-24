@@ -290,6 +290,9 @@
         "apiKey": "your-api-key-here",
         "genreFilter": ""
     },
+    "fanarttv": {
+        "apiKey": ""
+    },
     "embySync": {
         "enabled": true,
         "intervalMinutes": 360,

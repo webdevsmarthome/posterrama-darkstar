@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-05-24 (basierend auf Version 3.0.1z-5)
+**Stand:** 2026-05-24 (basierend auf Version 3.0.1z-6)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 **Release-Historie:** Siehe [CHANGELOG.md](./CHANGELOG.md) fuer die versionierte Uebersicht aller Aenderungen seit v3.0.1.
 
@@ -87,6 +87,7 @@
 | 62 | Media Flag Icons | public/icons/aspectratio, audio, mpaa, music, resolution, rottentomatoes, source, studio, videocodec | Icon-Sets fuer Metadaten-Anzeige im Cinema Footer |
 | 63 | ZIP-Metadata-Durchreichung | lib/media-aggregator.js | genres, director, studio, resolution, audioCodec, aspectRatio, hdr werden aus ZIP-`metadata.json` an das Media-Item durchgereicht |
 | 64 | Per-Device-Playlist-Pin | lib/device-operations.js, routes/devices.js, routes/poster-selector.js, public/admin.html, public/admin.js, public/admin.css, public/cinema/cinema-display.js, public/screensaver/screensaver.js | Jedes Device kann eine eigene Playlist gepinnt bekommen; globale Aktivierung überschreibt Pin nicht. Neuer Endpoint `GET /api/devices/:id/playlist`, Admin-UI "Pin playlist…" mit Dropdown + 📌-Badge |
+| 65 | Clearlogo-Pipeline (4 Stufen) | lib/clearlogo-pipeline.js, lib/text-clearlogo-renderer.js, lib/emby-sync.js, poster-updater/fetch-clearlogos-fanarttv.py, poster-updater/fetch-clearlogos-local.py, routes/posterpack-creator.js, routes/poster-updater.js, public/admin.js, public/admin.css, config.schema.json, config.example.json | Vierstufiges Nachladen fehlender Clearlogos: TMDB → fanart.tv → Plex/Jellyfin lokal → Sharp-Text-Render-Fallback. Auto-Trigger nach Emby-Sync. Manueller Upload per Film im Admin-UI. `clearlogoSource` in metadata.json markiert Herkunft |
 
 ---
 

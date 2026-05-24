@@ -6,6 +6,29 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-6] – 2026-05-24
+
+Clearlogo-Pipeline: vierstufiges Nachladen fehlender Logos (TMDB → fanart.tv → Plex/Jellyfin lokal → Text-Renderer-Fallback). Jeder Film hat ab jetzt garantiert ein Clearlogo.
+
+### Hintergrund
+Bisherige TMDB-Quelle ließ 344 von 1267 ZIPs (27,2 %) ohne Clearlogo. Diese werden jetzt von zusätzlichen Quellen ergänzt; was wirklich keine Quelle hat, bekommt einen automatisch gerenderten Schriftzug als Notlösung.
+
+### Neu
+- **Stage-1 fanart.tv-Fetcher** (`poster-updater/fetch-clearlogos-fanarttv.py`): Lädt Logos aus der Community-Datenbank fanart.tv. Priorität `hdmovielogo > movielogo`, Sprachen `de > en > 00` (sprachneutral), innerhalb jedes Pools nach Likes sortiert. Negativ-Cache verhindert wiederholte API-Calls (30-Tage-TTL). Benötigt `fanarttv.apiKey` in `config.json` (gratis via https://fanart.tv/get-an-api-key/).
+- **Stage-2 Plex/Jellyfin-Lokal-Scrape** (`poster-updater/fetch-clearlogos-local.py`): Sucht Logos auf den aktiven lokalen Media-Servern via Provider-ID `Tmdb.{id}`. 7-Tage-Negativ-Cache.
+- **Stage-3 manuelles Upload-UI** (`routes/posterpack-creator.js` + `public/admin.js`): Neuer Endpoint `POST /api/posterpack-creator/clearlogo/:packName` (multer-PNG-Upload, max 5 MB). In der Poster-Updater-Filmliste pro Zeile ein 📤-Button zum Hochladen, plus zwei neue Filter-Buttons "ohne echtes Clearlogo" und "mit Text-Fallback" (markiert die idealen Kandidaten zum manuellen Ersetzen).
+- **Stage-4 Text-Renderer-Fallback** (`lib/text-clearlogo-renderer.js`): Server-seitiger Sharp/SVG-Renderer erzeugt aus dem Filmtitel ein weißes, kondensiert-fettes Schriftbild auf transparentem 1200×400-Background. Auto-Split bei langen Titeln (Trenn-Heuristik via `:`, `–`, `-`, `|` oder Mittel-Leerzeichen). Schriftgrößen empirisch kalibriert für `DejaVu Sans Bold` (Pi-Standardfont).
+- **Pipeline-Orchestrator** (`lib/clearlogo-pipeline.js`): Sequenzieller 4-Stage-Lauf mit Singleton-Lock, 5-MB-Ringbuffer-Log, SSE-Subscriber-Pattern (analog zu `lib/poster-updater-runner.js`). Markiert die Quelle pro Film in `metadata.json.clearlogoSource` (`tmdb` | `fanarttv` | `plex` | `jellyfin` | `manual` | `generated`). Generierte Text-Fallbacks werden in Folgeläufen automatisch durch echte Logos ersetzt, sobald welche verfügbar sind.
+- **Auto-Trigger nach Emby-Sync** (`lib/emby-sync.js`): Direkt nach dem bestehenden Post-Job-Auto-Playlist-Refresh läuft die Clearlogo-Pipeline im Hintergrund an. Kein Admin-Klick nötig.
+- **API-Erweiterung `/api/poster-updater/films`** (`routes/poster-updater.js`): Liefert pro Film jetzt `hasClearlogo` und `clearlogoSource`, dazu Statistikfelder `withClearlogo` und `generatedClearlogo` für die UI-Filter.
+- **Konfiguration** (`config.schema.json`, `config.example.json`): Neuer optionaler Top-Level-Key `fanarttv.apiKey`. Fehlt der Key, wird Stage 1 still übersprungen — Pipeline läuft trotzdem (Stages 2-4).
+
+### Tests
+- `__tests__/lib/text-clearlogo-renderer.test.js` (14 Tests): Font-Size-Heuristik, Title-Splitting, SVG-Build, XML-Escaping, PNG-Output mit Dimensionen + Alpha-Kanal, Edge-Cases (leerer Titel, sehr lange Titel).
+- `__tests__/lib/clearlogo-pipeline.test.js` (5 Tests): API-Exports, Default-State, Subscribe/Unsubscribe, Stage-4-ZIP-Patch erhält vorhandene Files, Logger-Setter.
+
+---
+
 ## [3.0.1z-5] – 2026-05-24
 
 Hotfix für 3.0.1z-4: 📌-Pin-Badge verschwand nach 3 Sekunden wieder aus der Devices-Übersicht.

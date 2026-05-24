@@ -327,5 +327,85 @@ module.exports = function createPosterPackCreatorRouter({ logger, refreshPlaylis
         }
     });
 
+    // ============================================================
+    // POST /clearlogo/:packName — Manuelles Clearlogo-Upload
+    // Erlaubt das schnelle Ueberschreiben eines Clearlogos ohne weitere
+    // Felder. Markiert clearlogoSource: 'manual' in metadata.json.
+    // ============================================================
+    router.post(
+        '/clearlogo/:packName',
+        upload.single('clearlogo'),
+        // @ts-ignore - Multer attaches req.file at runtime; Express types miss it
+        async (req, res) => {
+            try {
+                const packName = decodeURIComponent(req.params.packName);
+                // @ts-ignore - req.file injected by multer
+                if (!req.file || !req.file.buffer) {
+                    return res.status(400).json({
+                        success: false,
+                        error: 'Keine Datei hochgeladen (Feldname: "clearlogo")',
+                    });
+                }
+                const existingZipPath = findZipPath(packName);
+                if (!existingZipPath) {
+                    return res
+                        .status(404)
+                        .json({ success: false, error: 'PosterPack nicht gefunden' });
+                }
+
+                const zip = new AdmZip(existingZipPath);
+                const entries = zip.getEntries();
+
+                // Bestehende clearlogo-Varianten entfernen
+                for (const e of entries) {
+                    if (/(^|\/)clearlogo\.(png|jpg|jpeg|webp)$/i.test(e.entryName)) {
+                        zip.deleteFile(e.entryName);
+                    }
+                }
+                // @ts-ignore - req.file injected by multer
+                zip.addFile('clearlogo.png', req.file.buffer);
+
+                // metadata.json patchen
+                let meta = {};
+                const metaEntry = zip.getEntry('metadata.json');
+                if (metaEntry) {
+                    try {
+                        meta = JSON.parse(zip.readAsText(metaEntry));
+                    } catch {
+                        meta = {};
+                    }
+                    zip.deleteFile('metadata.json');
+                }
+                meta.clearlogo = 'clearlogo.png';
+                meta.clearlogoSource = 'manual';
+                zip.addFile(
+                    'metadata.json',
+                    Buffer.from(JSON.stringify(meta, null, 2), 'utf8')
+                );
+                zip.writeZip(existingZipPath);
+
+                await invalidateCacheAndRefresh(existingZipPath);
+
+                logger.info(
+                    // @ts-ignore - req.file injected by multer
+                    `posterpack-creator: Manual clearlogo uploaded for ${packName} (${req.file.buffer.length} B)`
+                );
+                res.json({
+                    success: true,
+                    name: packName,
+                    // @ts-ignore - req.file injected by multer
+                    size: req.file.buffer.length,
+                    source: 'manual',
+                });
+            } catch (err) {
+                logger.error(
+                    'posterpack-creator: Manual clearlogo upload failed:',
+                    err.message
+                );
+                res.status(500).json({ success: false, error: err.message });
+            }
+        }
+    );
+
     return router;
 };

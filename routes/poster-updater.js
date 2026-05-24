@@ -57,19 +57,48 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
     }
 
     // ============================================================
-    // GET /films — list all films with ZIP and trailer status
+    // GET /films — list all films with ZIP, trailer and clearlogo status
     // ============================================================
+
+    // Lazy-loaded ZIP-scan-cache: enthaelt h.clearlogo + z.clearlogoSource pro ZIP.
+    // Wir bauen einen Lookup "name -> {hasClearlogo, clearlogoSource}".
+    let zipScanCacheLoadedAt = 0;
+    let clearlogoMap = new Map();
+    async function ensureClearlogoMap() {
+        const cachePath = path.join(PROJECT_ROOT, 'cache', 'zip-scan-cache.json');
+        try {
+            const st = await fsp.stat(cachePath);
+            if (st.mtimeMs === zipScanCacheLoadedAt && clearlogoMap.size > 0) return;
+            const raw = await fsp.readFile(cachePath, 'utf8');
+            const cache = JSON.parse(raw);
+            const map = new Map();
+            for (const [zipPath, entry] of Object.entries(cache)) {
+                const base = path.basename(zipPath).replace(/\.zip$/i, '');
+                map.set(base, {
+                    hasClearlogo: !!(entry && entry.h && entry.h.clearlogo),
+                    clearlogoSource: (entry && entry.z && entry.z.clearlogoSource) || null,
+                });
+            }
+            clearlogoMap = map;
+            zipScanCacheLoadedAt = st.mtimeMs;
+        } catch (_) {
+            // Cache fehlt oder lesbar — kein Drama, clearlogo bleibt unknown
+        }
+    }
+
     router.get('/films', async (req, res) => {
         try {
             const [films, zips] = await Promise.all([
                 runner.readFilmList(),
                 runner.getExistingZips(),
             ]);
+            await ensureClearlogoMap();
             const trailerInfo = readTrailerInfo();
             const result = films.map(raw => {
                 // Strip optional "[tmdb:N]"-Hint für UI-Anzeige und Datei-Vergleiche
                 const name = runner.stripTmdbHint(raw);
                 const hasTrailer = trailerFileExists(name);
+                const cl = clearlogoMap.get(name) || { hasClearlogo: false, clearlogoSource: null };
                 return {
                     name,
                     hasZip: zips.has(name),
@@ -77,16 +106,24 @@ module.exports = function createPosterUpdaterRouter({ logger }) {
                     trailerType: hasTrailer
                         ? trailerInfoLookup(trailerInfo, name) || 'unbekannt'
                         : null,
+                    hasClearlogo: cl.hasClearlogo,
+                    clearlogoSource: cl.clearlogoSource,
                 };
             });
             const withZip = result.filter(f => f.hasZip).length;
             const withTrailer = result.filter(f => f.hasTrailer).length;
+            const withClearlogo = result.filter(f => f.hasClearlogo).length;
+            const generatedClearlogo = result.filter(
+                f => f.hasClearlogo && f.clearlogoSource === 'generated'
+            ).length;
             res.json({
                 films: result,
                 total: result.length,
                 withZip,
                 pending: result.length - withZip,
                 withTrailer,
+                withClearlogo,
+                generatedClearlogo,
             });
         } catch (err) {
             logger.error('poster-updater: Failed to read film list:', err.message);
