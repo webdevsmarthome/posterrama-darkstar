@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-05-24 (basierend auf Version 3.0.1z-6)
+**Stand:** 2026-06-10 (basierend auf Version 3.0.1z-7)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 **Release-Historie:** Siehe [CHANGELOG.md](./CHANGELOG.md) fuer die versionierte Uebersicht aller Aenderungen seit v3.0.1.
 
@@ -24,6 +24,7 @@
 | 12 | Multi-Playlist-System | routes/poster-selector.js, admin.html, admin.js, admin.css | Benannte Playlisten erstellen, wechseln, aktivieren, duplizieren, loeschen |
 | 13 | Trailer sofort stoppen | cinema-display.js | Trailer wird sofort gestoppt wenn Poster manuell gewechselt wird |
 | 14 | Lokaler Trailer Prioritaet | sources/local.js | Trailer in /media/trailers/ hat immer Vorrang vor ZIP- und metadata.json-Trailern |
+| 15 | Sicherheit | routes/local-directory.js | Auth-Guard schuetzt alle /api/local/*-Routen (Upload/Cleanup/Browse/Jobs) vor unauthentifiziertem Zugriff (Audit-Befund A1) |
 | 15 | Unicode-Normalisierung | sources/local.js, routes/poster-selector.js | NFD/NFC-Fallback fuer Umlaute in Trailer-Dateinamen und Trailer-Info-Lookup (macOS-Kompatibilitaet) |
 | 16 | Zufall-Sortierung | admin.html, admin.js | Zufall-Button (Fisher-Yates Shuffle) in der Playlist-Sortierung |
 | 17 | Film-Loeschung Playlist-Sync | routes/poster-updater.js | Beim Loeschen eines Films wird dieser automatisch aus allen Playlisten entfernt |

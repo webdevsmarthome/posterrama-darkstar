@@ -22,6 +22,13 @@ module.exports = function createLocalDirectoryRouter({
 }) {
     const router = express.Router();
 
+    // SECURITY (A1): Der gesamte /api/local/*-Namespace ist Admin-only
+    // (Upload, Cleanup/Löschen, Scan, Posterpack-/Motion-Jobs, Metadaten).
+    // Der öffentliche Display-Client ruft diese Routen nie auf. Dieser Guard
+    // verhindert, dass je eine Einzelroute versehentlich ungeschützt
+    // ausgeliefert wird (bisher waren 17 von 26 Routen offen).
+    router.use('/api/local', isAuthenticated);
+
     const archiver = require('archiver');
     const { shuffleArray } = require('../utils/array-utils');
     const debugEnabled = Boolean(isDebug);

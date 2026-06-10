@@ -6,6 +6,21 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-7] – 2026-06-10
+
+Security-Fix: Authentifizierungs-Guard für alle `/api/local/*`-Endpunkte. Ein interner Sicherheits-Audit ergab, dass 17 von 26 Routen des Local-Directory-Routers unauthentifiziert erreichbar waren — darunter Datei-Upload, Datei-Löschung (`cleanup`), Verzeichnis-Browsing und das Starten ressourcenintensiver Jobs.
+
+### Hintergrund
+Der Local-Directory-Router (`routes/local-directory.js`) wird via `app.use('/', …)` ohne Router-Guard gemountet; die Authentifizierung lag pro Route und fehlte bei 17 von 26. Im LAN — wo der vorgelagerte Cloudflare-Access-Schutz nicht greift — konnte dadurch jeder Netzteilnehmer Dateien hochladen, löschen, den Medienbaum auslesen oder CPU-/ffmpeg-lastige Jobs als DoS auslösen.
+
+### Behoben
+- **Namespace-weiter Auth-Guard** (`routes/local-directory.js`): `router.use('/api/local', isAuthenticated)` direkt nach der Router-Erstellung schützt jetzt alle 26 `/api/local/*`-Routen. Der öffentliche Display-Client ruft diese Routen nie auf (0 Referenzen außerhalb `admin.js`) — Anzeige und Geräte bleiben unberührt. Verifiziert: zuvor offene Endpunkte (`/stats`, `/jobs`, `/browse`, `/metadata`, …) liefern jetzt `401`, öffentliche Pfade (`/get-config`, `/health`) unverändert.
+
+### Sicherheit
+Schließt Befund **A1** (kritisch im LAN-Kontext) aus dem internen Sicherheits-Audit vom 2026-06-10.
+
+---
+
 ## [3.0.1z-6] – 2026-05-24
 
 Clearlogo-Pipeline: vierstufiges Nachladen fehlender Logos (TMDB → fanart.tv → Plex/Jellyfin lokal → Text-Renderer-Fallback). Jeder Film hat ab jetzt garantiert ein Clearlogo.
