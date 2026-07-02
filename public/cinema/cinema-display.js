@@ -1222,6 +1222,7 @@
     let ytPlayer = null; // YouTube Player instance
     let ytApiReady = false; // Track if YouTube API is loaded
     let trailerDelayTimer = null; // Timer for delayed trailer start
+    let trailerStartWatchdog = null; // PATCH-YT-FREEZE: Fallback wenn YT-Embed nie startet (z.B. Age-Gate ohne Event)
     let trailerLoopCount = 0; // Count trailer loops for autohide
     let trailerAutohideTimer = null; // Timer for time-based autohide
     let trailerReshowTimer = null; // Timer for re-showing trailer
@@ -1281,6 +1282,10 @@
         if (trailerReshowTimer) {
             clearTimeout(trailerReshowTimer);
             trailerReshowTimer = null;
+        }
+        if (trailerStartWatchdog) {
+            clearTimeout(trailerStartWatchdog);
+            trailerStartWatchdog = null;
         }
 
         // Reset state for new trailer
@@ -1391,6 +1396,10 @@
         if (trailerReshowTimer) {
             clearTimeout(trailerReshowTimer);
             trailerReshowTimer = null;
+        }
+        if (trailerStartWatchdog) {
+            clearTimeout(trailerStartWatchdog);
+            trailerStartWatchdog = null;
         }
 
         const reshow = trailerConfig.reshow || 'never';
@@ -1704,6 +1713,19 @@
                 }
             }
 
+            // PATCH-YT-FREEZE: Age-restricted Videos zeigen im Embed nur die
+            // "Sign in to confirm your age"-Wand — je nach Player-Version kommt
+            // dabei weder onError noch ein StateChange. Ohne Watchdog blieb die
+            // Rotation (in startTrailerPlayback gestoppt) dann für immer stehen.
+            if (trailerStartWatchdog) clearTimeout(trailerStartWatchdog);
+            trailerStartWatchdog = setTimeout(() => {
+                trailerStartWatchdog = null;
+                log('Trailer: YouTube-Video hat nie gestartet (Watchdog) — weiter', { videoId });
+                removeTrailerOverlay();
+                showNextPoster();
+                startRotation();
+            }, 45000);
+
             debug('Trailer creating YouTube player');
             ytPlayer = new window.YT.Player(_ytIframe2, {
                 events: {
@@ -1766,6 +1788,10 @@
                         });
                         // Remove the trailer overlay on any error
                         removeTrailerOverlay();
+                        // PATCH-YT-FREEZE: Rotation wurde beim Trailer-Start gestoppt —
+                        // ohne Neustart stand das Poster für immer (z.B. Fehler 101/150:
+                        // Embedding gesperrt/Age-Gate). Analog zum Lokal-Pfad nach 2s weiter.
+                        setTimeout(() => { showNextPoster(); startRotation(); }, 2000);
                     },
                     onStateChange: event => {
                         const stateNames = {
@@ -1782,6 +1808,12 @@
                             trailerElExists: !!trailerEl,
                             trailerElVisible: trailerEl?.classList.contains('visible'),
                         });
+
+                        // PATCH-YT-FREEZE: Video spielt — Start-Watchdog entschärfen
+                        if (event.data === window.YT.PlayerState.PLAYING && trailerStartWatchdog) {
+                            clearTimeout(trailerStartWatchdog);
+                            trailerStartWatchdog = null;
+                        }
 
                         // Video ended
                         if (event.data === window.YT.PlayerState.ENDED) {
@@ -1812,6 +1844,8 @@
         } catch (err) {
             log('Trailer error', { error: err.message, title: media.title });
             removeTrailerOverlay();
+            // PATCH-YT-FREEZE: auch hier war die Rotation gestoppt — weiterschalten
+            setTimeout(() => { showNextPoster(); startRotation(); }, 2000);
         }
     }
 
@@ -1836,6 +1870,10 @@
         if (trailerReshowTimer) {
             clearTimeout(trailerReshowTimer);
             trailerReshowTimer = null;
+        }
+        if (trailerStartWatchdog) {
+            clearTimeout(trailerStartWatchdog);
+            trailerStartWatchdog = null;
         }
 
         // Destroy YouTube player if exists
@@ -1891,6 +1929,10 @@
         if (trailerReshowTimer) {
             clearTimeout(trailerReshowTimer);
             trailerReshowTimer = null;
+        }
+        if (trailerStartWatchdog) {
+            clearTimeout(trailerStartWatchdog);
+            trailerStartWatchdog = null;
         }
 
         // Destroy YouTube player if exists

@@ -6,6 +6,26 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-9] – 2026-07-02
+
+Cinema-Freeze-Fix: Das Display blieb dauerhaft auf einem Filmplakat stehen („Ich fühl mich Disco"), wenn der YouTube-Trailer des Films im Embed nicht abspielbar war. Root Cause live bewiesen und Fix am echten Kiosk end-to-end verifiziert.
+
+### Hintergrund
+`startTrailerPlayback()` in `public/cinema/cinema-display.js` stoppt beim Trailer-Start die Poster-Rotation (`stopRotation()`). Im YouTube-Pfad wurde sie aber nur im Erfolgsfall (`onStateChange: ENDED`) wieder gestartet — der `onError`-Handler und der äußere `catch` räumten lediglich das Overlay weg. Der Trailer von „Ich fühl mich Disco" (tmdb:241066) ist altersbeschränkt; altersbeschränkte Videos verweigern die iframe-Einbettung grundsätzlich (YT-Fehlercode 150, live am Kiosk beobachtet: `Embedding disabled (age-restricted or blocked)`). Ergebnis: Rotation für immer gestoppt, Plakat eingefroren — reproduzierbar bei genau diesem Film, weil er als einziger in der Rotation eine nicht-einbettbare YouTube-URL ohne lokalen Trailer hat. Der Lokal-Trailer-Pfad hatte für exakt dieses Problem bereits einen Fix („vorher 120s — Anzeige stand fest"); dem YouTube-Pfad fehlte das Pendant. Der Screensaver-Modus ist nicht betroffen (eigener `trailerEndTimer`-Watchdog, onError → `scheduleNextPoster`).
+
+### Behoben
+- **`onError` startet die Rotation wieder** — nach `removeTrailerOverlay()` folgt jetzt wie im Lokal-Pfad `showNextPoster()` + `startRotation()` (2 s Pause).
+- **`catch`-Pfad ebenso** — auch ein Fehler beim Player-Aufbau ließ die Rotation gestoppt zurück.
+- **45s-Start-Watchdog** (`trailerStartWatchdog`) — Age-Gate-Embeds feuern je nach Player-Version weder `onError` noch einen StateChange (nur die „Sign in to confirm your age"-Wand). Der Watchdog schaltet weiter, wenn binnen 45 s kein `PLAYING` kommt; er wird bei `PLAYING` entschärft und in allen Trailer-Cleanup-Pfaden mit aufgeräumt (Muster vom Screensaver übernommen).
+
+### Verifikation
+Per CDP-Injection am echten Kiosk-Chromium (Disco als einziges Queue-Element erzwungen, Monitor war aus): reproduzierbarer Zyklus `Trailer overlay created` → `YouTube player error {code:150}` → 2 s → `Showing next poster` + `Starting poster rotation`, im 5-Sekunden-Takt über die gesamte Beobachtung. Vor dem Fix stand die Anzeige an dieser Stelle dauerhaft (Kiosk hing >25 min auf dem Disco-Plakat bei 10 s Rotationsintervall). Lokal-Trailer-Pfad im selben Test gegengeprüft (spielt und advanced korrekt).
+
+### Hinweis
+Der Disco-Trailer bleibt im Embed prinzipbedingt unspielbar (YouTube-Alterssperre) — das Display überspringt ihn jetzt sauber. Soll der Film wieder einen Trailer zeigen, braucht er einen lokalen Trailer (z. B. via yt-dlp mit Cookies) oder eine alternative, nicht altersgesperrte Trailer-URL in der `metadata.json`.
+
+---
+
 ## [3.0.1z-8] – 2026-07-02
 
 TMDB-Downloader-Generalüberholung (`poster-updater/tmdb-get-posters-direct.py`): Der Downloader lieferte konstruktionsbedingt fast keine Backdrops, EN-Poster, Clearlogos und Trailer — und hinterließ bei Abbrüchen verwaiste `tmp_`-Ordner. Beides behoben, end-to-end verifiziert.
