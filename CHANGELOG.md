@@ -6,6 +6,31 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-8] – 2026-07-02
+
+TMDB-Downloader-Generalüberholung (`poster-updater/tmdb-get-posters-direct.py`): Der Downloader lieferte konstruktionsbedingt fast keine Backdrops, EN-Poster, Clearlogos und Trailer — und hinterließ bei Abbrüchen verwaiste `tmp_`-Ordner. Beides behoben, end-to-end verifiziert.
+
+### Hintergrund
+`api_call()` hängte `language=de-DE` an **jeden** TMDB-Request — auch an `/movie/{id}/images` und `/videos`. TMDB filtert die Galerie dann serverseitig auf Deutsch: EN-Poster, textfreie Backdrops (`iso_639_1 = null`, die Mehrheit aller Backdrops) und fast alle Clearlogos waren unsichtbar. Die „DE/EN"-Filterlogik im Script war dadurch toter Code; Bestands-ZIPs enthalten `"backdrops": []`. Der 27,2-%-Clearlogo-Mangel, den die Pipeline aus 3.0.1z-6 kompensiert, hat hier seine Wurzel. Zusätzlich überschrieb `params['language'] = 'de-DE'` das `en-US` des Tagline-Fallbacks (holte zweimal Deutsch), und ohne `try/finally` blieben bei Crash/Kill `tmp_NNN_`-Ordner liegen (zwei Leichen vom 24.05. im Repo, beide mitten in der People-Download-Phase gestorben).
+
+### Behoben
+- **Bildergalerie vollständig** — `/images` mit `include_image_language=de,en,null`, `/videos` mit `include_video_language=de,en`. Messbar an „Speed 2: Cruise Control": vorher 1 Poster, 0 Backdrops, kein Clearlogo, kein Trailer → nachher 5 Poster, 3 Backdrops, Clearlogo, Trailer.
+- **EN-Tagline-Fallback wirkt** — `api_call()` kopiert Params und setzt `language` nur noch als Default (`setdefault`); dabei auch den Mutable-Default-Bug (`params={}`) entfernt. Verifiziert mit tmdb:355024 (DE-Tagline leer → EN-Tagline landet im ZIP).
+- **Crash-/Kill-sicherer Cleanup** — per-Film `try/except/finally` (ein Fehler bricht nicht mehr den ganzen Lauf ab), SIGTERM-Handler, Ctrl+C mit Zwischenstands-Summary, Startup-Sweep entfernt verwaiste `tmp_`-Ordner alter Läufe, halbfertige ZIPs werden gelöscht (sonst gälte der Film künftig fälschlich als „vorhanden").
+- **Korrupte Bilder verhindert** — `download_image()` prüft jetzt den HTTP-Status (vorher landeten 404-HTML-Seiten als `.jpg` im ZIP) und fängt nicht mehr per nacktem `except:` sogar Ctrl+C.
+- **Null-sichere TMDB-Felder** — `runtime: null` (`None * 60000`), `vote_average: null` (unsortierbar/`round(None)`), `iso_639_1: null` (`None[:2]`) crashten den Lauf.
+- **DE-Priorität konsequent** — Poster DE vor EN (sonst verdrängen die zahlreichen EN-Poster den deutschen Treffer vom `primaryPoster`-Platz), Trailer DE vor EN, Clearlogo DE > EN > sprachneutral.
+- **Status-Zeile korrekt** — „🌟 Clearlogo" wurde nach dem `rmtree` per Dateisystem geprüft und erschien daher nie.
+
+### Neu
+- `POSTERRAMA_TMDB_EXPORT_DIR` übersteuert das Output-Verzeichnis (ermöglichte die gefahrlose End-to-End-Verifikation gegen die echte TMDB-API).
+- `.gitignore`: `poster-updater/__pycache__/` und `poster-updater/tmp_*/`.
+
+### Hinweis
+Bestehende Exporte behalten das alte Manko (kaum Backdrops, fehlende EN-Taglines), da vorhandene ZIPs übersprungen werden — nur neue Exporte profitieren automatisch. Ein Bestands-Refresh würde nachgepatchte fanart.tv-Clearlogos ersetzen und ist daher bewusst nicht Teil dieses Release.
+
+---
+
 ## [3.0.1z-7] – 2026-06-10
 
 Security-Fix: Authentifizierungs-Guard für alle `/api/local/*`-Endpunkte. Ein interner Sicherheits-Audit ergab, dass 17 von 26 Routen des Local-Directory-Routers unauthentifiziert erreichbar waren — darunter Datei-Upload, Datei-Löschung (`cleanup`), Verzeichnis-Browsing und das Starten ressourcenintensiver Jobs.

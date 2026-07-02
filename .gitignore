@@ -130,6 +130,8 @@ performance-baseline.json
 # Poster Updater private data
 filmliste.txt
 poster-updater/.env
+poster-updater/__pycache__/
+poster-updater/tmp_*/
 
 # Cinema playlists (private/local data)
 public/cinema-playlist.json
