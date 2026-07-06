@@ -1,6 +1,8 @@
 /**
  * Plex Sessions Polling Service
- * Polls Plex /status/sessions endpoint and caches results
+ * Polls Plex /status/sessions endpoint and caches results.
+ * When the server is unreachable the poller enters exponential backoff and
+ * retries automatically — it never stops permanently on errors.
  */
 
 const logger = require('../utils/logger');
@@ -18,6 +20,9 @@ class PlexSessionsPoller extends EventEmitter {
         this.lastUpdate = null;
         this.errorCount = 0;
         this.maxErrors = 5;
+        this.backoffMs = 0;
+        this.backoffBaseMs = 60000;
+        this.backoffMaxMs = 300000;
     }
 
     /**
@@ -35,6 +40,7 @@ class PlexSessionsPoller extends EventEmitter {
 
         this.isRunning = true;
         this.errorCount = 0;
+        this.backoffMs = 0;
 
         // Initial poll
         this.poll();
@@ -61,6 +67,7 @@ class PlexSessionsPoller extends EventEmitter {
     restart() {
         logger.info('Restarting Plex sessions poller');
         this.errorCount = 0;
+        this.backoffMs = 0;
         if (!this.isRunning) {
             this.start();
         }
@@ -278,25 +285,42 @@ class PlexSessionsPoller extends EventEmitter {
                 this.emit('sessions', processedSessions);
             }
 
-            // Reset error count on success
+            // Reset error/backoff state on success
+            if (this.errorCount >= this.maxErrors) {
+                logger.info('Plex sessions poller: server recovered, resuming normal polling');
+            }
             this.errorCount = 0;
+            this.backoffMs = 0;
         } catch (error) {
             this.errorCount++;
 
-            if (this.errorCount <= this.maxErrors) {
+            if (this.errorCount < this.maxErrors) {
                 logger.error('Plex sessions poll failed', {
                     error: error.message,
                     attempt: this.errorCount,
                     maxErrors: this.maxErrors,
                 });
-            }
-
-            if (this.errorCount === this.maxErrors) {
-                logger.error('Plex sessions poller: max errors reached, stopping', {
-                    totalErrors: this.errorCount,
-                    interval: this.pollInterval,
+            } else {
+                // Enter exponential backoff instead of stopping permanently;
+                // the server is retried automatically after the backoff delay.
+                this.backoffMs = Math.min(
+                    this.backoffMs > 0 ? this.backoffMs * 2 : this.backoffBaseMs,
+                    this.backoffMaxMs
+                );
+                logger.warn('Plex sessions poller: server unreachable, backing off', {
+                    error: error.message,
+                    errorCount: this.errorCount,
+                    retryInSeconds: Math.round(this.backoffMs / 1000),
                 });
-                this.stop();
+
+                // Sessions are unknown while the server is unreachable
+                if (this.lastSessions.length > 0) {
+                    this.lastSessions = [];
+                    this.lastUpdate = Date.now();
+                    this.emit('sessions', []);
+                }
+
+                this.scheduleNextPoll(this.backoffMs);
                 return;
             }
         }
@@ -308,10 +332,10 @@ class PlexSessionsPoller extends EventEmitter {
     /**
      * Schedule next poll
      */
-    scheduleNextPoll() {
+    scheduleNextPoll(delayMs = this.pollInterval) {
         if (!this.isRunning) return;
 
-        this.pollTimer = setTimeout(() => this.poll(), this.pollInterval);
+        this.pollTimer = setTimeout(() => this.poll(), delayMs);
     }
 
     /**

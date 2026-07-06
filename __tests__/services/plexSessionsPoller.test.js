@@ -348,7 +348,7 @@ describe('PlexSessionsPoller', () => {
             expect(poller.pollTimer).not.toBeNull();
         });
 
-        test('should stop polling after reaching maxErrors', async () => {
+        test('should enter backoff instead of stopping after reaching maxErrors', async () => {
             const mockError = new Error('Server offline');
             mockGetPlexClient.mockRejectedValue(mockError);
 
@@ -359,27 +359,23 @@ describe('PlexSessionsPoller', () => {
 
             poller.start();
 
-            // Simulate 5 failures
+            // Exactly 5 failures: initial poll (flush only) + 4 timer-driven polls
             for (let i = 0; i < 5; i++) {
-                await jest.runOnlyPendingTimersAsync();
-                if (i < 4) {
-                    await jest.advanceTimersByTimeAsync(10000);
-                }
+                await jest.advanceTimersByTimeAsync(i === 0 ? 0 : 10000);
             }
 
             expect(poller.errorCount).toBe(5);
-            expect(logger.error).toHaveBeenCalledWith(
-                'Plex sessions poller: max errors reached, stopping',
-                {
-                    totalErrors: 5,
-                    interval: 10000,
-                }
+            expect(poller.backoffMs).toBe(60000);
+            expect(logger.warn).toHaveBeenCalledWith(
+                'Plex sessions poller: server unreachable, backing off',
+                expect.objectContaining({ errorCount: 5, retryInSeconds: 60 })
             );
-            expect(poller.isRunning).toBe(false);
-            expect(poller.pollTimer).toBeNull();
+            // Poller keeps running with a scheduled retry
+            expect(poller.isRunning).toBe(true);
+            expect(poller.pollTimer).not.toBeNull();
         });
 
-        test('should NOT schedule next poll after maxErrors reached', async () => {
+        test('should retry after backoff expires and double the backoff on repeated failures', async () => {
             const mockError = new Error('Server offline');
             mockGetPlexClient.mockRejectedValue(mockError);
 
@@ -390,20 +386,22 @@ describe('PlexSessionsPoller', () => {
 
             poller.start();
 
-            // Simulate 5 failures
+            // Exactly 5 failures -> enters 60s backoff
             for (let i = 0; i < 5; i++) {
-                await jest.runOnlyPendingTimersAsync();
-                if (i < 4) {
-                    await jest.advanceTimersByTimeAsync(10000);
-                }
+                await jest.advanceTimersByTimeAsync(i === 0 ? 0 : 10000);
             }
+            expect(poller.backoffMs).toBe(60000);
 
-            expect(poller.pollTimer).toBeNull();
-
-            // Try to advance time - nothing should happen
+            // Within the backoff window nothing is polled
             const callCountBefore = mockGetPlexClient.mock.calls.length;
             await jest.advanceTimersByTimeAsync(30000);
             expect(mockGetPlexClient.mock.calls.length).toBe(callCountBefore);
+
+            // After the window one retry fires; failure doubles the backoff
+            await jest.advanceTimersByTimeAsync(30000);
+            expect(mockGetPlexClient.mock.calls.length).toBe(callCountBefore + 1);
+            expect(poller.backoffMs).toBe(120000);
+            expect(poller.isRunning).toBe(true);
         });
 
         test('should reset error count on successful poll after errors', async () => {
@@ -567,7 +565,7 @@ describe('PlexSessionsPoller', () => {
             expect(poller.pollTimer).toBeNull();
         });
 
-        test('should stop scheduling after maxErrors without memory leak', async () => {
+        test('should keep exactly one pending retry timer during backoff', async () => {
             const mockError = new Error('Server offline');
             mockGetPlexClient.mockRejectedValue(mockError);
 
@@ -578,29 +576,24 @@ describe('PlexSessionsPoller', () => {
 
             poller.start();
 
-            // Hit maxErrors
+            // Hit maxErrors (exactly 5 failures) -> backoff
             for (let i = 0; i < 5; i++) {
-                await jest.runOnlyPendingTimersAsync();
-                if (i < 4) {
-                    await jest.advanceTimersByTimeAsync(10000);
-                }
+                await jest.advanceTimersByTimeAsync(i === 0 ? 0 : 10000);
             }
 
-            // Should be stopped with no timer
-            expect(poller.isRunning).toBe(false);
+            // Still running with exactly one scheduled retry — no timer buildup
+            expect(poller.isRunning).toBe(true);
+            expect(jest.getTimerCount()).toBe(1);
+
+            // stop() clears the retry timer
+            poller.stop();
             expect(poller.pollTimer).toBeNull();
-
-            // Verify no timers leak by advancing time
-            await jest.advanceTimersByTimeAsync(100000);
-            const pendingTimersAfter = jest.getTimerCount();
-
-            // No new timers should be created
-            expect(pendingTimersAfter).toBe(0);
+            expect(jest.getTimerCount()).toBe(0);
         });
     });
 
-    describe('Integration: restart after maxErrors', () => {
-        test('should successfully restart after hitting maxErrors', async () => {
+    describe('Integration: automatic recovery after backoff', () => {
+        test('should recover automatically when the server comes back online', async () => {
             const mockError = new Error('Server offline');
             const mockSessions = {
                 MediaContainer: { Metadata: [] },
@@ -609,7 +602,6 @@ describe('PlexSessionsPoller', () => {
                 query: jest.fn().mockResolvedValue(mockSessions),
             };
 
-            // Fail 5 times, then succeed after restart
             mockGetPlexClient.mockRejectedValue(mockError);
 
             poller = new PlexSessionsPoller({
@@ -619,29 +611,27 @@ describe('PlexSessionsPoller', () => {
 
             poller.start();
 
-            // Hit maxErrors
+            // Hit maxErrors (exactly 5 failures) -> 60s backoff
             for (let i = 0; i < 5; i++) {
-                await jest.runOnlyPendingTimersAsync();
-                if (i < 4) {
-                    await jest.advanceTimersByTimeAsync(10000);
-                }
+                await jest.advanceTimersByTimeAsync(i === 0 ? 0 : 10000);
             }
 
-            expect(poller.isRunning).toBe(false);
+            expect(poller.isRunning).toBe(true);
             expect(poller.errorCount).toBe(5);
 
-            // Server comes back online
+            // Server comes back online — NO manual restart needed
             mockGetPlexClient.mockResolvedValue(mockPlexClient);
 
-            // Restart
-            poller.restart();
+            // Backoff expires, retry succeeds
+            await jest.advanceTimersByTimeAsync(60000);
 
-            expect(poller.isRunning).toBe(true);
-            expect(poller.errorCount).toBe(0);
-
-            // Should successfully poll
-            await jest.runOnlyPendingTimersAsync();
             expect(mockPlexClient.query).toHaveBeenCalled();
+            expect(poller.errorCount).toBe(0);
+            expect(poller.backoffMs).toBe(0);
+            expect(poller.isRunning).toBe(true);
+            expect(logger.info).toHaveBeenCalledWith(
+                'Plex sessions poller: server recovered, resuming normal polling'
+            );
         });
     });
 });

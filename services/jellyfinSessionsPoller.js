@@ -1,6 +1,9 @@
 /**
  * Jellyfin Sessions Polling Service
- * Polls Jellyfin /Sessions endpoint and caches results
+ * Polls the /Sessions endpoint of every enabled Jellyfin server and caches
+ * the merged results. Errors are isolated per server: an unreachable server
+ * enters exponential backoff (and is retried automatically) without affecting
+ * polling of the remaining servers — the poller itself never stops on errors.
  */
 
 const logger = require('../utils/logger');
@@ -16,8 +19,12 @@ class JellyfinSessionsPoller extends EventEmitter {
         this.pollTimer = null;
         this.lastSessions = [];
         this.lastUpdate = null;
-        this.errorCount = 0;
         this.maxErrors = 5;
+        // Per-server error/backoff state, keyed by server name (fallback host:port).
+        // Shape: { errorCount, backoffMs, backoffUntil, sessions }
+        this.serverStates = new Map();
+        this.backoffBaseMs = 60000;
+        this.backoffMaxMs = 300000;
     }
 
     /**
@@ -34,7 +41,7 @@ class JellyfinSessionsPoller extends EventEmitter {
         });
 
         this.isRunning = true;
-        this.errorCount = 0;
+        this.serverStates.clear();
 
         // Initial poll
         this.poll();
@@ -60,33 +67,78 @@ class JellyfinSessionsPoller extends EventEmitter {
      */
     restart() {
         logger.info('Restarting Jellyfin sessions poller');
-        this.errorCount = 0;
+        this.serverStates.clear();
         if (!this.isRunning) {
             this.start();
         }
     }
 
     /**
-     * Poll Jellyfin for active sessions
+     * Poll all enabled Jellyfin servers for active sessions
      */
     async poll() {
         if (!this.isRunning) return;
 
         try {
-            // Find enabled Jellyfin server
-            const jellyfinServer = (this.config.mediaServers || []).find(
+            const servers = (this.config.mediaServers || []).filter(
                 s => s.enabled && s.type === 'jellyfin'
             );
 
-            if (!jellyfinServer) {
-                // No Jellyfin server configured, stop polling
+            if (servers.length === 0) {
                 logger.debug('No Jellyfin server configured, skipping sessions poll');
                 this.scheduleNextPoll();
                 return;
             }
 
-            // Get Jellyfin client
-            const jellyfin = await this.getJellyfinClient(jellyfinServer);
+            const merged = [];
+            for (const server of servers) {
+                const sessions = await this.pollServer(server);
+                merged.push(...sessions);
+            }
+
+            const hasChanges = this.detectChanges(merged);
+
+            this.lastSessions = merged;
+            this.lastUpdate = Date.now();
+
+            if (hasChanges) {
+                this.emit('sessions', merged);
+            }
+
+            logger.debug('Jellyfin sessions polled', {
+                count: merged.length,
+                hasChanges,
+            });
+        } catch (error) {
+            // Unexpected failure outside the per-server handling — log and keep
+            // the polling loop alive; it must never die on errors.
+            logger.error('Jellyfin sessions poller: unexpected error', {
+                error: error.message,
+            });
+        }
+
+        this.scheduleNextPoll();
+    }
+
+    /**
+     * Poll a single server with isolated error/backoff state.
+     * Contributes fresh sessions on success, the last known sessions during a
+     * short error grace period, and nothing while the server is in backoff.
+     */
+    async pollServer(server) {
+        const key = server.name || `${server.hostname || server.host}:${server.port}`;
+        let state = this.serverStates.get(key);
+        if (!state) {
+            state = { errorCount: 0, backoffMs: 0, backoffUntil: 0, sessions: [] };
+            this.serverStates.set(key, state);
+        }
+
+        if (state.backoffUntil > Date.now()) {
+            return [];
+        }
+
+        try {
+            const jellyfin = await this.getJellyfinClient(server);
 
             // Fetch sessions - Jellyfin uses /Sessions endpoint
             const response = await jellyfin.http.get('/Sessions');
@@ -95,41 +147,43 @@ class JellyfinSessionsPoller extends EventEmitter {
             // Filter to only sessions with NowPlayingItem (currently playing)
             const activeSessions = sessions.filter(session => session.NowPlayingItem);
 
-            // Process sessions into a format similar to Plex for consistency
-            const processedSessions = activeSessions.map(session =>
-                this.processSession(session, jellyfinServer)
-            );
-
-            // Check for changes
-            const hasChanges = this.detectChanges(processedSessions);
-
-            this.lastSessions = processedSessions;
-            this.lastUpdate = Date.now();
-            this.errorCount = 0;
-
-            if (hasChanges) {
-                this.emit('sessions', processedSessions);
+            if (state.errorCount >= this.maxErrors) {
+                logger.info('Jellyfin sessions poller: server recovered, resuming polling', {
+                    server: key,
+                });
             }
-
-            logger.debug('Jellyfin sessions polled', {
-                count: processedSessions.length,
-                hasChanges,
-            });
+            state.errorCount = 0;
+            state.backoffMs = 0;
+            state.backoffUntil = 0;
+            state.sessions = activeSessions.map(session => this.processSession(session, server));
+            return state.sessions;
         } catch (error) {
-            this.errorCount++;
-            logger.warn('Failed to poll Jellyfin sessions', {
-                error: error.message,
-                errorCount: this.errorCount,
-            });
+            state.errorCount++;
 
-            if (this.errorCount >= this.maxErrors) {
-                logger.error('Jellyfin sessions poller: too many errors, stopping');
-                this.stop();
-                return;
+            if (state.errorCount < this.maxErrors) {
+                logger.warn('Failed to poll Jellyfin sessions', {
+                    server: key,
+                    error: error.message,
+                    errorCount: state.errorCount,
+                });
+                // Grace period: keep the last known sessions on transient errors
+                return state.sessions;
             }
-        }
 
-        this.scheduleNextPoll();
+            state.backoffMs = Math.min(
+                state.backoffMs > 0 ? state.backoffMs * 2 : this.backoffBaseMs,
+                this.backoffMaxMs
+            );
+            state.backoffUntil = Date.now() + state.backoffMs;
+            state.sessions = [];
+            logger.warn('Jellyfin sessions poller: server unreachable, backing off', {
+                server: key,
+                error: error.message,
+                errorCount: state.errorCount,
+                retryInSeconds: Math.round(state.backoffMs / 1000),
+            });
+            return [];
+        }
     }
 
     /**

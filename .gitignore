@@ -140,3 +140,6 @@ public/cinema-playlists.json
 # Custom patch/backup artifacts
 custom-patches-*.patch
 posterrama-custom-backup-*.tar.gz
+
+# Claude Code project settings
+.claude/

@@ -6,6 +6,34 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-10] – 2026-07-06
+
+Session-Poller-Härtung: Ein temporär nicht erreichbarer Media-Server schaltete die Now-Playing-Erkennung dauerhaft ab. Dazu npm-Security-Fixes (u. a. axios, express — 2× high). Live am Produktivsystem verifiziert.
+
+### Hintergrund
+
+Beide Session-Poller (`services/jellyfinSessionsPoller.js`, `services/plexSessionsPoller.js`) gaben nach 5 Fehlversuchen in Folge dauerhaft auf („too many errors, stopping") — ein vorübergehend offliner Media-Server (ausgeschaltet, Wartung, Netzproblem) beendete die Now-Playing-Erkennung bis zum nächsten Posterrama-Neustart, auch wenn der Server längst wieder lief. Der Jellyfin-Poller hatte zusätzlich einen versteckten Bug: `find()` statt `filter()` pollte nur den **ersten** enabled Server — bei zwei konfigurierten Jellyfin-Servern wurde der zweite nie abgefragt, und war der erste offline, fiel die Erkennung auch für den erreichbaren zweiten komplett aus. Genau so live beobachtet: primärer Server offline → Poller stoppte ~40 Minuten nach Boot dauerhaft.
+
+### Behoben
+
+- **Jellyfin pollt alle enabled Server** — Sessions werden gemerged (`_serverName` kennzeichnet die Quelle); ein zweiter Server wird nicht mehr ignoriert.
+- **Fehler-Isolation pro Server** — Fehlerzähler und Backoff je Server; ein toter Server beeinflusst das Polling der übrigen nicht. Bei kurzen Ausfällen (unter 5 Fehler) bleiben die letzten bekannten Sessions des Servers erhalten (Grace-Period), damit ein einzelner Timeout kein Now-Playing-Flackern erzeugt.
+- **Exponentieller Backoff statt Stopp** — nach 5 Fehlern in Folge wird der Server 60 s ausgesetzt, bei weiteren Fehlschlägen 120 s → 240 s → max. 300 s; beim ersten Erfolg automatische Wiederaufnahme („server recovered"-Log). Der Poller-Loop selbst stirbt nie mehr — auch unerwartete Fehler außerhalb der Server-Behandlung werden gefangen und geloggt.
+- **Plex-Poller symmetrisch gehärtet** — gleiches Backoff-/Auto-Recovery-Muster statt permanentem Stopp; beim Eintritt in den Backoff werden veraltete Sessions geleert (kein Geister-Now-Playing).
+- **Log-Hygiene** — statt einer Warnung alle 10 Sekunden für immer nur noch eine Warnung pro Backoff-Fenster (max. alle 5 Minuten), mit `server`- und `retryInSeconds`-Kontext.
+
+### Sicherheit (Dependencies)
+
+- `npm audit fix` (nur Lockfile): u. a. **axios 1.18.1** (high), **express 4.22.2** (high), fast-uri (high), body-parser, follow-redirects, dompurify, ajv, bn.js (moderate).
+- Bewusst zurückgestellt, da Major-Bumps: `bcrypt` → 6 (zieht die node-pre-gyp/tar-Kette), `file-type` → 22, brace-expansion-Kette. Verbleibend 5 bekannte Advisories, alle nur über diese Majors lösbar.
+
+### Verifikation
+
+- **Testsuite**: neue `__tests__/services/jellyfinSessionsPoller.test.js` (Multi-Server-Merge, Fehler-Isolation, Grace-Period, Backoff-Eintritt, Skip im Backoff-Fenster, Auto-Recovery, Never-Stop); Plex-Tests auf das neue Verhalten umgestellt (Backoff-Verdopplung, genau ein Retry-Timer, Auto-Recovery ohne `restart()`). 42/42 grün, ESLint sauber.
+- **Live am Produktivsystem** (ein Jellyfin-Server real offline): Fehler 1–4 als Warn mit Server-Kontext → 5. Fehler „backing off, retryIn=60s" → Retries mit exakter Verdopplung (11:45:53 → 60 s, 11:47:06 → 120 s, 11:49:20 → 240 s), 0 Stopp-Meldungen, Health durchgehend 200, der zweite (erreichbare) Server wird weiter gepollt.
+
+---
+
 ## [3.0.1z-9] – 2026-07-02
 
 Cinema-Freeze-Fix: Das Display blieb dauerhaft auf einem Filmplakat stehen („Ich fühl mich Disco"), wenn der YouTube-Trailer des Films im Embed nicht abspielbar war. Root Cause live bewiesen und Fix am echten Kiosk end-to-end verifiziert.
