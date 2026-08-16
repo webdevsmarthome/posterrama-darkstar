@@ -7,6 +7,12 @@ profiles.json
 # Environment variables and config files
 # Prevent sensitive data from being committed to Git
 .env
+# Audit 2026-08-16: .env war abgedeckt, Sicherungskopien davon NICHT.
+# `git add -A` haette .env.bak-* mit allen Secrets ins Repo geholt --
+# und dieses Repo hat zwei GitHub-Remotes (origin, darkstar).
+.env.*
+!.env.example
+*.env.bak*
 config.json
 .env.backup
 

@@ -14,9 +14,9 @@ const {
     setupTestApp,
 } = require('../test-utils/route-test-helpers');
 
-// 1x1 PNG data URL
+// 1x1 PNG data URL (must be a CRC-valid PNG — libvips >= 8.18 rejects broken IDAT checksums)
 const DATA_URL_PNG_1PX =
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PcDq3wAAAABJRU5ErkJggg==';
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4////fwAJ+wP9CNHoHgAAAABJRU5ErkJggg==';
 
 describe('POST /api/local/generate-motion-posterpack', () => {
     let tempRoot;

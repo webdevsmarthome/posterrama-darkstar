@@ -8,6 +8,58 @@ const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const { PassThrough } = require('stream');
+const dns = require('dns').promises;
+const ipaddr = require('ipaddr.js');
+
+// SECURITY (APP-1): SSRF guard for the image proxy's directUrl (?url=) mode.
+// Only globally-routable (public) targets and explicitly configured media-server
+// hosts are allowed to be fetched; loopback / RFC1918 / link-local / CGNAT /
+// reserved targets are blocked so the proxy cannot be abused to reach
+// internal-only services (e.g. a localhost-bound metrics endpoint).
+function isBlockedImageIp(ip) {
+    try {
+        let addr = ipaddr.parse(ip);
+        if (addr.kind() === 'ipv6' && addr.isIPv4MappedAddress()) {
+            addr = addr.toIPv4Address();
+        }
+        // Allow only globally-routable unicast addresses.
+        return addr.range() !== 'unicast';
+    } catch (_e) {
+        return true; // unparseable -> block (fail closed)
+    }
+}
+async function assertSafeDirectImageUrl(rawUrl, appConfig) {
+    let parsed;
+    try {
+        parsed = new URL(rawUrl);
+    } catch (_e) {
+        throw new Error('invalid URL');
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error(`disallowed scheme ${parsed.protocol}`);
+    }
+    const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    const allowedHosts = new Set(
+        (((appConfig && appConfig.mediaServers) || [])
+            .map(s => String((s && s.hostname) || '').toLowerCase())
+            .filter(Boolean))
+    );
+    // Configured media servers are trusted even when they live on private IPs.
+    if (allowedHosts.has(host)) return;
+    let addresses;
+    if (ipaddr.isValid(host)) {
+        addresses = [host];
+    } else {
+        const records = await dns.lookup(host, { all: true });
+        addresses = records.map(r => r.address);
+    }
+    if (!addresses.length) throw new Error('DNS resolution failed');
+    for (const ip of addresses) {
+        if (isBlockedImageIp(ip)) {
+            throw new Error(`blocked non-public target ${ip}`);
+        }
+    }
+}
 
 // Import enrichment functions for extras support
 const { enrichPlexItemWithExtras } = require('../lib/plex-helpers');
@@ -2330,6 +2382,24 @@ module.exports = function createMediaRouter({
                     .send('Either (server name and image path) or direct URL is required');
             }
 
+            // SECURITY (APP-1/SSRF): validate the caller-influenced directUrl BEFORE any
+            // cache lookup or fetch, so neither a fresh request nor a previously cached
+            // response can be used to reach internal-only services. Configured media-server
+            // hosts (possibly private IPs) remain allowed; loopback/RFC1918/link-local/
+            // CGNAT/reserved targets are blocked.
+            if (directUrl) {
+                try {
+                    await assertSafeDirectImageUrl(directUrl, config);
+                } catch (ssrfErr) {
+                    logger.warn('[Image Proxy] Blocked unsafe direct URL', {
+                        reason: ssrfErr.message,
+                        requestId: req.id,
+                    });
+                    trackFallback('unsafeDirectUrl', { reason: ssrfErr.message }, logger);
+                    return res.redirect('/fallback-poster.png');
+                }
+            }
+
             // Create a unique and safe filename for the cache
             // Include quality/width in cache key so high-res and low-res are cached separately
             const quality = parseInt(req.query.quality, 10) || 100;
@@ -2367,6 +2437,7 @@ module.exports = function createMediaRouter({
 
             // 2. Handle direct URL proxying (for Jellyfin and external images)
             if (directUrl) {
+                // Safety of directUrl is validated above (before the cache lookup).
                 imageUrl = directUrl;
                 if (isDebug) logger.debug(`[Image Proxy] Using direct URL: ${imageUrl}`);
             } else {

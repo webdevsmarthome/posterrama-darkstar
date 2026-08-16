@@ -50,12 +50,19 @@ module.exports = {
                 // Default to production if not set in .env
                 NODE_ENV: 'production',
                 APP_VERSION: pkg.version,
-                NODE_OPTIONS: '--max-old-space-size=8192', // 8GB heap limit
+                // Audit 2026-08-16 (OPS-2): war 8192 MB und damit groesser als der
+                // physische RAM (7,63 GB). Ein leckender Prozess haette nie den
+                // PM2-Neustart ausgeloest, sondern zuerst den OOM-Killer geweckt --
+                // der nach Heuristik den Chromium-Kiosk oder pihole-FTL trifft.
+                // Realer Bedarf im Betrieb: ~264 MB.
+                NODE_OPTIONS: '--max-old-space-size=1536', // 1,5 GB Heap-Obergrenze
                 ...loadEnvFile(), // Load .env (overrides defaults including NODE_ENV)
             },
             // Force environment update on restart
             restart_delay: 1000,
-            max_memory_restart: '8192M', // Restart if memory exceeds 8GB
+            // Audit 2026-08-16 (OPS-2): muss unter dem physischen RAM liegen,
+            // damit PM2 vor dem OOM-Killer eingreift.
+            max_memory_restart: '2048M', // Neustart ab 2 GB RSS
         },
     ],
 };
