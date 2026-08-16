@@ -1026,10 +1026,21 @@ app.post('/api/v1/devices/reload', (req, res) => {
 
 if (isDebug) logger.debug('--- DEBUG MODE IS ACTIVE ---');
 
-// Trust the first proxy in front of the app (e.g., Nginx, Cloudflare).
-// This is necessary for express-rate-limit to work correctly when behind a proxy,
-// as it allows the app to correctly identify the client's IP address.
-app.set('trust proxy', 1);
+// SECURITY (Audit 2026-08-16, Befund APP-4): Hier stand `1` -- also "vertraue
+// genau einem Hop". Eine Hop-ZAHL sagt Express aber nicht, WER der Proxy sein
+// darf: Es uebernimmt dann den letzten X-Forwarded-For-Eintrag bedingungslos,
+// auch wenn der Client direkt auf :4000 verbindet und den Header selbst setzt.
+// Nachgewiesen: curl -H "X-Forwarded-For: 10.255.0.9" .../bypass-check
+//               -> {"bypass":true}  (Allowlist damit wirkungslos)
+//
+// Richtig ist eine Proxy-LISTE. Der einzige legitime Proxy ist der lokale
+// cloudflared, der von 127.0.0.1 aus verbindet:
+//   - Anfrage von Loopback   -> XFF gilt (Tunnel liefert die echte Client-IP;
+//     ein vorangestellter Fake steht links davon und wird verworfen).
+//   - Anfrage direkt aus dem LAN -> XFF wird ignoriert, req.ip ist die echte
+//     Socket-Adresse. Genau das schliesst die Luecke.
+// Nebeneffekt: express-rate-limit zaehlt LAN-Clients nach echter IP.
+app.set('trust proxy', 'loopback');
 
 // --- Static Asset Cache Busting Middleware ---
 // Allows appending ?v=<pkg.version> to static asset URLs and strips it so the real file is served.

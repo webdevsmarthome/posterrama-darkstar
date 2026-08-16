@@ -149,3 +149,4 @@ posterrama-custom-backup-*.tar.gz
 
 # Claude Code project settings
 .claude/
+config.json.bak-*

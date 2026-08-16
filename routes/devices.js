@@ -226,12 +226,12 @@ module.exports = function createDevicesRouter({
         express.json(),
         async (/** @type {DeviceRequest} */ req, res) => {
             try {
-                const ip = Array.isArray(req.headers['x-forwarded-for'])
-                    ? req.headers['x-forwarded-for'][0]
-                    : (Array.isArray(req.headers['x-forwarded-for'])
-                          ? req.headers['x-forwarded-for'][0]
-                          : req.headers['x-forwarded-for']?.split(',')[0]
-                      )?.trim() || req.ip;
+                // SECURITY (Audit 2026-08-16, APP-4): las frueher den rohen
+                // X-Forwarded-For-Header (dessen erster Wert ist aufruferkontrolliert).
+                // req.ip wertet stattdessen `app.set('trust proxy', 1)` korrekt aus.
+                // Hier fliesst die IP nur ins Protokoll -- eine gefaelschte Adresse
+                // haette also die Herkunft jeder Registrierung verschleiern koennen.
+                const ip = req.ip;
 
                 const result = await deviceOps.processDeviceRegistration(deviceStore, {
                     body: req.body,
@@ -437,14 +437,11 @@ module.exports = function createDevicesRouter({
      */
     router.get('/bypass-check', (/** @type {DeviceRequest} */ req, res) => {
         const bypass = !!req.deviceBypass;
-        const ip =
-            (Array.isArray(req.headers['x-forwarded-for'])
-                ? req.headers['x-forwarded-for'][0]
-                : req.headers['x-forwarded-for']?.split(',')[0]
-            )?.trim() ||
-            req.connection?.remoteAddress ||
-            req.ip ||
-            'unknown';
+        // SECURITY (Audit 2026-08-16, APP-4): zeigte frueher die aus dem rohen
+        // X-Forwarded-For gelesene -- also faelschbare -- Adresse an. Die
+        // Diagnoseausgabe muss dieselbe Quelle nutzen wie die Bypass-Entscheidung
+        // selbst, sonst zeigt sie etwas anderes als tatsaechlich geprueft wurde.
+        const ip = req.ip || req.socket?.remoteAddress || 'unknown';
         res.json({ bypass, ip });
     });
 

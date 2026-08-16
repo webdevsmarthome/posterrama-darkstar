@@ -114,14 +114,34 @@ function refreshIfNeeded() {
         });
 }
 
+// SECURITY (Audit 2026-08-16, Befund APP-4): Diese Funktion las frueher den
+// ROHEN X-Forwarded-For-Header und nahm dessen ersten Wert -- unabhaengig von
+// Expresss `trust proxy`-Einstellung. Der erste Wert der Kette ist aber genau
+// der Teil, den der Aufrufer selbst setzt. Nachgewiesen:
+//     curl                                  -> {"bypass":false}
+//     curl -H "X-Forwarded-For: 10.255.0.9" -> {"bypass":true}
+// Damit war die Allowlist ["127.0.0.1","10.255.0.0/16"] wirkungslos. Der Trick
+// funktionierte auch hinter Cloudflare, weil der Proxy die echte Client-IP
+// HINTEN anhaengt, split(',')[0] aber vorne greift.
+//
+// Korrekt ist req.ip: Express wertet damit `app.set('trust proxy', 1)` aus und
+// nimmt genau einen vertrauenswuerdigen Proxy-Hop an -- die richtige Semantik
+// hinter dem Cloudflare-Tunnel.
 function extractClientIp(req) {
-    // Respect X-Forwarded-For first IP if provided; fall back to req.ip
-    const fwd = req.headers['x-forwarded-for'];
-    if (typeof fwd === 'string' && fwd.length) {
-        const first = fwd.split(',')[0].trim();
-        if (first) return first;
+    let ip = req.ip || (req.socket && req.socket.remoteAddress) || '';
+    // Auf Dual-Stack-Sockets liefert Node IPv4-gemappte Adressen (::ffff:127.0.0.1).
+    // Ohne Normalisierung schluege der kind()-Vergleich in buildMatcher() fehl.
+    try {
+        if (ip && ipaddr.isValid(ip)) {
+            const addr = ipaddr.parse(ip);
+            if (addr.kind() === 'ipv6' && addr.isIPv4MappedAddress()) {
+                return addr.toIPv4Address().toString();
+            }
+        }
+    } catch (_) {
+        /* nicht parsebar -> unveraendert zurueckgeben, Matcher verwirft es ohnehin */
     }
-    return req.ip || (req.connection && req.connection.remoteAddress) || '';
+    return ip || '';
 }
 
 function deviceBypassMiddleware(req, _res, next) {
