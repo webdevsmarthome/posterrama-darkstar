@@ -2,7 +2,17 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs-extra');
 const mimeTypes = require('mime-types');
-const FileType = require('file-type');
+// file-type ist ab v22 reines ESM (Audit 2026-08-18, DEP-2). Aus diesem
+// CommonJS-Modul wird es daher lazy per dynamischem import() geladen und der
+// Export einmalig gecacht. Der API-Name wechselte von FileType.fromBuffer()
+// zum benannten Export fileTypeFromBuffer().
+let _fileTypeFromBuffer;
+async function fileTypeFromBuffer(buffer) {
+    if (!_fileTypeFromBuffer) {
+        ({ fileTypeFromBuffer: _fileTypeFromBuffer } = await import('file-type'));
+    }
+    return _fileTypeFromBuffer(buffer);
+}
 const AdmZip = require('adm-zip');
 const logger = require('../utils/logger');
 
@@ -648,7 +658,7 @@ async function validateFileTypeFromHeader(filePath) {
         }
 
         // Detect file type
-        const fileType = await FileType.fromBuffer(buffer.slice(0, bytesRead));
+        const fileType = await fileTypeFromBuffer(buffer.slice(0, bytesRead));
 
         if (!fileType) {
             // Fallback to MIME type detection
