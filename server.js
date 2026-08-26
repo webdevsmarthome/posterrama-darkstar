@@ -541,7 +541,17 @@ app.use((req, res, next) => {
         // Only warn for modifying requests with neither a session nor a bearer token
         // Skip test-* endpoints as frontend routinely calls these before login
         const isTestEndpoint = req.path.includes('/test-');
-        if (!hasSessionUser && !hasBearer && req.method !== 'GET' && !isTestEndpoint) {
+        // Audit 2026-08-26 (L-14): OPTIONS (CORS-Preflight) traegt per Design keine
+        // Credentials und ist keine Modifikation -- sonst wird jeder Preflight
+        // faelschlich als "Unauthorized admin API modification attempt" geloggt und
+        // verrauscht genau die Log-Kategorie, die man im Ernstfall braucht.
+        if (
+            !hasSessionUser &&
+            !hasBearer &&
+            req.method !== 'GET' &&
+            req.method !== 'OPTIONS' &&
+            !isTestEndpoint
+        ) {
             logger.warn('Unauthorized admin API modification attempt', {
                 method: req.method,
                 path: req.path,
@@ -3705,6 +3715,17 @@ app.use(
 );
 
 // QR code generation route (modularized)
+// Audit 2026-08-26 (APP-6): /api/qr ist bewusst unauthentifiziert (Pairing-Modal),
+// der interne Auth-Guard ist zudem toter Code. Ohne Ratenbegrenzung ist das eine
+// unauth. Rechenlast-Primitive (bis 2953 Zeichen QR-Erzeugung je Anfrage). Ein
+// eigener Limiter deckelt Missbrauch, ohne den Pairing-Flow zu stoeren (100/15min
+// je IP ist fuer echtes Pairing reichlich).
+const qrLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    100,
+    'Too many QR code requests from this IP. Please try again later.'
+);
+app.use('/api/qr', qrLimiter);
 const createQRRouter = require('./routes/qr');
 app.use('/', createQRRouter({ isAuthenticated }));
 

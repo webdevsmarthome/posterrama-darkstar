@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⛔ NIEMALS DIE BOOT-KONFIGURATION ÄNDERN — postermonitor bootet sonst nicht mehr
+
+**`/boot/firmware/cmdline.txt` und speziell den Parameter `usb-storage.quirks=152d:1576:u` NIEMALS entfernen oder verändern.**
+
+Dieser Quirk erzwingt den BOT-Modus (kein UAS) für die USB-SATA-Bridge JMicron `152d:1576`, an der die System-SSD hängt. **Das Root-Dateisystem liegt auf genau dieser SSD.** Im UAS-Modus kommt die Bridge beim Booten nicht zuverlässig hoch — das Root-FS lässt sich nicht mounten und **der Pi bootet nicht mehr**.
+
+- **Empirisch belegt am 2026-08-18:** Nach Entfernen des Quirks bootete `postermonitor` nicht mehr. Wiederherstellung nur durch **physischen Zugriff** in Sachsendorf möglich.
+- Ein in-band Auto-Revert-Netz (systemd-Dienst nach dem Boot) hilft NICHT — der Ausfall passiert *vor* dem Start jedes Dienstes.
+- **Die BOT-Modus-Grenzen sind eine akzeptierte, dauerhafte Hardware-Eigenschaft, KEIN Optimierungsziel:** `nr_requests=2`, kein TRIM, ~5.086 IOPS (4K random). Audit-Befund HW-2 gilt als **„won't fix / Hardware-Limit"**.
+- Allgemeine Lehre: Auf diesem Remote-Host mit Root-auf-USB **keine boot-verhindernden Änderungen** (`cmdline.txt`, `config.txt`, Bootloader, Root-`fstab`/PARTUUID) ohne vorab organisierten physischen bzw. Out-of-Band-Zugang.
+
 ## Project Overview
 
 Posterrama is a self-hosted Node.js display server that turns screens into media art galleries. It pulls artwork from Plex, Jellyfin/Emby, TMDB, and RomM, presenting it in three display modes: Cinema (single poster), Wallart (poster grid), and Screensaver (slideshow). It includes an admin dashboard, device management, MQTT/Home Assistant integration, and WebSocket-based real-time control.
