@@ -12,21 +12,56 @@ const logger = require('../utils/logger');
  * Security middleware configuration
  * Implements security best practices
  */
+// SECURITY (Audit 2026-08-16, Befund APP-3): Diese Middleware wurde frueher erst
+// NACH dem Frontend-Router montiert (server.js:2644 gegenueber :1069). Dadurch
+// liefen /, /screensaver, /cinema und /wallart -- also genau die per
+// Cloudflare-Tunnel exponierten Seiten -- voellig ohne Schutz-Header (0 von 4),
+// waehrend /admin/login korrekt 4 von 4 setzte.
+//
+// Mit dem Vorziehen gilt die CSP erstmals auch fuer die Anzeigeseiten. Die
+// Direktiven wurden deshalb an deren tatsaechlichen Ressourcenbedarf angepasst --
+// die vorherige Liste haette die Trailer-Wiedergabe stillgelegt:
+//   - frameSrc stand auf 'none', aber cinema-display.js und screensaver.js
+//     erzeugen iframes auf www.youtube.com / www.youtube-nocookie.com
+//   - scriptSrc kannte www.youtube.com/iframe_api nicht; die IFrame-API laedt
+//     den eigentlichen Player anschliessend von s.ytimg.com
+//   - cinema.html bindet zusaetzlich Ressourcen von cdn.jsdelivr.net ein
 function securityMiddleware() {
     // @ts-ignore - helmet is callable but require() doesn't map types correctly
     return helmet({
         contentSecurityPolicy: {
             directives: {
                 defaultSrc: ["'self'"],
-                styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
-                fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-                imgSrc: ["'self'", 'data:', 'https:', 'http:'],
-                scriptSrc: ["'self'", "'unsafe-inline'"],
-                connectSrc: ["'self'"],
-                frameSrc: ["'none'"],
+                styleSrc: [
+                    "'self'",
+                    "'unsafe-inline'",
+                    'https://fonts.googleapis.com',
+                    'https://cdnjs.cloudflare.com',
+                    'https://cdn.jsdelivr.net',
+                ],
+                fontSrc: [
+                    "'self'",
+                    'data:',
+                    'https://fonts.gstatic.com',
+                    'https://cdnjs.cloudflare.com',
+                    'https://cdn.jsdelivr.net',
+                ],
+                imgSrc: ["'self'", 'data:', 'blob:', 'https:', 'http:'],
+                scriptSrc: [
+                    "'self'",
+                    "'unsafe-inline'",
+                    'https://www.youtube.com',
+                    'https://s.ytimg.com',
+                    'https://cdn.jsdelivr.net',
+                    'https://cdnjs.cloudflare.com',
+                ],
+                // 'self' deckt gleichoriginale WebSocket-/SSE-Verbindungen mit ab (CSP3).
+                connectSrc: ["'self'", 'https://www.youtube.com'],
+                frameSrc: ['https://www.youtube.com', 'https://www.youtube-nocookie.com'],
                 objectSrc: ["'none'"],
-                mediaSrc: ["'self'", 'https:', 'http:'],
+                mediaSrc: ["'self'", 'blob:', 'data:', 'https:', 'http:'],
                 upgradeInsecureRequests: null,
+                reportUri: ['/api/csp-report'],
             },
         },
         crossOriginEmbedderPolicy: false,
@@ -126,18 +161,77 @@ function compressionMiddleware() {
  * CORS middleware configuration
  * Handles cross-origin requests securely
  */
+// SECURITY (Audit 2026-08-16, Befund APP-2): Vorher spiegelte diese Middleware
+// JEDEN fremden Origin zurueck -- zusammen mit `credentials: true` und auch auf
+// /api/admin/*. Nachgewiesen mit `curl -H "Origin: https://evil.example.com"`:
+// die Antwort enthielt genau diesen Origin in Access-Control-Allow-Origin.
+// Dass daraus keine Uebernahme folgte, lag einzig am SameSite=Lax-Cookie --
+// eine einzige Verteidigungslinie ohne Tiefenschutz, die bei einem Wechsel auf
+// sameSite:'none' sofort gefallen waere.
+//
+// Die Absicht des alten Codes ("self-hosted, Nutzer waehlen ihre Domain") ist
+// berechtigt; sie wird jetzt ueber eine konfigurierbare Allowlist erfuellt statt
+// ueber Pauschalfreigabe. Zusaetzliche Origins koennen ohne Codeaenderung ueber
+// die Umgebungsvariable CORS_ALLOWED_ORIGINS (kommagetrennt) ergaenzt werden.
+function buildAllowedOrigins() {
+    const list = new Set();
+
+    // 1. Oeffentliche URL aus der Konfiguration (z. B. https://pr.go27.one)
+    for (const key of ['PUBLIC_URL', 'BASE_URL', 'SITE_URL']) {
+        const v = (process.env[key] || '').trim().replace(/\/+$/, '');
+        if (v) list.add(v);
+    }
+
+    // 2. Ausdrueckliche Ergaenzungen des Betreibers
+    for (const v of (process.env.CORS_ALLOWED_ORIGINS || '').split(',')) {
+        const t = v.trim().replace(/\/+$/, '');
+        if (t) list.add(t);
+    }
+
+    // 3. Lokale Zugriffe: Loopback und die eigene LAN-Adresse auf dem App-Port.
+    //    Die Anzeigeclients im LAN sprechen die App direkt auf :4000 an.
+    const port = process.env.SERVER_PORT || process.env.PORT || '4000';
+    for (const host of ['localhost', '127.0.0.1']) {
+        list.add(`http://${host}:${port}`);
+        list.add(`https://${host}:${port}`);
+    }
+    try {
+        const os = require('os');
+        for (const ifaces of Object.values(os.networkInterfaces() || {})) {
+            for (const i of ifaces || []) {
+                if (i.family === 'IPv4' && !i.internal) {
+                    list.add(`http://${i.address}:${port}`);
+                    list.add(`https://${i.address}:${port}`);
+                }
+            }
+        }
+    } catch (_) {
+        /* Netzwerkliste optional -- Allowlist bleibt sonst einfach kuerzer */
+    }
+    return list;
+}
+
 function corsMiddleware() {
+    const allowed = buildAllowedOrigins();
+    logger.info('[CORS] Allowlist aktiv', { origins: [...allowed] });
+
     return cors({
         origin: function (origin, callback) {
-            // Allow requests with no origin (mobile apps, curl, Postman, etc.)
+            // Anfragen ohne Origin (curl, native Apps, Server-zu-Server) tragen
+            // keine Browser-Credentials und sind daher unkritisch.
             if (!origin || origin === 'null') {
                 callback(null, true);
                 return;
             }
-
-            // Allow all origins for self-hosted applications
-            // Users can host Posterrama on any domain they want
-            callback(null, true);
+            if (allowed.has(origin.replace(/\/+$/, ''))) {
+                callback(null, true);
+                return;
+            }
+            // Kein Fehler, sondern schlicht KEIN Access-Control-Allow-Origin-Header:
+            // Der Browser blockt die Antwort, die Anfrage selbst laeuft normal durch.
+            // Ein Fehler wuerde stattdessen 500er fuer harmlose Aufrufe erzeugen.
+            logger.warn('[CORS] Origin abgelehnt', { origin });
+            callback(null, false);
         },
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

@@ -628,6 +628,35 @@ app.use((req, res, next) => {
 });
 
 // API Versioning Middleware
+// === SICHERHEITS-HEADER (Audit APP-3) — vor den ersten antwortenden Handler ===
+// Helmet stand frueher hinter dem Frontend-Router; /, /screensaver, /cinema,
+// /wallart, /api/v1/config gingen dadurch ohne Schutz-Header raus. Gegenprobe:
+//   for p in / /screensaver /cinema /wallart /api/v1/config /admin/login; do
+//     curl -sD - -o /dev/null "http://127.0.0.1:4000$p" | grep -ciE \
+//       '^(content-security-policy|strict-transport-security|x-frame-options|x-content-type-options):'; done
+const {
+    securityMiddleware: earlySecurityMiddleware,
+    permissionsPolicyMiddleware: earlyPermissionsPolicyMiddleware,
+} = require('./middleware/index');
+// CSP-Verstoss-Endpunkt: Browser POSTen hierher bei Blockade (Diagnose).
+app.post(
+    '/api/csp-report',
+    express.json({ type: ['application/csp-report', 'application/json'], limit: '64kb' }),
+    (req, res) => {
+        const r = (req.body && (req.body['csp-report'] || req.body)) || {};
+        logger.warn('[CSP] Verstoss gemeldet', {
+            directive: r['effective-directive'] || r['violated-directive'],
+            blockedUri: r['blocked-uri'],
+            documentUri: r['document-uri'],
+            sourceFile: r['source-file'],
+            line: r['line-number'],
+        });
+        res.status(204).end();
+    }
+);
+app.use(earlySecurityMiddleware());
+app.use(earlyPermissionsPolicyMiddleware());
+
 app.use('/api', (req, res, next) => {
     const currentVersion = pkg.version;
     const acceptedVersion = req.headers['accept-version'];
@@ -2484,8 +2513,6 @@ app.post('/api/v1/admin/metrics/config', express.json(), (req, res) => {
 
 // Import optimized middleware
 const {
-    securityMiddleware,
-    permissionsPolicyMiddleware,
     compressionMiddleware,
     corsMiddleware,
     requestLoggingMiddleware,
@@ -2662,8 +2689,7 @@ app.use(express.json({ limit: '10mb' })); // For parsing JSON payloads
 // Apply new optimization middleware
 // Fixed compression middleware - now respects Accept-Encoding properly
 app.use(compressionMiddleware());
-app.use(securityMiddleware());
-app.use(permissionsPolicyMiddleware());
+// securityMiddleware()/permissionsPolicyMiddleware() sind nach oben gewandert (APP-3).
 app.use(corsMiddleware());
 app.use(requestLoggingMiddleware());
 // In test environment, optionally log requests; only seed session for safe idempotent reads (GET/HEAD)
