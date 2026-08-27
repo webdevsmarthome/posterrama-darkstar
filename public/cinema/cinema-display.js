@@ -1223,6 +1223,7 @@
     let ytApiReady = false; // Track if YouTube API is loaded
     let trailerDelayTimer = null; // Timer for delayed trailer start
     let trailerStartWatchdog = null; // PATCH-YT-FREEZE: Fallback wenn YT-Embed nie startet (z.B. Age-Gate ohne Event)
+    let localTrailerStallWatchdog = null; // PATCH-LOCAL-STALL: Fallback wenn lokales <video> haengenbleibt ohne ended/error
     let trailerLoopCount = 0; // Count trailer loops for autohide
     let trailerAutohideTimer = null; // Timer for time-based autohide
     let trailerReshowTimer = null; // Timer for re-showing trailer
@@ -1286,6 +1287,10 @@
         if (trailerStartWatchdog) {
             clearTimeout(trailerStartWatchdog);
             trailerStartWatchdog = null;
+        }
+        if (localTrailerStallWatchdog) {
+            clearInterval(localTrailerStallWatchdog);
+            localTrailerStallWatchdog = null;
         }
 
         // Reset state for new trailer
@@ -1401,6 +1406,8 @@
             clearTimeout(trailerStartWatchdog);
             trailerStartWatchdog = null;
         }
+        // localTrailerStallWatchdog wird hier BEWUSST nicht geloescht — er muss
+        // waehrend der gesamten Wiedergabe laufen (auch ueber Autohide/Reshow hinweg).
 
         const reshow = trailerConfig.reshow || 'never';
         if (reshow === 'never' || reshow === 'nextposter') return;
@@ -1530,6 +1537,49 @@
             trailerEl.appendChild(video);
             document.body.appendChild(trailerEl);
             setupAutohideTimer(trailerConfig);
+
+            // PATCH-LOCAL-STALL: Der lokale Pfad setzt die Rotation ausschliesslich
+            // ueber onended / onerror / play()-Reject fort. Stallt der Stream aber
+            // MITTEN in der Wiedergabe — etwa weil der Server beim Playlist-Rescan
+            // seinen Event-Loop 150s blockiert und die MP4-Auslieferung stockt —,
+            // feuert HTML5 nur 'stalled'/'waiting': weder 'ended' noch 'error'.
+            // Die Rotation blieb dann fuer immer stehen (schwarzes Overlay ueber
+            // dem Poster). Fortschritts-Watchdog: bewegt sich currentTime laenger
+            // als STALL_MAX_TICKS Ticks nicht, brechen wir ab und rotieren weiter.
+            // Deckt zugleich den Fall ab, dass das Video nie zu spielen beginnt.
+            if (localTrailerStallWatchdog) clearInterval(localTrailerStallWatchdog);
+            let _lastCurrentTime = -1;
+            let _stalledTicks = 0;
+            const STALL_TICK_MS = 2000;
+            const STALL_MAX_TICKS = 10; // 20s ohne Fortschritt
+            const _stallHandle = setInterval(() => {
+                // Overlay schon weg? Dann hat ein regulaerer Pfad uebernommen.
+                if (!video.isConnected) return;
+                const t = video.currentTime;
+                if (t !== _lastCurrentTime) {
+                    _lastCurrentTime = t;
+                    _stalledTicks = 0;
+                    return;
+                }
+                if (++_stalledTicks < STALL_MAX_TICKS) return;
+                // Eigenen Handle zuerst stoppen: nur EIN Vorrueck-Impuls, auch
+                // falls removeTrailerOverlay() inzwischen einen anderen Watchdog
+                // in der gemeinsamen Variable haelt.
+                clearInterval(_stallHandle);
+                if (localTrailerStallWatchdog === _stallHandle) localTrailerStallWatchdog = null;
+                log('Trailer: Lokales Video haengt (Stall-Watchdog) — weiter', {
+                    title: media.title,
+                    currentTime: t,
+                    readyState: video.readyState,
+                    networkState: video.networkState,
+                });
+                removeTrailerOverlay();
+                setTimeout(() => {
+                    showNextPoster();
+                    startRotation();
+                }, 2000);
+            }, STALL_TICK_MS);
+            localTrailerStallWatchdog = _stallHandle;
 
             // PATCH-SAFARI-AUTOPLAY: Expliziter play()-Call. Wenn Safari den Autoplay
             // verweigert (NotAllowedError), wird die Promise rejected — wir können dann
@@ -1875,6 +1925,10 @@
             clearTimeout(trailerStartWatchdog);
             trailerStartWatchdog = null;
         }
+        if (localTrailerStallWatchdog) {
+            clearInterval(localTrailerStallWatchdog);
+            localTrailerStallWatchdog = null;
+        }
 
         // Destroy YouTube player if exists
         if (ytPlayer) {
@@ -1933,6 +1987,10 @@
         if (trailerStartWatchdog) {
             clearTimeout(trailerStartWatchdog);
             trailerStartWatchdog = null;
+        }
+        if (localTrailerStallWatchdog) {
+            clearInterval(localTrailerStallWatchdog);
+            localTrailerStallWatchdog = null;
         }
 
         // Destroy YouTube player if exists

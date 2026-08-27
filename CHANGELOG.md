@@ -6,6 +6,49 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-11] – 2026-08-27
+
+Zwei Themen: die Sicherheits-Nacharbeit aus dem Audit vom 2026-08-16 (npm-Schwachstellen von 16 auf 0, SSRF-Guard endlich versioniert, Header-Reihenfolge, X-Forwarded-For-Spoofing) und die Behebung eines wiederkehrenden Anzeige-Hängers am Kiosk. Beides live am Produktivsystem verifiziert.
+
+### Behoben: Cinema-Anzeige blieb periodisch auf einem Poster stehen
+
+Der Monitor fror mehrmals täglich auf einem Bild ein — sichtbar als schwarzer Kasten über dem unteren Posterdrittel (das Trailer-`<video>` ohne Bild). Die Kette:
+
+1. `invalidateZipScanCache()` setzte den ZIP-Scan-Cache nach **jedem** Clearlogo-Pipeline-Lauf auf `'{}'` zurück.
+2. Der nächste Playlist-Refresh musste daraufhin alle ~1300 ZIPs neu einlesen. Gemessen: **126 ms pro ZIP allein fürs AdmZip-Öffnen** (92 % der Scan-Zeit — AdmZip liest jede ~1,3-MB-Datei komplett in den Speicher), macht ~150 s am Stück. Weil AdmZip synchron arbeitet, blockierte das den kompletten Node-Event-Loop: Requests brauchten 1,5–2,7 s statt Millisekunden.
+3. 94 % der Items (2444 von 2586) haben lokale Trailer, die vom selben Server streamen. Stallt so ein Stream, feuert HTML5 nur `stalled`/`waiting` — **weder `ended` noch `error`**. Genau diese drei Events waren aber die einzigen Wege, über die der lokale Trailer-Pfad die zuvor gestoppte Rotation wieder anwarf. Ergebnis: Anzeige stand bis zum nächsten Reload.
+
+Da die Pipeline alle 6 Stunden läuft, traf das vier Zeitfenster pro Tag.
+
+- **Gezielte statt totaler Cache-Invalidierung** (`lib/clearlogo-pipeline.js`) — der Reset war überflüssig: `zip.writeZip()` ändert mtime *und* size jedes gepatchten ZIPs, der Scan erkennt sie ohnehin an seinem mtime/size-Abgleich. Jetzt werden nur noch tatsächlich veraltete Einträge entfernt: 1310 von 1310 bleiben erhalten, Laufzeit 557 ms.
+- **Stall-Watchdog für lokale Trailer** (`public/cinema/cinema-display.js`) — Fortschritts-Überwachung alle 2 s; steht `currentTime` 20 s still, wird abgebrochen und weiterrotiert. Analog zum bereits vorhandenen YouTube-Watchdog, den der lokale Pfad nicht hatte. Deckt auch den Fall ab, dass ein Video nie zu spielen beginnt.
+- **Event-Loop-Yield im ZIP-Scan** (`sources/local.js`) — `setImmediate` nach jedem AdmZip-Read, nur im Cache-Miss-Zweig. Die längste Blockade am Stück ist damit ein einzelner ZIP-Read statt drei Minuten.
+- **Atomares Cache-Schreiben** (tmp + rename) — die 4,2-MB-Datei braucht 155 ms; ein parallel lesender Scan bekam bisher potenziell halben JSON-Text, `JSON.parse` warf, und der Scan fiel stillschweigend auf einen leeren Cache zurück.
+- **Cache-Lesefehler wird geloggt statt verschluckt** — das leere `catch (e) {}` war der Grund, warum ein kalter Cache nie im Log auftauchte. `ENOENT` (Erstlauf) bleibt `debug`, alles andere ist jetzt `warn`.
+
+Messwerte vorher/nachher: Refresh im Routinefall **150 s → 5,4 s**, Request-Latenz während des Refresh **1,5–2,7 s → 0,038 s** (Max 0,501 s). Im Ausnahmefall (Cache wirklich verloren) dauert der Scan jetzt ~7 min statt 150 s — bewusster Tausch: unterbrechbar statt schnell, die Latenz bleibt dabei bei 0,494 s im Mittel.
+
+### Sicherheit (Audit 2026-08-16)
+
+- **SSRF-Guard versioniert** (OPS-4/APP-1) — `assertSafeDirectImageUrl()` im Bild-Proxy lag 36 Tage ausschließlich als unversionierte Arbeitskopie vor; ein `git checkout` hätte ihn stillschweigend entfernt. Die Prüfung läuft vor dem Cache-Lookup, erlaubt nur global routbare Ziele plus konfigurierte Medienserver-Hosts und schließt Loopback, RFC1918, Link-Local, CGNAT und Reserved aus (fail closed).
+- **X-Forwarded-For-Spoofing geschlossen** (APP-4) — die Bypass-Allowlist ließ sich per Header umgehen, auch hinter Cloudflare (der Proxy hängt die echte Client-IP hinten an, der Code las vorne). `middleware/deviceBypass.js` und `routes/devices.js` nutzen jetzt `req.ip` statt des rohen Headers, passend zur `trust proxy`-Einstellung.
+- **Schutz-Header vor dem Frontend-Router** (APP-3) — `securityMiddleware()`/`permissionsPolicyMiddleware()` liefen hinter dem Frontend-Router; `/`, `/screensaver`, `/cinema`, `/wallart` und `/api/v1/config` gingen ohne Schutz-Header raus (0/4). Jetzt liefern alle Seiten CSP, HSTS, X-Frame-Options und nosniff, `X-Powered-By` ist weg. CSP-Direktiven an den realen Bedarf der Anzeigeseiten angepasst (youtube/s.ytimg/jsdelivr, `frame-src` für Trailer).
+- **CORS-Allowlist** (APP-2) statt offener Origin-Spiegelung.
+- **Ratelimit für `/api/qr`** (APP-6) — die Route ist bewusst unauthentifiziert (Pairing), ihr interner Auth-Guard war toter Code: eine unauthentifizierte Rechenlast-Primitive ohne Begrenzung. Jetzt 100 Anfragen/15 min je IP.
+- **Log-Hygiene** (L-14) — die Warnung „Unauthorized admin API modification attempt" feuerte auf jedem CORS-Preflight und verrauschte genau die Sicherheits-Logkategorie.
+- **npm-Schwachstellen von 16 auf 0** — `bcrypt` 5.1.1 → 6.0.0 entfernt die `@mapbox/node-pre-gyp` → `node-tar`-Kette samt der einzigen kritischen Schwachstelle (Pfad-Traversal, GHSA-r292-9mhp-454m); `puppeteer` → 25, `file-type` 16 → 22 (ab v22 reines ESM, beide Nutzungsstellen auf lazy `import()` umgestellt), `adm-zip` → 0.6.0, `sharp` → 0.35.3 (libvips 8.18.3). Möglich wurde das durch den vorangegangenen Wechsel auf **Node 22**.
+
+### Verifikation
+
+- **Testsuite**: 4 neue Tests in `__tests__/lib/clearlogo-pipeline.test.js` (unveränderte Einträge überleben, korrupter Cache wird zurückgesetzt, fehlende Datei bleibt unangetastet, keine `.tmp`-Reste) — 9/9 grün, der echte Cache wird nachweislich nicht angefasst. Regression über die local/ZIP-Suiten: 64/65, einziger Fail vorbestehend (`local.preview-romm`).
+- **Live am Produktivsystem**: der alte Zustand exakt reproduziert (Cache auf `{}`, Neustart, Vollscan über 1310 ZIPs) — die Anzeige lief durch, der Stall-Watchdog musste nicht einmal auslösen. Genau diese Bedingung hatte den Monitor zuvor eingefroren.
+
+### Bekannte Einschränkung
+
+Bleibt der ZIP-Scan-Cache einmal wirklich verloren (Erstinstallation, gelöschte Datei), dauert der Wiederaufbau ~7 Minuten. Der einzige große Hebel dagegen wäre, `adm-zip` durch eine lazy lesende Bibliothek wie `yauzl` zu ersetzen, die nur das Central Directory liest statt der ganzen Datei — bewusst nicht gemacht, weil `adm-zip` projektweit genutzt wird und der Fall nach dieser Änderung selten ist.
+
+---
+
 ## [3.0.1z-10] – 2026-07-06
 
 Session-Poller-Härtung: Ein temporär nicht erreichbarer Media-Server schaltete die Now-Playing-Erkennung dauerhaft ab. Dazu npm-Security-Fixes (u. a. axios, express — 2× high). Live am Produktivsystem verifiziert.

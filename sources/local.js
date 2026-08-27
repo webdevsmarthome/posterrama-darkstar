@@ -741,7 +741,17 @@ class LocalDirectorySource {
         }
         let _zipScanCache = {};
         let _zipCacheChanged = false;
-        try { _zipScanCache = JSON.parse(require('fs').readFileSync(_zipCacheFile, 'utf8')); } catch (e) {}
+        try { _zipScanCache = JSON.parse(require('fs').readFileSync(_zipCacheFile, 'utf8')); }
+        catch (e) {
+            // NICHT verschlucken: faellt der Cache hier aus, liest der Scan
+            // gleich ALLE ~1300 ZIPs per AdmZip neu (~150ms/ZIP) und blockiert
+            // den Event-Loop minutenlang. Ohne Log war genau das unsichtbar.
+            // ENOENT ist der normale Erstlauf und bleibt auf debug.
+            const _lvl = e && e.code === 'ENOENT' ? 'debug' : 'warn';
+            logger[_lvl](
+                `LocalDirectorySource: ZIP-Scan-Cache nicht nutzbar (${e?.message}) — Scan liest alle ZIPs neu`
+            );
+        }
         for (const base of this.rootPaths) {
             const completeRoot = path.join(base, this.directories.complete);
             for (const sub of subdirs) {
@@ -799,6 +809,13 @@ class LocalDirectorySource {
                             zipMeta = this.readZipMetadata(zip);
                             _zipScanCache[zipFull] = { m: _st.mtimeMs, s: _st.size, h: has, z: zipMeta };
                             _zipCacheChanged = true;
+                            // AdmZip liest und parst synchron — ~150ms pro ZIP (gemessen auf
+                            // dem Pi). Ohne Yield blockiert ein kalter Scan ueber ~1300 ZIPs
+                            // den Event-Loop minutenlang am Stueck: HTTP-Requests brauchen
+                            // dann Sekunden und laufende Trailer-Streams stallen. Mit dem
+                            // Yield ist die laengste Blockade ein einzelner ZIP-Read.
+                            // Nur im Miss-Zweig — Cache-Hits kosten nur einen stat().
+                            await new Promise(resolve => setImmediate(resolve));
                         }
                         const st = _st;
                         let found = false;
@@ -819,8 +836,18 @@ class LocalDirectorySource {
         }
         // PATCH8: ZIP scan disk cache — persist to disk if updated
         if (_zipCacheChanged) {
-            try { require('fs').writeFileSync(_zipCacheFile, JSON.stringify(_zipScanCache)); }
-            catch (e) { logger.debug('LocalDirectorySource: Failed to save ZIP scan cache:', e?.message); }
+            // Atomar schreiben (tmp + rename): die Datei ist ~4,2 MB gross und
+            // braucht ~150ms. Ein paralleler Scan, der in diesem Fenster liest,
+            // bekaeme sonst halben JSON-Text, JSON.parse wuerfe — und er fiele
+            // auf einen leeren Cache zurueck (= voller AdmZip-Scan, Blockade).
+            try {
+                const _fs = require('fs');
+                const _tmp = `${_zipCacheFile}.tmp`;
+                _fs.writeFileSync(_tmp, JSON.stringify(_zipScanCache));
+                _fs.renameSync(_tmp, _zipCacheFile);
+            } catch (e) {
+                logger.debug('LocalDirectorySource: Failed to save ZIP scan cache:', e?.message);
+            }
         }
         if (results.length) {
             logger.debug(

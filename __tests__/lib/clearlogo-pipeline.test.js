@@ -113,4 +113,74 @@ describe('clearlogo-pipeline', () => {
             expect(() => pipeline.setLogger(myLogger)).not.toThrow();
         });
     });
+
+    describe('zip-scan-cache-Invalidierung', () => {
+        let tmpDir;
+        let cacheFile;
+
+        beforeEach(() => {
+            tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'clearlogo-cache-'));
+            cacheFile = path.join(tmpDir, 'zip-scan-cache.json');
+        });
+
+        afterEach(() => {
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+        });
+
+        // Legt eine echte Datei an und liefert den passenden Cache-Eintrag.
+        function makeZip(name, content = 'zip-inhalt') {
+            const p = path.join(tmpDir, name);
+            fs.writeFileSync(p, content);
+            const st = fs.statSync(p);
+            return { path: p, entry: { m: st.mtimeMs, s: st.size, h: { poster: true }, z: {} } };
+        }
+
+        it('behaelt unveraenderte Eintraege und entfernt nur veraltete', async () => {
+            const unchanged = makeZip('unchanged.zip');
+            const touched = makeZip('touched.zip');
+            const removed = makeZip('removed.zip');
+
+            const cache = {
+                [unchanged.path]: unchanged.entry,
+                [touched.path]: touched.entry,
+                [removed.path]: removed.entry,
+                [path.join(tmpDir, 'never-existed.zip')]: { m: 1, s: 1, h: {}, z: {} },
+            };
+            fs.writeFileSync(cacheFile, JSON.stringify(cache));
+
+            // touched.zip bekommt neuen Inhalt -> mtime UND size aendern sich,
+            // genau wie bei zip.writeZip() in patchZipWithGenerated().
+            fs.writeFileSync(touched.path, 'anderer inhalt mit anderer laenge');
+            // removed.zip verschwindet komplett.
+            fs.rmSync(removed.path);
+
+            await pipeline.__invalidateZipScanCache(cacheFile);
+
+            const after = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+            // Der entscheidende Punkt: der unveraenderte Eintrag ueberlebt.
+            // Frueher wurde der Cache komplett auf '{}' gesetzt, was den
+            // naechsten Refresh zwang, alle ~1300 ZIPs neu zu lesen.
+            expect(Object.keys(after)).toEqual([unchanged.path]);
+            expect(after[unchanged.path]).toEqual(unchanged.entry);
+        });
+
+        it('setzt einen korrupten Cache zurueck statt zu werfen', async () => {
+            fs.writeFileSync(cacheFile, '{ das ist kein gueltiges JSON');
+            await expect(pipeline.__invalidateZipScanCache(cacheFile)).resolves.toBeUndefined();
+            expect(fs.readFileSync(cacheFile, 'utf8')).toBe('{}');
+        });
+
+        it('laesst eine fehlende Cache-Datei unangetastet', async () => {
+            await expect(pipeline.__invalidateZipScanCache(cacheFile)).resolves.toBeUndefined();
+            expect(fs.existsSync(cacheFile)).toBe(false);
+        });
+
+        it('hinterlaesst keine .tmp-Datei (atomares Schreiben)', async () => {
+            const z = makeZip('a.zip');
+            fs.writeFileSync(cacheFile, JSON.stringify({ [z.path]: z.entry }));
+            await pipeline.__invalidateZipScanCache(cacheFile);
+            expect(fs.existsSync(`${cacheFile}.tmp`)).toBe(false);
+            expect(fs.readdirSync(tmpDir).filter(f => f.endsWith('.tmp'))).toEqual([]);
+        });
+    });
 });
