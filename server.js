@@ -3138,6 +3138,46 @@ app.post('/csp-report', cspReportJson, (req, res) => {
     res.status(204).end();
 });
 
+// Client-Fehler-Telemetrie: public/error-handler.js POSTet uncaught errors und
+// unhandled rejections der Anzeigeseiten hierher (fire-and-forget, keepalive).
+// Der Endpoint fehlte bisher komplett (404) — Browserfehler blieben serverseitig
+// unsichtbar. Aufgefallen am 2026-08-27, als Safari die Cinema-Seite ohne
+// Geraeteeinstellungen darstellte und der einzige Server-Treffer ein 404 auf
+// genau diesen Pfad war. Unauthentifiziert, weil die Anzeigeseiten nicht
+// eingeloggt sind — deshalb Ratelimit, hartes Body-Limit und Feldkuerzung.
+const telemetryErrorLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    60,
+    'Too many error reports from this IP. Please try again later.'
+);
+const clipTelemetryField = (value, max) =>
+    value == null ? undefined : String(value).slice(0, max);
+app.post(
+    '/api/telemetry/error',
+    telemetryErrorLimiter,
+    express.json({ limit: '16kb' }),
+    (req, res) => {
+        const b = req.body && typeof req.body === 'object' ? req.body : {};
+        // Meta-Schluessel heisst bewusst NICHT "message": Winston liesse ihn die
+        // Log-Nachricht ueberschreiben, und das "[Telemetry]"-Label ginge verloren.
+        logger.warn('[Telemetry] Client-Fehler', {
+            error: clipTelemetryField(b.message, 1000),
+            type: clipTelemetryField(b.type, 100),
+            url: clipTelemetryField(b.url, 500),
+            source: b.filename
+                ? `${clipTelemetryField(b.filename, 300)}:${b.lineno || '?'}:${b.colno || '?'}`
+                : undefined,
+            stack: clipTelemetryField(b.stack, 1000),
+            promiseRejection: b.promiseRejection === true || undefined,
+            manual: b.manual === true || undefined,
+            userAgent: clipTelemetryField(b.userAgent || req.headers['user-agent'], 200),
+            ip: req.ip,
+        });
+        // Immer 204 — der Client wertet die Antwort ohnehin nicht aus.
+        res.status(204).end();
+    }
+);
+
 // API cache stats endpoint (admin only)
 /**
  * @swagger

@@ -6,6 +6,20 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-12] – 2026-08-28
+
+Kleines Nachfolge-Release: Browserfehler der Anzeigeseiten werden serverseitig sichtbar, und die Watcher-Dokumentation beschreibt die gehärtete Monitor-Erkennung.
+
+### Hinzugefügt
+
+- **`POST /api/telemetry/error`** — `public/error-handler.js` meldet seit jeher uncaught errors und unhandled rejections der Anzeigeseiten an diesen Endpoint, der aber nie existierte (404). Browserfehler blieben damit unsichtbar — aufgefallen, als Safari auf einem MacBook die Cinema-Seite nur noch ohne Geräteeinstellungen darstellte und der einzige Server-Treffer ein 404 auf genau diesen Pfad war. Unauthentifiziert, weil die Anzeigeseiten nicht eingeloggt sind; deshalb 60 Meldungen/15 min je IP, 16 kB Body-Limit, alle Felder gekürzt. Log als `[Telemetry] Client-Fehler` (warn) mit Quelle `datei:zeile:spalte`, Stack, User-Agent und IP. 3 neue Tests.
+
+### Dokumentation
+
+- `docs/MONITOR-POWER-WATCHER.md`: Abschnitt „Fehlalarm-Falle" — die ursprüngliche Erkennung wertete *jeden* DDC-Fehler als „Monitor aus" und fror den Kiosk bei laufendem Monitor stundenlang per SIGSTOP ein (die wackelige DDC/CI-Firmware des U2720Q verstummte mehrfach für 8–13 Stunden). Beschreibt die dreistufige `probe_monitor`-Erkennung (HPD-Leitung, D6-Wert, I2C-ACK des Scalers) mit den gemessenen Signalen des Monitors in allen Zuständen sowie die Diagnose-Signatur (`ps` zeigt lauter `T`, `wchan = do_signal_stop`). Das Watcher-Script selbst liegt außerhalb des Repos in `~/.local/bin`.
+
+---
+
 ## [3.0.1z-11] – 2026-08-27
 
 Zwei Themen: die Sicherheits-Nacharbeit aus dem Audit vom 2026-08-16 (npm-Schwachstellen von 16 auf 0, SSRF-Guard endlich versioniert, Header-Reihenfolge, X-Forwarded-For-Spoofing) und die Behebung eines wiederkehrenden Anzeige-Hängers am Kiosk. Beides live am Produktivsystem verifiziert.

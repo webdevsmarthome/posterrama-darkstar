@@ -1,6 +1,6 @@
 # Monitor Power Watcher
 
-**Status:** Aktiv seit 2026-04-24
+**Status:** Aktiv seit 2026-04-24; Erkennungslogik am 2026-08-27 gehärtet (siehe „Fehlalarm-Falle")
 **Scope:** Lokale Pi-Installation (Darkstar-Fork), nicht Teil des Posterrama-Code-Releases
 **Zweck:** CPU/GPU-Last am Raspberry Pi reduzieren, wenn der direkt angeschlossene Monitor ausgeschaltet ist — ohne den Posterrama-Server zu pausieren, der weiterhin andere Clients bedient.
 
@@ -37,8 +37,8 @@ Der CRTC-Zustand bleibt inkonsistent, ein Reboot ist dann erforderlich. **Nicht 
 `~/.local/bin/monitor-power-watch.sh` — Bash-Endlosschleife, die:
 
 1. Wartet bis der Wayland-Socket verfügbar ist (für robusten Start).
-2. Initial per `ddcutil getvcp D6` den Power-State erfasst; falls Monitor beim Start bereits aus ist, sofort SIGSTOP.
-3. Danach alle 7 s pollt. Bei Zustandswechsel:
+2. Initial per `probe_monitor` den Power-State erfasst (`on`/`off`/`unknown`, siehe Tabelle unten); falls der Monitor beim Start bereits sicher aus ist, sofort SIGSTOP. Bei `unknown` wird **an** angenommen — lieber ein laufender Kiosk vor einem dunklen Monitor als ein eingefrorener vor einem hellen.
+3. Danach alle 7 s pollt. `unknown` hält den letzten Zustand (Log einmal sofort, dann alle ~10 min). Bei Zustandswechsel:
    - `on → off`: `kill -STOP` an `pgrep -u <uid> '^chromium$'`
    - `off → on`: `kill -CONT` an dieselbe Menge, **plus** 300 ms später ein virtueller ArrowRight-Tastendruck via `wtype -k Right`. Dadurch wird in `cinema-display.js` der Keyboard-Handler getriggert (`window.__posterramaPlayback.next()`) → sofort neues Poster. Ohne diesen Schritt wäre beim Wieder-Einschalten kurz das eingefrorene alte Poster sichtbar.
 4. **Self-Heal-Block (seit 3.0.1x):** Nach dem Übergangs-Check wird bei `curr=off` jeden Tick zusätzlich geprüft, ob alle gefundenen Chromium-PIDs tatsächlich `T`-Status haben. Wenn nicht, wird `stop_chromium` nachgeschickt. Loggt nur dann, wenn er nachschießen muss — kein Tick-Spam. Schützt gegen den **Boot-Race** (siehe Abschnitt unten) und gegen Chromium-Restarts während Monitor-off (z.B. nach Wayland-Crash).
@@ -79,14 +79,24 @@ WantedBy=default.target
 - User in Gruppen `i2c` und `video`.
 - Wayland-Compositor muss `wlr-virtual-keyboard-unstable-v1`-Protokoll unterstützen (labwc tut es).
 
-Vom Dell U2720Q antwortet `ddcutil getvcp D6` mit:
+`probe_monitor` wertet drei physische Signale in dieser Reihenfolge aus (`monitor-power-watch.sh --probe` gibt das Ergebnis einmalig aus):
 
-| Monitor-Zustand | Rückgabe |
-|---|---|
-| An | `sl=0x01` (DPM: On, DPMS: Off) |
-| Soft-Off (Taster) | `Display not found` (DDC-Kanal abgeschaltet) |
+| Schritt | Signal | Ergebnis |
+|---|---|---|
+| 1 | HPD-Leitung (`/sys/class/drm/card1-HDMI-A-1/status`) `disconnected` | **off** — Kabel ab oder Monitor ohne Netz |
+| 2 | `ddcutil --syslog NEVER --brief getvcp D6` antwortet | **Wert entscheidet:** `x01` = **on**, alles andere (`x02`–`x05`) = **off** |
+| 3 | DDC/CI stumm → I2C-ACK-Test `i2cdetect -y -r 20 0x37 0x37` | kein ACK = **off** (Scaler stromlos); ACK = **unknown** |
 
-Die *Unterscheidung* ist das Signal — nicht der numerische Wert selbst. Andere Monitore liefern ggf. `sl=0x04` statt eines Timeouts.
+Verhalten des Dell U2720Q (gemessen 2026-08-27/28):
+
+| Monitor-Zustand | HPD | 0x37-ACK | D6 |
+|---|---|---|---|
+| An | connected | ja | `x01` |
+| Soft-Off (Taster) | connected | ja | **intermittierend** Standby-Wert bzw. `Display not found` |
+| Netz weg | disconnected | nein | – |
+| An, aber DDC/CI-Firmware hängt | connected | ja | `Display not found` — stundenlang |
+
+Die letzte Zeile ist der Grund für den Umbau: Für die alte Logik (`ddcutil`-Erfolg = an, Fehler = aus) war ein DDC/CI-Hänger von einem Soft-Off nicht zu unterscheiden. Jetzt ergibt er `unknown` → Zustand bleibt. Beim Soft-Off fängt Schritt 2 den Übergang am Standby-Wert; die Funkstille danach hält den Zustand `off`. `--syslog NEVER` unterdrückt zudem die `is_sysfs_reliable_for_busno`-Diagnosezeilen, die ddcutil sonst dreimal pro Poll ins Journal schreibt (~37.000 Zeilen/Tag).
 
 ## Setup
 
@@ -179,6 +189,16 @@ Greift innerhalb von 7 s nach Chromium-Start. Idempotent (kill -STOP auf bereits
 
 ---
 
+## Fehlalarm-Falle (2026-08-27)
+
+**Symptom:** Der Kiosk blieb „immer wieder" auf einem Poster stehen, bei eingeschaltetem Monitor. Morgens half ein Netz-Power-Cycle des Monitors — scheinbar ein Anzeigeproblem.
+
+**Root-Cause:** Die ursprüngliche `is_monitor_on()` war nur `ddcutil getvcp D6 >/dev/null 2>&1` — *jeder* Fehler galt als „Monitor aus". Die DDC/CI-Firmware des U2720Q ist aber notorisch wackelig (`DDCRC_NULL_RESPONSE` / `DDCRC_DDC_DATA` / `DDCRC_RETRIES`, rund 20-mal pro Woche) und verstummte mehrfach **für Stunden bei laufendem Monitor** (23:32→07:55, 18:40→07:24). Der Watcher schickte daraufhin SIGSTOP, der Kiosk zeigte ein Standbild — bis der Nutzer den Monitor vom Netz trennte, was die Firmware zurücksetzte und DDC (und damit den Watcher) wieder zum Leben brachte. Der Power-Cycle „reparierte" also unwissentlich den eigentlichen Verursacher.
+
+**Diagnose-Signatur:** alle Chromium-PIDs im Status `T`; `/proc/<pid>/task/*/wchan` = `do_signal_stop`; Watcher-Log `Übergang on → off` mit direkt vorausgehendem `DDCRC_*`-Fehler; `ddcutil detect` → „Invalid display", während die EDID (0x50, EEPROM an den HDMI-+5V) weiter lesbar bleibt und 0x37 auf dem Bus ACKt. Bemerkenswert: Auch die Kernel-EDID (`/sys/class/drm/.../edid`) war in dem Zustand leer.
+
+**Fix:** `probe_monitor` mit drei Signalen und dem Zustand `unknown` (siehe Tabelle unter „Voraussetzungen"). Der Kiosk wird nie mehr auf blossen Verdacht eingefroren; die erste Nacht mit der neuen Logik überstand einen 13-stündigen DDC-Ausfall (4030 Polls) mit durchlaufendem Kiosk. Verifiziert am 2026-08-28 per Taster-Test: `on → off` in <1 s, `off → on` nach Wiedereinschalten.
+
 ## Latenz & Timing
 
 - **Detektions-Latenz**: 0–7 s (Polling-Intervall `INTERVAL=7` im Script).
@@ -188,7 +208,7 @@ Greift innerhalb von 7 s nach Chromium-Start. Idempotent (kill -STOP auf bereits
 ## Bekannte Einschränkungen
 
 1. **Crashpad-Handler werden nicht eingefroren** — `chrome_crashpad_handler` hat nicht `comm=chromium`, wird vom Pattern `^chromium$` bewusst ausgeschlossen. Harmlos, minimale Last (~0 %).
-2. **Monitor-Hersteller-abhängig** — Funktioniert, solange der Monitor bei Soft-Off den DDC-Kanal abschaltet. Bei Monitoren, die DDC im Standby aktiv lassen, müsste man das Script auf `sl=0x04/0x05`-Werte anpassen.
+2. **Monitor-Hersteller-abhängig** — Schritt 2 deckt Monitore ab, die im Standby per DDC einen Wert ≠ `x01` melden; Schritt 3 deckt stromlose Monitore ab. Ein Monitor, dessen DDC beim Soft-Off *sofort und dauerhaft* verstummt, während der Scaler weiter ACKt, bleibt im Zustand `on` — Chromium läuft dann weiter (harmlos, nur CPU). Beim U2720Q tritt das nicht auf, weil er den Standby-Wert zumindest intermittierend meldet.
 3. **Polling, kein Event** — Kein DRM-Hotplug, da der Pi den Monitor durchgehend als `connected` sieht. 7-Sekunden-Granularität ist der Kompromiss.
 4. **Greift nur das lokale Kiosk an** — Der Posterrama-Node.js-Server (`server.js`, PM2-verwaltet) wird **nicht** angefasst. Andere Clients (andere Pis, Browser, WebSocket-verbundene Displays) laufen ungestört weiter. Das ist bewusst so.
 
@@ -196,6 +216,7 @@ Greift innerhalb von 7 s nach Chromium-Start. Idempotent (kill -STOP auf bereits
 
 | Symptom | Ursache / Fix |
 |---|---|
+| Monitor an, aber **Standbild**; `ps -eo stat,comm \| grep chromium` zeigt lauter `T` | Chromium ist per SIGSTOP eingefroren. Watcher-Log auf `Übergang on → off` prüfen; `--probe` zeigt den aktuellen Befund. Sofortmaßnahme: `systemctl --user stop monitor-power-watch.service` (Trap + `ExecStopPost` senden SIGCONT). Hängt die DDC/CI-Firmware (`ddcutil detect` → „Invalid display", EDID trotzdem lesbar), hilft nur ein Netz-Power-Cycle des Monitors — Soft-Standby per `setvcp D6 4/1` und Kernel-Reprobe reichen nicht. |
 | Monitor an, aber schwarzes Bild | Chromium evtl. in einem Bad-State nach Testsequenz. Fix: `pkill -u 1000 '^chromium$'` — der Loop in `~/.config/labwc/autostart` startet es neu. |
 | Service startet, pausiert aber nicht | `ddcutil detect` manuell prüfen; sicherstellen, dass der User in Gruppe `i2c` ist. |
 | Chromium bleibt nach `systemctl stop` eingefroren | Sollte nicht passieren (ExecStopPost + Trap), aber manuell: `pkill -CONT -u 1000 '^chromium$'` |

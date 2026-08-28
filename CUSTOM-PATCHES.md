@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-08-27 (basierend auf Version 3.0.1z-11)
+**Stand:** 2026-08-28 (basierend auf Version 3.0.1z-12)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 **Release-Historie:** Siehe [CHANGELOG.md](./CHANGELOG.md) fuer die versionierte Uebersicht aller Aenderungen seit v3.0.1.
 
@@ -94,6 +94,7 @@
 | 65 | Clearlogo-Pipeline (4 Stufen) | lib/clearlogo-pipeline.js, lib/text-clearlogo-renderer.js, lib/emby-sync.js, poster-updater/fetch-clearlogos-fanarttv.py, poster-updater/fetch-clearlogos-local.py, routes/posterpack-creator.js, routes/poster-updater.js, public/admin.js, public/admin.css, config.schema.json, config.example.json | Vierstufiges Nachladen fehlender Clearlogos: TMDB → fanart.tv → Plex/Jellyfin lokal → Sharp-Text-Render-Fallback. Auto-Trigger nach Emby-Sync. Manueller Upload per Film im Admin-UI. `clearlogoSource` in metadata.json markiert Herkunft |
 | 66 | Trailer-Stall-Watchdog | public/cinema/cinema-display.js | Lokale Trailer setzen die Rotation nur ueber `onended`/`onerror`/`play()`-Reject fort. Stallt der Stream mittendrin, feuert keines davon und die Anzeige steht fuer immer. Fortschritts-Watchdog: 20 s ohne `currentTime`-Fortschritt → Overlay entfernen und weiterrotieren (`PATCH-LOCAL-STALL`) |
 | 67 | ZIP-Scan-Cache ohne Event-Loop-Blockade | lib/clearlogo-pipeline.js, sources/local.js | `invalidateZipScanCache()` leert den Cache nicht mehr komplett, sondern entfernt nur Eintraege mit veralteter mtime/size — der Totalreset zwang den naechsten Refresh, alle ~1300 ZIPs per AdmZip zu lesen (~150 s Event-Loop-Blockade). Dazu `setImmediate`-Yield nach jedem AdmZip-Read, atomares Cache-Schreiben (tmp+rename) und Logging statt `catch (e) {}` beim Cache-Lesefehler |
+| 68 | Client-Fehler-Telemetrie | server.js, __tests__/api/telemetry-error.test.js | `POST /api/telemetry/error` fuer `public/error-handler.js` — der Endpoint fehlte (404), Browserfehler der Anzeigeseiten blieben unsichtbar. Unauth., 60/15 min je IP, 16 kB Limit, Felder gekuerzt, Log `[Telemetry] Client-Fehler` mit Quelle/Stack/UA/IP |
 
 ---
 
