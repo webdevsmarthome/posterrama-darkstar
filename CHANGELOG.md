@@ -6,6 +6,20 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-13] – 2026-08-28
+
+CSP-Regression aus dem Audit-Commit behoben: Screensaver- und Wallart-Seite blieben unformatiert, Admin- und Setup-Buttons ohne Funktion.
+
+### Behoben
+
+- **`script-src-attr 'none'` blockierte Inline-Event-Handler** — Helmet liefert diese Direktive als Default mit, sobald `contentSecurityPolicy` aktiviert wird; der Audit-Commit vom 26.08. (APP-3) hat sie unbeabsichtigt geerbt und nur die Kiosk-Seite geprüft. Betroffen: `screensaver.html` und `wallart.html` (Stylesheet-Aktivierung via `<link rel="preload" onload="this.rel='stylesheet'">` — die Seite blieb beim ~1 KB Critical-CSS), `admin.html` (Modal schließen, YAML kopieren), `setup.html` (2FA-Verifizierung), `cache-browser.html`, `poster-updater.html` — 14 Handler in 6 Dateien. Nur `cinema.html` hat keine, deshalb blieb der Kiosk unauffällig. Aufgedeckt durch Safaris CSP-Reports an `/api/csp-report` („blockedUri: inline, directive: script-src-attr, /screensaver Zeile 61/62"). Fix: `scriptSrcAttr: ["'unsafe-inline'"]` — `script-src` erlaubt `'unsafe-inline'` ohnehin, ein Attribut-Verbot allein bringt keinen Schutz. Regressionstest `__tests__/middleware/csp-inline-handlers.test.js` (drei Seiten plus Marker, dass das Preload-Muster noch existiert).
+
+### Offen (Härtung)
+
+- Inline-Handler aus den sechs Dateien entfernen, danach `script-src-attr` wieder auf `'none'`.
+
+---
+
 ## [3.0.1z-12] – 2026-08-28
 
 Kleines Nachfolge-Release: Browserfehler der Anzeigeseiten werden serverseitig sichtbar, und die Watcher-Dokumentation beschreibt die gehärtete Monitor-Erkennung.
