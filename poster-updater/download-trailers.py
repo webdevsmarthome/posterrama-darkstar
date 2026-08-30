@@ -263,3 +263,9 @@ print(f"""
   Gesamt:             {len(films)}
 ==============================
 """)
+
+# Maschinenlesbare Ergebniszeile fuer lib/poster-updater-runner.js, der daraus
+# eine Zeile im Server-Log baut (Warnung bei Fehlern). Format nicht aendern:
+# der Runner parst genau diese Schluessel.
+print(f"TRAILER-SUMMARY downloaded={erfolg} skipped={uebersprungen} "
+      f"no_trailer={kein_trailer} failed={fehler} total={len(films)}")

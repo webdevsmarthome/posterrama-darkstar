@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-08-30 (basierend auf Version 3.0.1z-15)
+**Stand:** 2026-08-30 (basierend auf Version 3.0.1z-16)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 **Release-Historie:** Siehe [CHANGELOG.md](./CHANGELOG.md) fuer die versionierte Uebersicht aller Aenderungen seit v3.0.1.
 
@@ -97,6 +97,7 @@
 | 68 | Client-Fehler-Telemetrie | server.js, __tests__/api/telemetry-error.test.js | `POST /api/telemetry/error` fuer `public/error-handler.js` — der Endpoint fehlte (404), Browserfehler der Anzeigeseiten blieben unsichtbar. Unauth., 60/15 min je IP, 16 kB Limit, Felder gekuerzt, Log `[Telemetry] Client-Fehler` mit Quelle/Stack/UA/IP |
 | 69 | CSP script-src-attr 'none' ohne Inline-Handler | middleware/index.js, public/screensaver.html, public/wallart.html, public/admin.html, public/admin.js, public/admin.css, public/cache-browser.html, public/poster-updater.html, public/setup.html, public/promo/promo-box-overlay.js, __tests__/middleware/csp-inline-handlers.test.js | Alle 21 Inline-Event-Handler (onload/onclick/onerror/onfocus/onsubmit/onchange/onmouseover) durch addEventListener bzw. Event-Delegation ersetzt (`wireCspSafeHandlers()` am Ende von admin.js; Deferred-CSS via `data-deferred-css` + load-Listener; Bild-Fallbacks via `data-img-error` in der Capture-Phase). `script-src-attr` explizit `'none'` — Helmet liefert das sonst still als Default, was in z-13 die Seiten unformatiert liess. Test scannt public/ statisch auf `on<event>=` |
 | 70 | CSP frame-src 'self' (Admin-Vorschau) | middleware/index.js, __tests__/middleware/csp-admin-preview.test.js | Die Admin-Live-Vorschau (`<iframe src="/screensaver?preview=1">`) braucht `frame-src 'self'`; `X-Frame-Options` auf SAMEORIGIN statt DENY, konsistent mit `frame-ancestors 'self'`. Test prueft das Header-Paar |
+| 71 | Trailer-Lauf-Ergebnis im Server-Log | poster-updater/download-trailers.py, lib/poster-updater-runner.js, __tests__/lib/poster-updater-runner.summary.test.js | `TRAILER-SUMMARY`-Zeile am Script-Ende; `parseTrailerSummary()` im Runner loggt `Trailer-Lauf: N geladen, M fehlgeschlagen, …` (warn mit bis zu drei Fehlergruenden, sobald etwas scheitert; warn auch ohne Ergebniszeile). Vorher: `code=0` trotz wochenlang scheiternder Downloads |
 
 ---
 

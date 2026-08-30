@@ -6,6 +6,18 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-16] – 2026-08-30
+
+Trailer-Läufe melden ihr Ergebnis im Server-Log — stilles Scheitern ist vorbei.
+
+### Geändert
+
+- **Ergebniszeile pro Trailer-Lauf** — `download-trailers.py` druckt am Ende `TRAILER-SUMMARY downloaded=… skipped=… no_trailer=… failed=… total=…`; der Runner (`lib/poster-updater-runner.js`, `parseTrailerSummary()`) parst sie beim Prozessende und loggt `Trailer-Lauf: N geladen, M fehlgeschlagen, K ohne TMDB-Trailer, S uebersprungen (T Filme)` — als **Warnung** mit bis zu drei verschiedenen Fehlergründen (Video-IDs entfernt, damit gleiche Ursachen zusammenfallen), sobald etwas fehlschlug oder der Exit-Code ≠ 0 ist; sonst als Info. Fehlt die Zeile, weil das Script vorzeitig abbrach (z. B. `filmliste.txt` nicht gefunden), gibt es ebenfalls eine Warnung mit den letzten Logzeilen. Die bisherige Zeile `Trailer download finished, code=…` bleibt erhalten.
+- Hintergrund: Seit dem 02.08. scheiterte jeder Download an einem fünf Monate alten yt-dlp (`This video is not available`). Das Script fängt Fehler ab und endet mit 0, der Runner meldete wochenlang `finished, code=0`, der Fehlertext lag nur im In-Memory-Ringpuffer des Admins — der wegen der 2FA-Sperre nicht erreichbar war. Zehn neue Filme blieben ohne Trailer. yt-dlp-Pflege selbst (Update auf 2026.08.19, wöchentlicher `yt-dlp-update.timer`) liegt außerhalb des Repos.
+- Unit-Test `__tests__/lib/poster-updater-runner.summary.test.js` mit der echten Ausgabe des Laufs vom 30.08. (Zähler, Gründe ohne Duplikate/IDs, Abbruch ohne Ergebniszeile, Obergrenze drei Gründe). 4/4 grün.
+
+---
+
 ## [3.0.1z-15] – 2026-08-30
 
 Admin-Live-Vorschau repariert: gleichoriginale Frames sind wieder erlaubt.
