@@ -73,7 +73,7 @@
                     <!-- One-liner installation section -->
                     <div class="oneliner-install">
                         <p class="oneliner-text">Install instantly with one command:</p>
-                        <div class="oneliner-command" onclick="window.__copyPromoCommand(this)">
+                        <div class="oneliner-command" role="button" tabindex="0">
                             <code>curl -fsSL https://raw.githubusercontent.com/Posterrama/posterrama/main/install.sh | bash</code>
                             <span class="copy-indicator">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -105,6 +105,8 @@
             // FORCE oneliner command styling (fallback if CSS doesn't load properly)
             const oneliners = promoBox.querySelectorAll('.oneliner-command');
             oneliners.forEach(el => {
+                // CSP (script-src-attr 'none'): Listener statt onclick-Attribut im Template.
+                el.addEventListener('click', () => window.__copyPromoCommand(el));
                 el.style.background = 'rgba(255, 255, 255, 0.1)';
                 el.style.backdropFilter = 'blur(10px)';
                 el.style.webkitBackdropFilter = 'blur(10px)';

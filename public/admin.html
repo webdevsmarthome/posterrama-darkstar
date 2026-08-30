@@ -124,7 +124,7 @@
                data-form-type="other"
                data-lpignore="true"
                readonly
-               onfocus="this.removeAttribute('readonly'); this.value='';">
+               data-autofill-guard>
         <div class="doc-search-icon-circle">
           <i class="fas fa-search"></i>
         </div>
@@ -5925,7 +5925,7 @@
         <div class="modal-title" id="modal-ha-dashboard-title">
           <i class="fas fa-home"></i> Generate Home Assistant Section
         </div>
-        <button class="modal-close" onclick="closeHADashboardModal()" aria-label="Close">
+        <button class="modal-close" data-action="ha-dashboard-close" aria-label="Close">
           <i class="fas fa-times"></i>
         </button>
       </div>
@@ -5985,10 +5985,10 @@
       
       <!-- Modal Footer with Actions -->
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="closeHADashboardModal()">
+        <button type="button" class="btn btn-secondary btn-sm" data-action="ha-dashboard-close">
           <i class="fas fa-times"></i><span>Cancel</span>
         </button>
-        <button type="button" class="btn btn-primary btn-sm" onclick="copyDashboardYAML()">
+        <button type="button" class="btn btn-primary btn-sm" data-action="ha-dashboard-copy">
           <i class="fas fa-copy"></i><span>Copy YAML</span>
         </button>
       </div>

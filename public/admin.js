@@ -12488,7 +12488,7 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                 // Show thumbnail only if URL exists AND device is not offline
                 const hasNowplay = !!thumbSrc && status !== 'offline';
                 const thumbRightHtml = hasNowplay
-                    ? `<div class="nowplay-thumb nowplay-thumb-right js-media-hover" data-device-id="${d.id}"><img src="${thumbSrc}" alt="${thumbAlt}" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="48" height="72" onerror="this.parentElement.remove();this.closest('.device-card').classList.remove('has-nowplay');"></div>`
+                    ? `<div class="nowplay-thumb nowplay-thumb-right js-media-hover" data-device-id="${d.id}"><img src="${thumbSrc}" alt="${thumbAlt}" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="48" height="72" data-img-error="drop-nowplay"></div>`
                     : '';
                 // Title rendering handled via live reconcile; no separate inline row here
                 return `
@@ -26215,12 +26215,11 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                         height: 18px;
                         border: none;
                         background: transparent;
-                        color: var(--color-text-muted);
                         border-radius: 3px;
                         cursor: pointer;
                         transition: color 0.2s ease;
                         font-size: 10px;
-                    " onmouseover="this.style.color='var(--color-error)'" onmouseout="this.style.color='var(--color-text-muted)'">
+                    ">
                         <i class="fas fa-times"></i>
                     </button>
                 `;
@@ -26738,7 +26737,6 @@ window.COLOR_PRESETS = COLOR_PRESETS;
                         class="ha-dashboard-device-radio" 
                         data-device-id="${safeDeviceId}" 
                         ${index === 0 ? 'checked' : ''}
-                        onchange="updateRadioSelection(); generateHADashboard();"
                     />
                     <div class="ha-device-meta">
                         <div class="ha-device-name">${deviceName}</div>
@@ -32967,7 +32965,7 @@ if (!document.__niwDelegatedFallback) {
             var posterSrc = r.posterUrl || '';
             return '<div class="pu-search-card" data-entry="' + puEscAttr(entry) + '">' +
                 (posterSrc
-                    ? '<img class="pu-search-poster" src="' + puEscAttr(posterSrc) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+                    ? '<img class="pu-search-poster" src="' + puEscAttr(posterSrc) + '" alt="" loading="lazy" data-img-error="hide">'
                     : '<div class="pu-search-poster" style="display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--color-text-muted);">Kein Poster</div>') +
                 '<div class="pu-search-info">' +
                 '<div class="pu-search-title" title="' + puEscAttr(title) + '">' + puEscHtml(title) + '</div>' +
@@ -34769,4 +34767,73 @@ if (!document.__niwDelegatedFallback) {
             if (!section.hidden) initPosterPackStudio();
         }, 200);
     })();
+})();
+
+// ---------------------------------------------------------------------------
+// CSP: Event-Delegation statt Inline-Handler-Attribute (script-src-attr 'none').
+// Ersetzt die frueheren onclick/onchange/onerror/onfocus-Attribute in admin.html
+// und in den hier erzeugten Templates. Delegiert auf document, damit auch
+// spaeter per innerHTML eingefuegte Elemente (Geraetekarten, HA-Dashboard-
+// Radios, Suchergebnisse) abgedeckt sind. admin.js ist ein ES-Modul und laeuft
+// nach dem Parsen -- die statischen Elemente existieren hier bereits.
+// ---------------------------------------------------------------------------
+(function wireCspSafeHandlers() {
+    document.addEventListener('click', event => {
+        const el = event.target.closest('[data-action]');
+        if (!el) return;
+        switch (el.dataset.action) {
+            case 'ha-dashboard-close':
+                if (typeof window.closeHADashboardModal === 'function') {
+                    window.closeHADashboardModal();
+                }
+                break;
+            case 'ha-dashboard-copy':
+                if (typeof window.copyDashboardYAML === 'function') {
+                    window.copyDashboardYAML();
+                }
+                break;
+            default:
+                break; // fremde data-action-Werte gehoeren anderen Handlern
+        }
+    });
+
+    document.addEventListener('change', event => {
+        const el = event.target;
+        const isDeviceRadio =
+            el && el.tagName === 'INPUT' && el.classList.contains('ha-dashboard-device-radio');
+        if (!isDeviceRadio) return;
+        if (typeof window.updateRadioSelection === 'function') window.updateRadioSelection();
+        if (typeof window.generateHADashboard === 'function') window.generateHADashboard();
+    });
+
+    // Bild-Ladefehler bubbeln nicht -> Capture-Phase.
+    document.addEventListener(
+        'error',
+        event => {
+            const img = event.target;
+            if (!img || img.tagName !== 'IMG') return;
+            switch (img.dataset.imgError) {
+                case 'hide':
+                    img.style.display = 'none';
+                    break;
+                case 'drop-nowplay': {
+                    const card = img.closest('.device-card');
+                    img.parentElement?.remove();
+                    card?.classList.remove('has-nowplay');
+                    break;
+                }
+                default:
+                    break;
+            }
+        },
+        true
+    );
+
+    // Hilfe-Suchfeld: readonly-Trick gegen Browser-Autofill (vorher onfocus-Attribut).
+    document.querySelectorAll('input[data-autofill-guard]').forEach(input => {
+        input.addEventListener('focus', () => {
+            input.removeAttribute('readonly');
+            input.value = '';
+        });
+    });
 })();

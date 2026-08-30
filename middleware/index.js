@@ -55,17 +55,14 @@ function securityMiddleware() {
                     'https://cdn.jsdelivr.net',
                     'https://cdnjs.cloudflare.com',
                 ],
-                // Helmet setzt script-src-attr standardmaessig auf 'none' und blockiert
-                // damit Inline-Event-Handler (onload=, onclick=, onerror=). Das brach
-                // screensaver.html/wallart.html (Stylesheet-Aktivierung via
-                // <link rel="preload" onload="this.rel='stylesheet'"> -> Seite blieb
-                // unformatiert, Safari meldete es per CSP-Report), admin.html,
-                // setup.html (2FA-Verify), cache-browser.html und poster-updater.html
-                // -- 14 Handler in 6 Dateien. Nur cinema.html hat keine, deshalb fiel
-                // es am Kiosk nicht auf. Da script-src ohnehin 'unsafe-inline' erlaubt,
-                // bringt ein Attribut-Verbot allein keinen Schutz. Erst wenn die
-                // Inline-Handler aus dem HTML entfernt sind, kann das wieder auf 'none'.
-                scriptSrcAttr: ["'unsafe-inline'"],
+                // Inline-Event-Handler-Attribute (onclick=, onload=, onerror=, ...) sind
+                // verboten. Alle 20 Vorkommen (14 in HTML, 6 in JS-Templates) wurden
+                // durch addEventListener bzw. Event-Delegation ersetzt; der Test
+                // __tests__/middleware/csp-inline-handlers.test.js scannt public/ und
+                // schlaegt an, sobald wieder eines auftaucht. Explizit gesetzt, weil
+                // Helmet den Wert sonst still als Default mitliefert -- genau so ist
+                // die Regression v3.0.1z-13 entstanden (Seiten blieben unformatiert).
+                scriptSrcAttr: ["'none'"],
                 // 'self' deckt gleichoriginale WebSocket-/SSE-Verbindungen mit ab (CSP3).
                 connectSrc: ["'self'", 'https://www.youtube.com'],
                 frameSrc: ['https://www.youtube.com', 'https://www.youtube-nocookie.com'],

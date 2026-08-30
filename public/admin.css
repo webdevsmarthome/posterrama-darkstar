@@ -20438,3 +20438,14 @@ select.pu-input optgroup { font-weight: 600; color: var(--color-text-secondary);
 #section-emby-sync .ignore-list-table .es-remove-btn:hover {
     color: #e74c3c; border-color: #e74c3c;
 }
+
+/* IP-Whitelist-Chip: Farbe des Entfernen-Buttons in CSS statt im Inline-Style
+   des Templates (admin.js), damit :hover ohne onmouseover/onmouseout-Attribute
+   funktioniert (CSP script-src-attr 'none'). */
+.ip-chip .ip-remove {
+    color: var(--color-text-muted);
+}
+
+.ip-chip .ip-remove:hover {
+    color: var(--color-error);
+}

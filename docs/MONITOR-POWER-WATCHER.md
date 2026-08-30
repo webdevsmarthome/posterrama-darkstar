@@ -199,6 +199,22 @@ Greift innerhalb von 7 s nach Chromium-Start. Idempotent (kill -STOP auf bereits
 
 **Fix:** `probe_monitor` mit drei Signalen und dem Zustand `unknown` (siehe Tabelle unter „Voraussetzungen"). Der Kiosk wird nie mehr auf blossen Verdacht eingefroren; die erste Nacht mit der neuen Logik überstand einen 13-stündigen DDC-Ausfall (4030 Polls) mit durchlaufendem Kiosk. Verifiziert am 2026-08-28 per Taster-Test: `on → off` in <1 s, `off → on` nach Wiedereinschalten.
 
+## Scanout-Freeze: stehendes Poster trotz laufendem Compositor (2026-08-30)
+
+**Symptom:** Der Monitor zeigt stundenlang dasselbe Poster. Der Pi ist dabei völlig unauffällig: Chromium rendert (Renderer-CPU > 0), `grim` liefert wechselnde Frames, die Framebuffer-ID der Primary-Plane wechselt, der Vblank-IRQ der Pixelvalve zählt mit ~50/s. Nur das Bild am HDMI-Ausgang steht. Der Nutzer hatte den Monitor deshalb bis zu viermal am Tag vom Netz getrennt (Kernel-Log `User-defined mode not supported` jeweils sekundengenau vor `DDC/CI antwortet wieder`).
+
+**Ursache (Befund):** labwc legt das Chromium-Fenster per **libliftoff** als Direct-Scanout auf eine Overlay-Plane (DRM-State: zwei Planes an `pixelvalve-2`, beide `allocated by = labwc`). Scheitert dort ein Atomic-Commit — im Session-Log: `[backend/drm/libliftoff.c:567] Atomic commit failed: Device or resource busy` — bleibt die Overlay-Plane auf ihrem alten Buffer stehen, während die Primary-Plane weiter flippt und `grim` die Szene frisch rendert. Ein **echter Moduswechsel** (1280x720 → 1920x1080) programmiert HVS, Pixelvalve und HDMI-Encoder neu und holt das Bild zurück; ein `--transform`-Zyklus reicht nicht (reine Software-Rotation).
+
+**Gegenmaßnahmen (drei Ebenen):**
+
+| Ebene | Werkzeug | Wirkung |
+|---|---|---|
+| Sofort, manuell | `~/.local/bin/display-resync.sh` (`--check` zeigt nur den Zustand) | Moduswechsel-Zyklus, Original-Modus und Transform 270 bleiben erhalten, Log in `~/.local/state/display-resync.log` |
+| Automatisch | `scanout-watchdog.service` (User-Service, `~/.local/bin/scanout-watchdog.sh`) | Alle 10 s: Frame-Hash (`grim -s 0.25`) + Framebuffer-IDs aller Planes an `pixelvalve-2`. Hat sich der Frame in 5 min ≥ 3× geändert, aber keine Plane je eine andere ID gezeigt → Resync (Cooldown 15 min). Statisches Poster oder SIGSTOP-Kiosk erzeugen keinen Befund. Log `~/.local/state/scanout-watchdog/watchdog.log` |
+| Ursache | `WLR_DRM_NO_ATOMIC=1` in `~/.config/labwc/environment` | Legacy-KMS: kein libliftoff, keine Overlay-Planes, Chromium wird immer in die Primary-Plane komponiert. Greift beim nächsten Start von labwc (Session-Neustart oder Reboot). Mildere Alternative: `WLR_SCENE_DISABLE_DIRECT_SCANOUT=1` |
+
+Nach Aktivierung von `WLR_DRM_NO_ATOMIC=1` sollte der DRM-State (`/sys/kernel/debug/dri/1/state`) nur noch **eine** Plane an `pixelvalve-2` zeigen. Der Watchdog bleibt als Sicherheitsnetz aktiv; seine Signatur funktioniert mit einer wie mit zwei Planes.
+
 ## Latenz & Timing
 
 - **Detektions-Latenz**: 0–7 s (Polling-Intervall `INTERVAL=7` im Script).
@@ -217,6 +233,7 @@ Greift innerhalb von 7 s nach Chromium-Start. Idempotent (kill -STOP auf bereits
 | Symptom | Ursache / Fix |
 |---|---|
 | Monitor an, aber **Standbild**; `ps -eo stat,comm \| grep chromium` zeigt lauter `T` | Chromium ist per SIGSTOP eingefroren. Watcher-Log auf `Übergang on → off` prüfen; `--probe` zeigt den aktuellen Befund. Sofortmaßnahme: `systemctl --user stop monitor-power-watch.service` (Trap + `ExecStopPost` senden SIGCONT). Hängt die DDC/CI-Firmware (`ddcutil detect` → „Invalid display", EDID trotzdem lesbar), hilft nur ein Netz-Power-Cycle des Monitors — Soft-Standby per `setvcp D6 4/1` und Kernel-Reprobe reichen nicht. |
+| Monitor an, **Poster steht**, aber `grim`-Frames wechseln und Chromium-PIDs sind `S`/`R` | Scanout-Freeze (Overlay-Plane hängt, siehe eigener Abschnitt). Fix: `display-resync.sh` — kein Power-Cycle nötig. Der `scanout-watchdog.service` macht das nach ≤ 5 min automatisch. |
 | Monitor an, aber schwarzes Bild | Chromium evtl. in einem Bad-State nach Testsequenz. Fix: `pkill -u 1000 '^chromium$'` — der Loop in `~/.config/labwc/autostart` startet es neu. |
 | Service startet, pausiert aber nicht | `ddcutil detect` manuell prüfen; sicherstellen, dass der User in Gruppe `i2c` ist. |
 | Chromium bleibt nach `systemctl stop` eingefroren | Sollte nicht passieren (ExecStopPost + Trap), aber manuell: `pkill -CONT -u 1000 '^chromium$'` |

@@ -100,12 +100,12 @@
                     <div id="qr-container" style="text-align:center; margin:1.25rem 0">
                         <!-- QR code will be inserted here -->
                     </div>
-                    <form id="verify-2fa-form" onsubmit="event.preventDefault(); verify2FA(document.getElementById('token').value);" class="form-compact">
+                    <form id="verify-2fa-form" class="form-compact">
                         <div class="form-group">
                             <input type="text" id="token" name="token" maxlength="6" placeholder="6-digit code" required style="text-align:center; letter-spacing:.25rem;" />
                         </div>
                         <div class="step-actions">
-                            <button type="button" id="back-to-choice" class="btn auth-btn-secondary btn-sm" onclick="goBackToStep2()"><i class="fas fa-arrow-left"></i><span>Back</span></button>
+                            <button type="button" id="back-to-choice" class="btn auth-btn-secondary btn-sm"><i class="fas fa-arrow-left"></i><span>Back</span></button>
                             <button type="submit" class="btn auth-btn-primary btn-sm" style="flex:1"><i class="fas fa-check"></i><span>Verify & Complete</span></button>
                         </div>
                     </form>
@@ -290,6 +290,13 @@
                 document.getElementById('step3').style.display = 'none';
                 document.getElementById('step2').style.display = 'block';
             }
+
+            // CSP (script-src-attr 'none'): Listener statt onsubmit-/onclick-Attribute.
+            document.getElementById('verify-2fa-form')?.addEventListener('submit', event => {
+                event.preventDefault();
+                verify2FA(document.getElementById('token').value);
+            });
+            document.getElementById('back-to-choice')?.addEventListener('click', goBackToStep2);
 
             async function verify2FA(token) {
                 // Prevent double execution

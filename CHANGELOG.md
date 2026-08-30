@@ -6,6 +6,26 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-14] – 2026-08-28
+
+Härtung nachgeholt: keine Inline-Event-Handler mehr im Frontend, `script-src-attr` steht wieder auf `'none'`.
+
+### Geändert
+
+- **Alle 21 Inline-Event-Handler entfernt** (nicht 14, wie in z-13 gezählt — der erste Scan hatte JS-Templates und lange Attributwerte übersehen): `screensaver.html`/`wallart.html` aktivieren ihr Deferred-CSS jetzt über ein Inline-Script mit `load`-Listener direkt hinter den `<link rel="preload">`-Tags (läuft noch während des Parsens, das Event kann nicht verpasst werden); `admin.html` (Hilfe-Suchfeld-Autofill-Schutz, HA-Dashboard-Modal), `cache-browser.html` (Hinweis schließen, Analyse öffnen/schließen, Poster-Fallback), `poster-updater.html` (Poster ausblenden) und `setup.html` (**2FA-Verifizierung**, Zurück-Button) nutzen `addEventListener`; die JS-Templates in `admin.js` (Gerätekarten-Thumbnail, IP-Whitelist-Chip, HA-Dashboard-Radios, Poster-Suche) und `promo-box-overlay.js` (Copy-Befehl) laufen über Event-Delegation auf `document` (`wireCspSafeHandlers()` am Ende von `admin.js`), damit auch per `innerHTML` erzeugte Elemente abgedeckt sind. Bild-Ladefehler werden in der Capture-Phase behandelt, weil `error` nicht bubbelt; der Poster-Fallback im Cache-Browser bekommt einen Marker gegen Endlosschleifen, falls auch das Fallback fehlt. Der Chip-Hover liegt jetzt in `admin.css` statt in `onmouseover`.
+- **`script-src-attr` explizit `'none'`** (`middleware/index.js`) — mit Kommentar, warum explizit: Helmet liefert den Wert sonst still als Default, genau so entstand die Regression.
+- **Regressionstest erweitert** (`__tests__/middleware/csp-inline-handlers.test.js`): prüft den Header auf `'none'` und scannt `public/` (HTML + JS, ohne `vendor/`, `*.min.js`, `sw.js`) statisch auf `on<event>=`-Attribute mit einer Liste echter DOM-Events — schlägt an, sobald wieder ein Inline-Handler auftaucht. 5/5 grün.
+
+### Verifikation
+
+- Safari am MacBook mit scharfer CSP: Screensaver korrekt formatiert; seit dem Neustart keine CSP-Reports mehr. Syntax aller Inline-Scripts und von `admin.js` (als ES-Modul) geprüft.
+
+### Dokumentation
+
+- `docs/MONITOR-POWER-WATCHER.md`: neuer Abschnitt „Scanout-Freeze" — der Kiosk-Monitor zeigte mehrfach täglich ein stehendes Poster, obwohl der Compositor nachweislich weiter renderte (wechselnde `grim`-Frames, flippende Primary-Plane, laufender Vblank-IRQ). Ursache: labwc legt das Chromium-Fenster per libliftoff auf eine Overlay-Plane, die nach einem gescheiterten Atomic-Commit (`Device or resource busy`) auf ihrem alten Buffer stehen bleibt. Ein Moduswechsel holt das Bild zurück — kein Power-Cycle nötig. Beschreibt die drei Ebenen der Gegenmaßnahme (manuelles `display-resync.sh`, automatischer `scanout-watchdog.service`, `WLR_DRM_NO_ATOMIC=1` gegen die Ursache); die Werkzeuge selbst liegen außerhalb des Repos in `~/.local/bin`.
+
+---
+
 ## [3.0.1z-13] – 2026-08-28
 
 CSP-Regression aus dem Audit-Commit behoben: Screensaver- und Wallart-Seite blieben unformatiert, Admin- und Setup-Buttons ohne Funktion.

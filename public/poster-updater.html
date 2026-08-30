@@ -309,6 +309,15 @@ body {
 <div class="toast-container" id="toastContainer"></div>
 
 <script>
+    // CSP (script-src-attr 'none'): Bild-Ladefehler per Capture-Listener statt onerror-Attribut.
+    document.addEventListener(
+        'error',
+        e => {
+            const img = e.target;
+            if (img instanceof HTMLImageElement && img.dataset.imgError === 'hide') img.style.display = 'none';
+        },
+        true
+    );
 (function() {
     'use strict';
 
@@ -495,7 +504,7 @@ body {
             return `
                 <div class="search-card" data-entry="${escAttr(entry)}">
                     ${posterSrc
-                        ? `<img class="search-poster" src="${escAttr(posterSrc)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+                        ? `<img class="search-poster" src="${escAttr(posterSrc)}" alt="" loading="lazy" data-img-error="hide">`
                         : `<div class="search-poster" style="display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--color-text-muted);">Kein Poster</div>`
                     }
                     <div class="search-info">

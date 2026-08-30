@@ -470,7 +470,7 @@
             <span class="stat-value success" id="statHighres">—</span>
         </div>
         <div class="stat-item" style="margin-left: auto;">
-            <button onclick="showAnalysis()" style="padding: 0.5rem 1rem;">
+            <button type="button" data-action="show-analysis" style="padding: 0.5rem 1rem;">
                 <i class="fas fa-chart-pie"></i> Detailed Analysis
             </button>
         </div>
@@ -484,7 +484,7 @@
             High-res versions (~500KB+) are used for large displays like Wallart, while small thumbnails (~20-50KB) 
             are used for quick loading during transitions.
         </span>
-        <button class="dismiss-btn" onclick="this.parentElement.style.display='none'">×</button>
+        <button class="dismiss-btn" data-action="dismiss-parent">×</button>
     </div>
 
     <div class="controls">
@@ -528,7 +528,7 @@
     </div>
 
     <div class="analysis-modal" id="analysisModal">
-        <button class="close-analysis" onclick="closeAnalysisModal()">&times;</button>
+        <button class="close-analysis" type="button">&times;</button>
         <div class="analysis-content">
             <h2><i class="fas fa-chart-pie"></i> Cache Analysis</h2>
             <div id="analysisLoading" class="loading">
@@ -630,7 +630,7 @@
                 else if (file.sizeKB >= 50) sizeClass = 'medium';
 
                 card.innerHTML = `
-                    <img src="${file.url}" alt="Cached poster" loading="lazy" onerror="this.src='/fallback-poster.png'">
+                    <img src="${file.url}" alt="Cached poster" loading="lazy" data-img-error="fallback-poster">
                     <span class="size-badge ${sizeClass}">${file.sizeKB} KB</span>
                     <div class="info-overlay">
                         <div class="info-text">
@@ -800,6 +800,30 @@
         function closeAnalysisModal() {
             document.getElementById('analysisModal').classList.remove('active');
         }
+
+        // CSP (script-src-attr 'none'): Listener statt Inline-Handler-Attribute.
+        document.querySelector('.close-analysis')?.addEventListener('click', closeAnalysisModal);
+        document
+            .querySelector('[data-action="show-analysis"]')
+            ?.addEventListener('click', () => showAnalysis());
+        document.querySelectorAll('[data-action="dismiss-parent"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                btn.parentElement.style.display = 'none';
+            });
+        });
+        // Bild-Ladefehler bubbeln nicht -> Capture-Phase. Der Marker verhindert eine
+        // Endlosschleife, falls auch das Fallback-Poster fehlt.
+        document.addEventListener(
+            'error',
+            e => {
+                const img = e.target;
+                if (!(img instanceof HTMLImageElement)) return;
+                if (img.dataset.imgError !== 'fallback-poster' || img.dataset.imgErrorHandled) return;
+                img.dataset.imgErrorHandled = '1';
+                img.src = '/fallback-poster.png';
+            },
+            true
+        );
 
         document.getElementById('analysisModal').onclick = (e) => {
             if (e.target === document.getElementById('analysisModal')) {
