@@ -6,6 +6,16 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-15] – 2026-08-30
+
+Admin-Live-Vorschau repariert: gleichoriginale Frames sind wieder erlaubt.
+
+### Behoben
+
+- **Admin-Live-Vorschau war leer** — `admin.html` bettet `/screensaver?preview=1` als iframe ein. Die CSP aus dem Audit-Commit vom 26.08. erlaubte in `frame-src` nur YouTube, kein `'self'`, und `X-Frame-Options: DENY` widersprach dem gleichzeitig gesetzten `frame-ancestors 'self'`. Der Frame wurde still blockiert; aufgefallen erst über den CSP-Report beim ersten Admin-Login nach der 2FA-Reparatur (Vorschau ist die einzige Frame-Einbettung im Frontend). Jetzt `frame-src 'self' …` und `frameguard: sameorigin`. Test `__tests__/middleware/csp-admin-preview.test.js`: Header-Paar (`frame-src 'self'`, `frame-ancestors 'self'`, kein `DENY`) plus Marker, dass die Vorschau als gleichoriginaler iframe existiert. 2/2 grün, live per Header verifiziert.
+
+---
+
 ## [3.0.1z-14] – 2026-08-28
 
 Härtung nachgeholt: keine Inline-Event-Handler mehr im Frontend, `script-src-attr` steht wieder auf `'none'`.

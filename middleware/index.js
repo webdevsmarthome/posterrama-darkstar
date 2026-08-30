@@ -65,7 +65,10 @@ function securityMiddleware() {
                 scriptSrcAttr: ["'none'"],
                 // 'self' deckt gleichoriginale WebSocket-/SSE-Verbindungen mit ab (CSP3).
                 connectSrc: ["'self'", 'https://www.youtube.com'],
-                frameSrc: ['https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+                // 'self': das Admin bettet die eigene Anzeigeseite als Live-Vorschau ein
+                // (<iframe src="/screensaver?preview=1">). Ohne 'self' blockierte die CSP
+                // den Frame still -- aufgefallen erst per CSP-Report am 2026-08-30.
+                frameSrc: ["'self'", 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
                 objectSrc: ["'none'"],
                 mediaSrc: ["'self'", 'blob:', 'data:', 'https:', 'http:'],
                 upgradeInsecureRequests: null,
@@ -80,8 +83,10 @@ function securityMiddleware() {
             includeSubDomains: true,
             preload: true,
         },
-        // Explicit frameguard to prevent clickjacking
-        frameguard: { action: 'deny' },
+        // Clickjacking-Schutz: sameorigin statt deny, konsistent mit frame-ancestors
+        // 'self' -- die Admin-Live-Vorschau framt die eigene Anzeigeseite. Browser
+        // mit CSP-Unterstuetzung werten ohnehin frame-ancestors vor X-Frame-Options.
+        frameguard: { action: 'sameorigin' },
         // XSS filter for legacy browser protection
         xssFilter: true,
     });
