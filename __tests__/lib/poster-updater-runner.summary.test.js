@@ -45,7 +45,14 @@ describe('parseTrailerSummary', () => {
             noTrailer: 42,
             failed: 9,
             total: 1323,
+            searched: 0, // Zeile ohne searched= (vor z-17) -> 0
         });
+    });
+
+    test('liest das optionale searched= (per YouTube-Suche geladen)', () => {
+        const log =
+            'TRAILER-SUMMARY downloaded=11 skipped=1260 no_trailer=40 failed=2 total=1323 searched=3\n';
+        expect(parseTrailerSummary(log)).toMatchObject({ downloaded: 11, failed: 2, searched: 3 });
     });
 
     test('fasst Fehlergruende ohne Video-ID zusammen, hoechstens drei, ohne Duplikate', () => {

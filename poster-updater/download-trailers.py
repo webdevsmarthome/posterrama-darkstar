@@ -13,6 +13,7 @@ import sys
 import re
 import unicodedata
 import yt_dlp
+from trailer_search import search_youtube_trailer_candidates
 
 print("""
 **************************************************************
@@ -69,10 +70,23 @@ except FileNotFoundError:
 
 print(f"  Filme gesamt: {len(films)}\n")
 
+# Titel-Dubletten (gleicher Titel, anderes Jahr -- Original und Remake): Fuer sie
+# muss ein per YouTube-Suche gefundener Trailer das Jahr im Videotitel tragen,
+# sonst bekommt "Der Hauptmann von Koepenick (1931)" den Trailer von 1956.
+_title_counts = {}
+for _e in films:
+    _t = re.sub(r'\s*\[tmdb:\d+\]\s*$', '', _e)
+    _t = re.sub(r'\s*\(\d{4}\)\s*$', '', _t).strip().lower()
+    _title_counts[_t] = _title_counts.get(_t, 0) + 1
+duplicate_titles = {t for t, n in _title_counts.items() if n > 1}
+if duplicate_titles:
+    print(f"  Titel-Dubletten (Jahr im Trailer-Titel Pflicht): {len(duplicate_titles)}\n")
+
 erfolg = 0
 uebersprungen = 0
 fehler = 0
 kein_trailer = 0
+suche_erfolg = 0   # davon per YouTube-Suche (Fallback) geladen
 
 
 def api_call(endpoint, language='de-DE'):
@@ -158,22 +172,49 @@ def download_trailer(youtube_url, output_path):
         return False
 
 
+def search_fallback(i, entry, clean_title, original_title, year, trailer_path, exclude_ids=()):
+    """
+    YouTube-Suche als Fallback (trailer_search.py). Greift, wenn TMDB keinen
+    Treffer/Trailer hat oder das TMDB-Video nicht mehr verfuegbar ist.
+    Gibt das Sprach-Label ('DE'/'EN') zurueck, wenn ein Trailer geladen wurde,
+    sonst None. Der gewaehlte Videotitel wird protokolliert, damit Fehlgriffe
+    im Trailer-Log des Admins sofort auffallen.
+    """
+    candidates = search_youtube_trailer_candidates(
+        clean_title, original_title, year, exclude_ids=exclude_ids,
+        require_year=clean_title.strip().lower() in duplicate_titles,
+    )
+    # Bis zu drei Kandidaten: ist der beste nicht (mehr) ladbar, der naechste.
+    for cand in candidates:
+        print(f"   🔎 [{i}/{len(films)}] {entry} — Suche: \"{cand['title']}\" "
+              f"({cand['duration']} s, {cand['label']}) ...", end='', flush=True)
+        if download_trailer(cand['url'], trailer_path):
+            size_mb = os.path.getsize(trailer_path) / (1024 * 1024)
+            print(f" ✅ {size_mb:.1f} MB")
+            return cand['label']
+        print(" ❌ nicht ladbar")
+        if os.path.exists(trailer_path):
+            os.remove(trailer_path)
+    return None
+
+
 # Format-Erweiterung (Patch 51): Filmliste-Einträge können einen optionalen
-# TMDB-ID-Hinweis tragen, z.B. "Hamlet (2000)[tmdb:10688]". Wir strippen den
-# Hint vor dem Format-Match — der Hint ist für die Trailer-Suche aktuell
-# nicht relevant (yt-dlp sucht per Titel), kann aber für künftige direkte
-# TMDB-Lookups genutzt werden.
+# TMDB-ID-Hinweis tragen, z.B. "Hamlet (2000)[tmdb:10688]". Seit z-17 wird der
+# Hint genutzt: Der Film wird direkt per ID nachgeschlagen statt per unscharfer
+# Titelsuche -- die lieferte fuer "Elvis & Priscilla" den Film "Elvis & Nixon"
+# und fuer den Nicht-Film "SOUND TRAILER V01" den Film "Scream VI".
 TMDB_HINT_RE = re.compile(r'^(.+?)\s*\[tmdb:(\d+)\]\s*$')
 
 # --- Hauptschleife ---
 for i, entry in enumerate(films, 1):
-    # Optionaler [tmdb:NNN]-Hint: abstrippen, ID merken (aktuell unused — siehe oben)
+    # Optionaler [tmdb:NNN]-Hint: abstrippen, ID merken
     hint_match = TMDB_HINT_RE.match(entry)
     if hint_match:
         entry_for_match = hint_match.group(1).strip()
-        # tmdb_id_hint = int(hint_match.group(2))  # für künftige direkte Lookups
+        tmdb_id_hint = int(hint_match.group(2))
     else:
         entry_for_match = entry
+        tmdb_id_hint = None
 
     # Titel und Jahr extrahieren: "Film (2024)"
     m = re.match(r'^(.+?)\s*\((\d{4})\)\s*$', entry_for_match)
@@ -194,20 +235,15 @@ for i, entry in enumerate(films, 1):
         uebersprungen += 1
         continue
 
-    # TMDB-Suche
-    search = api_call('search/movie', language='de-DE')
+    # TMDB: bei [tmdb:ID]-Hint direkt nachschlagen (eindeutig), sonst Titelsuche
     search = None
-    search_params = {'api_key': TMDB_API_KEY, 'language': 'de-DE', 'query': clean_title, 'year': year}
-    try:
-        r = requests.get(f"{BASE_URL}/search/movie", params=search_params, timeout=15)
-        if r.status_code == 200:
-            search = r.json()
-    except Exception:
-        pass
+    if tmdb_id_hint:
+        details = api_call(f'movie/{tmdb_id_hint}', language='de-DE')
+        if details and details.get('id'):
+            search = {'results': [details]}
 
-    if not search or not search.get('results'):
-        # Retry ohne Jahr
-        search_params.pop('year', None)
+    if not search:
+        search_params = {'api_key': TMDB_API_KEY, 'language': 'de-DE', 'query': clean_title, 'year': year}
         try:
             r = requests.get(f"{BASE_URL}/search/movie", params=search_params, timeout=15)
             if r.status_code == 200:
@@ -216,17 +252,50 @@ for i, entry in enumerate(films, 1):
             pass
 
     if not search or not search.get('results'):
-        print(f"   ❌ [{i}/{len(films)}] {entry} — kein TMDB-Treffer")
-        fehler += 1
+        # Retry ohne Jahr
+        search_params = {'api_key': TMDB_API_KEY, 'language': 'de-DE', 'query': clean_title}
+        try:
+            r = requests.get(f"{BASE_URL}/search/movie", params=search_params, timeout=15)
+            if r.status_code == 200:
+                search = r.json()
+        except Exception:
+            pass
+
+    if not search or not search.get('results'):
+        print(f"   ⚠️  [{i}/{len(films)}] {entry} — kein TMDB-Treffer, versuche YouTube-Suche")
+        label = search_fallback(i, entry, clean_title, None, year, trailer_path)
+        if label:
+            erfolg += 1
+            suche_erfolg += 1
+            trailer_info[entry] = label
+        else:
+            print(f"   ❌ [{i}/{len(films)}] {entry} — kein TMDB-Treffer, Suche ohne Ergebnis")
+            fehler += 1
         continue
 
-    movie_id = search['results'][0]['id']
+    movie = search['results'][0]
+    movie_id = movie['id']
+    # Originaltitel nur fuer die YouTube-Suche uebernehmen, wenn TMDB plausibel
+    # denselben Film meint (Erscheinungsjahr +-1). Sonst sucht ein fremder
+    # Originaltitel den falschen Film ("Beach Party Animals" -> "The Quest").
+    _release_year = (movie.get('release_date') or '')[:4]
+    original_title = (
+        movie.get('original_title')
+        if _release_year.isdigit() and abs(int(_release_year) - int(year)) <= 1
+        else None
+    )
 
     # Trailer-URL finden
     youtube_url, lang = find_trailer_url(movie_id)
     if not youtube_url:
-        print(f"   ⚠️  [{i}/{len(films)}] {entry} — kein Trailer bei TMDB")
-        kein_trailer += 1
+        label = search_fallback(i, entry, clean_title, original_title, year, trailer_path)
+        if label:
+            erfolg += 1
+            suche_erfolg += 1
+            trailer_info[entry] = label
+        else:
+            print(f"   ⚠️  [{i}/{len(films)}] {entry} — kein Trailer bei TMDB, Suche ohne Ergebnis")
+            kein_trailer += 1
         continue
 
     # Trailer herunterladen
@@ -242,7 +311,16 @@ for i, entry in enumerate(films, 1):
         # Aufraumen bei Fehler
         if os.path.exists(trailer_path):
             os.remove(trailer_path)
-        fehler += 1
+        # TMDB-Video nicht (mehr) verfuegbar -> YouTube-Suche, das tote Video ausschliessen
+        failed_id = re.search(r'v=([\w-]+)', youtube_url)
+        label = search_fallback(i, entry, clean_title, original_title, year, trailer_path,
+                                exclude_ids=(failed_id.group(1),) if failed_id else ())
+        if label:
+            erfolg += 1
+            suche_erfolg += 1
+            trailer_info[entry] = label
+        else:
+            fehler += 1
 
 # --- trailer-info.json speichern ---
 try:
@@ -257,6 +335,7 @@ print(f"""
 ==============================
   Ergebnis:
   ✅ Heruntergeladen: {erfolg}
+  🔎 davon per Suche: {suche_erfolg}
   ⏭️  Uebersprungen:  {uebersprungen}
   ⚠️  Kein Trailer:   {kein_trailer}
   ❌ Fehler:          {fehler}
@@ -268,4 +347,4 @@ print(f"""
 # eine Zeile im Server-Log baut (Warnung bei Fehlern). Format nicht aendern:
 # der Runner parst genau diese Schluessel.
 print(f"TRAILER-SUMMARY downloaded={erfolg} skipped={uebersprungen} "
-      f"no_trailer={kein_trailer} failed={fehler} total={len(films)}")
+      f"no_trailer={kein_trailer} failed={fehler} total={len(films)} searched={suche_erfolg}")

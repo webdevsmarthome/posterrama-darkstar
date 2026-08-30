@@ -6,6 +6,21 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-17] – 2026-08-30
+
+YouTube-Suche als Fallback für Trailer, die TMDB nicht kennt oder deren TMDB-Video verschwunden ist.
+
+### Hinzugefügt
+
+- **`poster-updater/trailer_search.py`** — `download-trailers.py` sucht jetzt per yt-dlp (`ytsearch`) einen Trailer, wenn TMDB keinen Treffer oder keinen Trailer liefert oder das von TMDB referenzierte Video nicht ladbar ist (dessen ID wird ausgeschlossen). Anlass: *Toy Story 5 (2026)* blieb ohne Trailer, weil TMDBs YouTube-Key auf ein gelöschtes Video zeigte — die Suche fand den offiziellen deutschen Trailer sofort. Query-Kette: `<Titel> <Jahr> trailer deutsch` → `<Originaltitel> <Jahr> official trailer` → `<Titel> <Jahr> trailer`; es zählt die erste Query mit brauchbaren Treffern.
+- **Strenge Filter gegen Fehlgriffe** — Präzision vor Trefferquote, denn ein fehlender Trailer fällt nicht auf, ein falscher sofort. Jeder Treffer muss alles bestehen: Dauer 20 s–6 min; „Trailer"/„Teaser" im Videotitel; Sperrliste (Reaction, Review, Breakdown, Fan-Made, Parodie, Clip, Making-of, Full Movie …); Titelwort-Abgleich (deutsch *oder* Original) mit Schwelle nach Titellänge — 1–2 Wörter: alle, 3–4: 75 %, ab 5: 60 % —, wobei generische Wörter (trailer, official, deutsch, hd …), Jahreszahlen und Einzelzeichen nicht zählen und Zahlwörter vereinheitlicht werden („Ocean's Thirteen" = „Ocean's 13"); eine Jahreszahl im Videotitel muss zum Film passen (±1). **Das Filmjahr muss im Videotitel stehen** bei Ein-Wort-Titeln, bei Filmen vor 1980 und bei Titel-Dubletten der Filmliste (Original + Remake: „Der Hauptmann von Köpenick" 1931/1956, Anaconda, Die Mumie, Godzilla, Nikita …) — die echten Trailer alter Filme tragen das Jahr auf YouTube praktisch immer, und ohne diese Regel bekam der 1931er den Trailer des Remakes. 10 Suchergebnisse je Query, weil YouTube-Ergebnisse zwischen Aufrufen schwanken.
+- **`[tmdb:ID]`-Hint der Filmliste wird endlich genutzt** — der Film wird direkt per ID nachgeschlagen (1316 von 1323 Einträgen tragen den Hint) statt per unscharfer Titelsuche, die „Elvis & Priscilla" als „Elvis & Nixon" und den Nicht-Film „SOUND TRAILER V01" als „Scream VI" auflöste. Das verbessert auch den bisherigen TMDB-Trailer-Pfad. Ohne Hint bleibt die Suche, deren Originaltitel nur bei passendem Erscheinungsjahr übernommen wird.
+- Die Regeln wurden an den echten Fehlgriffen zweier Testläufe geschärft — „Beach Party Animals" → „The Quest", „Elvis & Priscilla" → „Elvis & Nixon", „Was ist Was – Unsere Erde" → „PLANET 4K", „Der rote Schakal" → „Der Schakal", „SOUND TRAILER V01" → „Scream VI" — und gegen alle korrekten Treffer derselben Läufe gegengeprüft (Driver, Erkan & Stefan, Ich fühl mich Disco, Minions & Monster, Ob blond ob braun ↔ It Happened at the World's Fair, Ocean's 13, Werner, One Desire, zwei japanische Originaltitel). Die Fehldateien wurden entfernt.
+- **Rangfolge wie bei TMDB**: Sprache vor Offizialität — deutscher Treffer (Hinweise deutsch/german/offiziell/Kino, Umlaute, oder das Video trägt den deutschen statt des Originaltitels) schlägt einen englischen „Official Trailer"; dann „official", „Trailer" vor „Teaser", typische Trailerlänge. Bis zu drei Kandidaten werden nacheinander probiert, falls der beste nicht (mehr) ladbar ist. Label `DE`/`EN` (nie „-offiziell") — kompatibel mit dem Playlist-Editor-Filter, der genau die vier bekannten Werte kennt. Jede Wahl steht als `🔎 … Suche: "<Videotitel>" (<s>, DE/EN)` im Trailer-Log des Admins, damit Fehlgriffe auffallen.
+- `TRAILER-SUMMARY … searched=N`; das Server-Log meldet `N geladen (davon M per YouTube-Suche)`. Parser-Test um das optionale Feld erweitert (5/5 grün). Die Suchlogik ist ohne Netz testbar (`extract=` injizierbar).
+
+---
+
 ## [3.0.1z-16] – 2026-08-30
 
 Trailer-Läufe melden ihr Ergebnis im Server-Log — stilles Scheitern ist vorbei.
