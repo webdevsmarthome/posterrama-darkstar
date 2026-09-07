@@ -172,6 +172,29 @@ def download_trailer(youtube_url, output_path):
         return False
 
 
+def tmdb_knows_same_title_other_year(clean_title, year):
+    """
+    Gibt es bei TMDB einen gleichnamigen Film aus einem anderen Jahr (Remake,
+    Neuverfilmung)? Dann muss ein Suchtreffer das Jahr im Videotitel tragen --
+    auch wenn nur eine Fassung in der Filmliste steht ("Arielle, die
+    Meerjungfrau" 1989 vs. Realfilm 2023).
+    """
+    try:
+        r = requests.get(f"{BASE_URL}/search/movie", timeout=15,
+                         params={'api_key': TMDB_API_KEY, 'language': 'de-DE', 'query': clean_title})
+        if r.status_code != 200:
+            return False
+        wanted = clean_title.strip().lower()
+        for m in (r.json().get('results') or [])[:10]:
+            titles = {(m.get('title') or '').strip().lower(), (m.get('original_title') or '').strip().lower()}
+            rel = (m.get('release_date') or '')[:4]
+            if wanted in titles and rel.isdigit() and abs(int(rel) - int(year)) > 1:
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def search_fallback(i, entry, clean_title, original_title, year, trailer_path, exclude_ids=()):
     """
     YouTube-Suche als Fallback (trailer_search.py). Greift, wenn TMDB keinen
@@ -180,9 +203,11 @@ def search_fallback(i, entry, clean_title, original_title, year, trailer_path, e
     sonst None. Der gewaehlte Videotitel wird protokolliert, damit Fehlgriffe
     im Trailer-Log des Admins sofort auffallen.
     """
+    require_year = (clean_title.strip().lower() in duplicate_titles
+                    or tmdb_knows_same_title_other_year(clean_title, year))
     candidates = search_youtube_trailer_candidates(
         clean_title, original_title, year, exclude_ids=exclude_ids,
-        require_year=clean_title.strip().lower() in duplicate_titles,
+        require_year=require_year,
     )
     # Bis zu drei Kandidaten: ist der beste nicht (mehr) ladbar, der naechste.
     for cand in candidates:

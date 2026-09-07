@@ -59,6 +59,15 @@ GERMAN_HINTS = (
     'deutsch', 'german', 'synchro', 'offiziell', 'kino', 'untertitel',
     ' dt ', '(dt.)', 'ger)', 'ger ',
 )
+# Kinostart-Marketing: Ein Video "Jetzt im Kino" gehoert zu einem aktuellen Film.
+# Fuer einen Film, der aelter als ein Jahr ist, ist so ein Titel fast immer das
+# Remake ("ARIELLE DIE MEERJUNGFRAU - Offizieller Trailer - Jetzt im Kino" =
+# Realfilm 2023, nicht der Zeichentrickfilm von 1989).
+RECENT_RELEASE_HINTS = (
+    'jetzt im kino', 'nur im kino', 'bald im kino', 'demnaechst', 'demnächst',
+    'now in theaters', 'now in theatres', 'in theaters', 'in theatres', 'in cinemas',
+    'only in theaters', 'only in theatres', 'coming soon', 'now playing', 'now streaming',
+)
 YEAR_RE = re.compile(r'(?<!\d)(19\d{2}|20\d{2})(?!\d)')
 
 # Zahlwoerter -> Ziffern, damit "Ocean's 13" und "Ocean's Thirteen" zusammenfinden.
@@ -101,6 +110,11 @@ def _years_in(text):
     return [int(y) for y in YEAR_RE.findall(text or '')]
 
 
+def _current_year():
+    import datetime
+    return datetime.date.today().year
+
+
 def _year_matches(years, year):
     return any(abs(y - year) <= YEAR_TOLERANCE for y in years)
 
@@ -114,8 +128,16 @@ def title_match(film_title, video_title, film_year=None, require_year=False):
     film_tokens = _tokens(film_title)
     if not film_tokens:
         return None
-    overlap = len(film_tokens & _tokens(video_title)) / len(film_tokens)
+    video_tokens = _tokens(video_title)
+    overlap = len(film_tokens & video_tokens) / len(film_tokens)
     if overlap < _required_overlap(len(film_tokens)):
+        return None
+    # Ein-Wort-Titel ("The Quest", "Driver") sind zu mehrdeutig: Der Videotitel
+    # darf dann hoechstens zwei weitere aussagekraeftige Woerter tragen, sonst ist
+    # es ein anderer Film, der das Wort nur enthaelt -- "Azur & Asmar: The
+    # Princes' Quest (2006)" fuer "The Quest (2006)". Marketing-Beiwerk wie
+    # "official", "deutsch", "hd" zaehlt nicht (GENERIC).
+    if len(film_tokens) == 1 and len(video_tokens - film_tokens) > 2:
         return None
     # Jahr im Videotitel ist Pflicht bei Ein-Wort-Titeln, bei Filmen vor 1980 und
     # bei Titel-Dubletten der Filmliste (require_year): Klassiker haben oft
@@ -147,6 +169,8 @@ def score_candidate(cand, film_titles, year=None, require_year=False):
     years = _years_in(title)
     if film_year and years and not _year_matches(years, film_year):
         return None  # Jahr im Videotitel widerspricht dem Film
+    if film_year and film_year < _current_year() - 1 and any(h in low for h in RECENT_RELEASE_HINTS):
+        return None  # "Jetzt im Kino" fuer einen alten Film = Remake/Neuverfilmung
 
     titles = [t for t in film_titles if t]
     matches = [

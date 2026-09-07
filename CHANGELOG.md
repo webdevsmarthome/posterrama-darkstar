@@ -6,6 +6,17 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-18] – 2026-08-30
+
+Nachschärfung des Trailer-Fallbacks nach dem ersten scharfen Runner-Lauf — und die Suchentscheidungen stehen jetzt im Server-Log.
+
+### Geändert
+
+- **Suchentscheidungen im Server-Log** — der Runner (`lib/poster-updater-runner.js`) loggt jede `🔎`-Zeile des Trailer-Scripts (gewähltes Video, Dauer, Sprache, Ergebnis) als Info, sobald die Zeile vollständig ist (das Script schreibt sie ohne Zeilenumbruch und hängt das Ergebnis später an). Bisher lagen sie nur im In-Memory-Ringpuffer des Admins. `grep -a "🔎" ~/.pm2/logs/posterrama-out.log` zeigt die Historie; die Zählzeile „davon per Suche" wird nicht mitgeloggt.
+- **Remake-Schutz** — der erste Runner-Lauf mit Fallback wählte für *Arielle, die Meerjungfrau (1989)* den Trailer „Offizieller Trailer – Jetzt im Kino" des Realfilm-Remakes von 2023; der Download scheiterte nur zufällig. Zwei neue Regeln in `trailer_search.py`/`download-trailers.py`: Kinostart-Marketing im Videotitel („jetzt im Kino", „in theaters", „coming soon" …) wird für Filme abgelehnt, die älter als ein Jahr sind; und das Script fragt TMDB, ob es gleichnamige Filme anderer Jahre gibt (Arielle 2023, Die Mumie 1932/2017, Nikita 1990/2025) — dann ist das Jahr im Videotitel Pflicht, auch wenn nur eine Fassung in der Filmliste steht. Und weil ein Ein-Wort-Originaltitel („The Quest") selbst mit passendem Jahr mehrdeutig bleibt — der zweite Runner-Lauf bediente *Beach Party Animals (2006)* mit „Azur & Asmar: The Princes' Quest (2006)" —, darf der Videotitel bei Ein-Wort-Titeln höchstens zwei weitere aussagekräftige Wörter tragen. 8/8 im Offline-Prüfskript, TMDB-Erkennung online gegen sechs Titel geprüft; die Fehldatei wurde entfernt.
+
+---
+
 ## [3.0.1z-17] – 2026-08-30
 
 YouTube-Suche als Fallback für Trailer, die TMDB nicht kennt oder deren TMDB-Video verschwunden ist.
