@@ -32087,6 +32087,13 @@ if (!document.__niwDelegatedFallback) {
                         }
                     }
 
+                    const requireTrailerInput = document.getElementById(
+                        'localDirectory.requireTrailer'
+                    );
+                    if (requireTrailerInput) {
+                        requireTrailerInput.checked = cfg.requireTrailer === true;
+                    }
+
                     // Update status pill (match Plex/Jellyfin styling)
                     const statusPill = document.getElementById('local-status-pill-header');
                     if (statusPill) {
@@ -32141,6 +32148,8 @@ if (!document.__niwDelegatedFallback) {
         const config = {
             localDirectory: {
                 enabled: document.getElementById('localDirectory.enabled')?.checked || false,
+                requireTrailer:
+                    document.getElementById('localDirectory.requireTrailer')?.checked || false,
                 rootPath: 'media',
                 // Schema requires an array of absolute paths; UI currently doesn't expose inputs,
                 // so send an empty array to satisfy validation.
@@ -32161,6 +32170,7 @@ if (!document.__niwDelegatedFallback) {
         const enabledInput = document.getElementById('localDirectory.enabled');
         // Prefer persisted config for baseline; fallback to dataset only if config is unavailable
         let originalEnabled;
+        let originalRequireTrailer;
         try {
             const cfgRes = await window.dedupJSON('/api/admin/config', {
                 credentials: 'include',
@@ -32181,6 +32191,7 @@ if (!document.__niwDelegatedFallback) {
                           ? false
                           : undefined;
             }
+            originalRequireTrailer = currentCfg?.localDirectory?.requireTrailer === true;
         } catch (_) {
             originalEnabled =
                 enabledInput?.dataset?.originalEnabled === 'true'
@@ -32207,6 +32218,19 @@ if (!document.__niwDelegatedFallback) {
                     if (span) span.textContent = 'Save Settings & Restart';
                     saveBtn && (saveBtn.dataset.restartRequired = 'true');
                     await window.triggerRestartAndPoll();
+                } else if (
+                    originalRequireTrailer !== !!config.localDirectory.requireTrailer
+                ) {
+                    // Trailer filter toggled without restart: rebuild the playlist so it takes effect now
+                    try {
+                        await fetch('/api/admin/refresh-media', {
+                            method: 'POST',
+                            credentials: 'include',
+                        });
+                        showNotification('Playlist refreshed', 'success');
+                    } catch (_) {
+                        /* non-fatal: next scheduled refresh applies the filter */
+                    }
                 }
             } catch (_) {
                 /* restart trigger optional; ignore if helper unavailable */

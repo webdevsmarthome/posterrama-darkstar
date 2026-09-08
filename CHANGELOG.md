@@ -6,6 +6,23 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-19] – 2026-09-08
+
+Filme ohne Trailer verschwinden auf Wunsch aus der Anzeige — und ein lange unbemerkter Bug hatte jedes lokale Item doppelt in die Playlist gelegt.
+
+### Hinzugefügt
+
+- **`localDirectory.requireTrailer`** (Config-Option, default `false`) — blendet lokale Filme ohne Trailer aus allen Anzeigen (Cinema/Wallart/Screensaver) aus. Kein statisches Blacklisting: Sobald ein Trailer auftaucht (automatischer Download der Pipeline oder manueller Upload im PosterPack-Creator), erscheint der Film beim nächsten Playlist-Refresh von selbst wieder. Jede Trailer-Art zählt (lokale Datei, Trailer im ZIP, YouTube-URL aus den Metadaten); Motion-Poster und reine Hintergrund-Wallpaper sind ausgenommen. Filter sitzt quellenbewusst im lokalen Aggregations-Zweig (`lib/media-aggregator.js`) — Plex/Jellyfin/TMDB-Quellen haben strukturell kein `trailerUrl`-Feld und bleiben unberührt. Schaltbar im Admin (Local-Directory-Panel, Toggle „Only with trailer"); das Speichern stößt den Playlist-Refresh direkt an. Der Admin-Poster-Selector zeigt bewusst weiterhin alle Filme — dort wird der fehlende Trailer nachgeliefert.
+- **Playlist-Refresh nach Trailer-Läufen** — lud ein Trailer-Lauf etwas herunter (`downloaded > 0`), baut der Server die Playlist sofort neu (`setOnTrailerJobDone`-Hook im Runner, verdrahtet in `server.js`); bisher wurden frische Trailer erst beim nächsten 60-Minuten-Refresh sichtbar.
+
+### Behoben
+
+- **Lokale Items lagen doppelt in der Playlist** — `fetchFromLocal` hängte seine Items selbst an die Gesamtliste an UND gab sie zurück, worauf der Aufrufer sie erneut anhängte. Live gemessen: 2572 statt 1286 lokale Einträge, jede ID exakt zweimal. Durch das Mischen der Playlist fiel das nie auf; lokale Filme waren gegenüber anderen Quellen doppelt gewichtet.
+- **Stale HTTP-Antworten nach Playlist-Refresh** — `/api/admin/refresh-media` und der PosterPack-Creator-Upload leeren jetzt auch den HTTP-Response-Cache (`apiCache`, TTL 30 min); zuvor konnten Clients trotz frischer Playlist bis zu 30 Minuten alte `/get-media`-Antworten bekommen.
+- **`_findLocalTrailer`-Fallback** (NFC/NFD-Suche) liest das Trailer-Verzeichnis jetzt höchstens alle 30 s statt pro Item.
+
+---
+
 ## [3.0.1z-18] – 2026-08-30
 
 Nachschärfung des Trailer-Fallbacks nach dem ersten scharfen Runner-Lauf — und die Suchentscheidungen stehen jetzt im Server-Log.

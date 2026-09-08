@@ -136,6 +136,12 @@ module.exports = function createPosterPackCreatorRouter({ logger, refreshPlaylis
                 await fsp.writeFile(cachePath, JSON.stringify(cache), 'utf8');
             }
         } catch { }
+        // Drop cached /get-media responses so uploads (e.g. a new trailer) show up immediately
+        try {
+            require('../middleware/cache').apiCache.clear();
+        } catch {
+            /* cache clear is best-effort */
+        }
         if (typeof refreshPlaylistCache === 'function') {
             try { await refreshPlaylistCache(); } catch { }
         }

@@ -3414,6 +3414,20 @@ async function refreshPlaylistCache() {
     });
 }
 
+// After a trailer download run fetched something new, rebuild the playlist so fresh
+// trailerUrls (and the localDirectory.requireTrailer filter) take effect immediately.
+require('./lib/poster-updater-runner').setOnTrailerJobDone(({ summary }) => {
+    if (summary && summary.downloaded > 0) {
+        logger.info(
+            `[TrailerJob] ${summary.downloaded} new trailer(s) downloaded -- refreshing playlist cache`
+        );
+        apiCache.clear();
+        refreshPlaylistCache().catch(err =>
+            logger.warn('[TrailerJob] Post-download playlist refresh failed: ' + err.message)
+        );
+    }
+});
+
 /**
  * Wrapper for schedulePlaylistBackgroundRefresh that injects dependencies.
  */
@@ -5815,6 +5829,8 @@ app.post(
 
         // Clear media cache before refreshing
         const cleared = cacheManager.clear('media');
+        // Also drop cached HTTP responses (/get-media et al.) so clients see the fresh playlist
+        apiCache.clear();
         logger.info('Media cache cleared before refresh', { cleared });
 
         // Force reset any stuck refresh state before starting

@@ -2524,6 +2524,11 @@
                     "type": "boolean",
                     "default": true
                 },
+                "requireTrailer": {
+                    "description": "When enabled, local movie items without a trailer are excluded from the playlist until a trailer is downloaded or uploaded. Motion posters and standalone backgrounds are not affected.",
+                    "type": "boolean",
+                    "default": false
+                },
                 "rootPath": {
                     "description": "Root path for local media directory. Must be an absolute path.",
                     "type": "string",

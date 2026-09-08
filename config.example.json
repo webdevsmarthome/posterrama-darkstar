@@ -368,6 +368,7 @@
     "someInt": 42,
     "localDirectory": {
         "enabled": false,
+        "requireTrailer": false,
         "rootPath": "media",
         "watchDirectories": [],
         "posterpackGeneration": {

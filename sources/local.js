@@ -1533,7 +1533,13 @@ class LocalDirectorySource {
             // Fallback: NFD/NFC normalization mismatch (macOS copies files in NFD form)
             const filenameNFC = filename.normalize('NFC');
             const filenameNFD = filename.normalize('NFD');
-            const entries = fs.readdirSync(trailerDir);
+            // Memoize the directory listing briefly -- this runs once per item without a
+            // direct hit, which adds up during a full playlist refresh
+            const now = Date.now();
+            if (!this._trailerDirCache || now - this._trailerDirCache.ts > 30000) {
+                this._trailerDirCache = { entries: fs.readdirSync(trailerDir), ts: now };
+            }
+            const entries = this._trailerDirCache.entries;
             const match = entries.find(e =>
                 e.normalize('NFC') === filenameNFC || e.normalize('NFD') === filenameNFD
             );
