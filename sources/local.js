@@ -752,6 +752,10 @@ class LocalDirectorySource {
                 `LocalDirectorySource: ZIP-Scan-Cache nicht nutzbar (${e?.message}) — Scan liest alle ZIPs neu`
             );
         }
+        // Vollständig gelesene Verzeichnisse und die darin gefundenen ZIPs: Cache-Einträge
+        // gelöschter ZIPs werden nach dem Scan entfernt (s. unten).
+        const _scannedDirs = new Set();
+        const _presentZips = new Set();
         for (const base of this.rootPaths) {
             const completeRoot = path.join(base, this.directories.complete);
             for (const sub of subdirs) {
@@ -761,6 +765,7 @@ class LocalDirectorySource {
                 let entries = [];
                 try {
                     entries = await fs.readdir(dir, { withFileTypes: true });
+                    _scannedDirs.add(dir);
                 } catch (e) {
                     logger.debug(
                         `LocalDirectorySource: Failed to read posterpacks at ${dir}: ${e?.message}`
@@ -770,6 +775,7 @@ class LocalDirectorySource {
                     if (!ent.isFile()) continue;
                     if (!/\.zip$/i.test(ent.name)) continue;
                     const baseName = ent.name.replace(/\.zip$/i, '');
+                    _presentZips.add(path.join(dir, ent.name));
                     if (seen.has(baseName)) continue; // keep higher-priority one
                     const zipFull = path.join(dir, ent.name);
                     try {
@@ -832,6 +838,17 @@ class LocalDirectorySource {
                         logger.debug(`LocalDirectorySource: Failed to inspect ZIP ${zipFull}: ${e?.message}`);
                     }
                 }
+            }
+        }
+        // Einträge gelöschter ZIPs entfernen (z-20). Der Scan fügte bisher nur hinzu:
+        // Nach einem Löschen (Admin, Dedup) blieb der Eintrag für immer, und die
+        // Quick-Start-Phase lieferte das ZIP nach jedem Neustart erneut aus. Nur für
+        // Verzeichnisse, die gerade vollständig gelesen wurden — bei einem Lesefehler
+        // bleibt der Cache unangetastet.
+        for (const zipFull of Object.keys(_zipScanCache)) {
+            if (_scannedDirs.has(path.dirname(zipFull)) && !_presentZips.has(zipFull)) {
+                delete _zipScanCache[zipFull];
+                _zipCacheChanged = true;
             }
         }
         // PATCH8: ZIP scan disk cache — persist to disk if updated

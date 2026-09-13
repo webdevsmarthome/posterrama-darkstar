@@ -8,6 +8,8 @@ import re
 import signal
 import sys
 
+from zip_index import load_zip_tmdb_index
+
 print("""
 **************************************************************
 * Posterrama TMDB Export - Full-Blown-Solution                *
@@ -90,6 +92,10 @@ def parse_filmliste_entry(line):
         return m.group(1).strip(), int(m.group(2))
     return line.strip(), None
 
+# TMDB-ID -> vorhandene ZIP-Namen (z-20, zip_index.py): kein zweites PosterPack
+# fuer einen Film, der unter anderem Namen schon eins hat.
+zip_by_tmdb = load_zip_tmdb_index(PROJECT_ROOT)
+
 print(f"\n🎬 {len(films)} Filme gefunden (FULL IMAGES)")
 
 def api_call(endpoint, params=None):
@@ -149,6 +155,11 @@ try:
             uebersprungen += 1
             continue
 
+        if tmdb_hint and zip_by_tmdb.get(str(tmdb_hint)):
+            print(f"   ⏭️  TMDB-ID {tmdb_hint} bereits als: {sorted(zip_by_tmdb[str(tmdb_hint)])[0]}.zip")
+            uebersprungen += 1
+            continue
+
         tmp_dir = None
         try:
             movie_id = None
@@ -170,6 +181,10 @@ try:
                         fehler += 1
                         continue
                 movie_id = search['results'][0]['id']
+                if zip_by_tmdb.get(str(movie_id)):
+                    print(f"   ⏭️  TMDB-ID {movie_id} bereits als: {sorted(zip_by_tmdb[str(movie_id)])[0]}.zip")
+                    uebersprungen += 1
+                    continue
 
             # CORE DATA + FULL IMAGES
             details = api_call(f'movie/{movie_id}')
@@ -350,6 +365,9 @@ try:
             # ZIP-Größe
             zip_size = os.path.getsize(zip_path) / (1024*1024)
             erfolgreich += 1
+            # Im selben Lauf erzeugte IDs merken: Steht der Film unter zweitem Namen
+            # weiter unten in der Liste, wird er nicht erneut geladen (z-20).
+            zip_by_tmdb.setdefault(str(movie_id), set()).add(f"{clean_title} ({year})")
 
             # ULTIMATE STATUS (aus metadata, nicht vom Dateisystem — der
             # tmp-Ordner ist gleich weg)

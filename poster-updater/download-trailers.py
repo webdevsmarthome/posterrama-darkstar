@@ -14,6 +14,7 @@ import re
 import unicodedata
 import yt_dlp
 from trailer_search import search_youtube_trailer_candidates
+from zip_index import load_zip_tmdb_index
 
 print("""
 **************************************************************
@@ -52,6 +53,10 @@ try:
         trailer_info = json.load(_f)
 except (FileNotFoundError, json.JSONDecodeError):
     pass
+
+# TMDB-ID -> vorhandene ZIP-Namen (z-20, zip_index.py): kein zweiter Trailer fuer
+# einen Film, der unter anderem Namen schon ein PosterPack hat.
+zip_by_tmdb = load_zip_tmdb_index(PROJECT_ROOT)
 
 BASE_URL = 'https://api.themoviedb.org/3'
 
@@ -223,6 +228,20 @@ def search_fallback(i, entry, clean_title, original_title, year, trailer_path, e
     return None
 
 
+def skip_other_zip(i, entry, tmdb_id):
+    """
+    True, wenn die TMDB-ID schon ein PosterPack unter ANDEREM Namen hat (z-20).
+    Dann gehoert der Trailer zu jenem Namen -- ein zweiter waere ein Duplikat.
+    """
+    global uebersprungen
+    names = zip_by_tmdb.get(str(tmdb_id)) if tmdb_id else None
+    if not names or entry in names:
+        return False
+    print(f"   ⏭️  [{i}/{len(films)}] {entry} — TMDB-ID {tmdb_id} gehört zu: {sorted(names)[0]}")
+    uebersprungen += 1
+    return True
+
+
 # Format-Erweiterung (Patch 51): Filmliste-Einträge können einen optionalen
 # TMDB-ID-Hinweis tragen, z.B. "Hamlet (2000)[tmdb:10688]". Seit z-17 wird der
 # Hint genutzt: Der Film wird direkt per ID nachgeschlagen statt per unscharfer
@@ -258,6 +277,9 @@ for i, entry in enumerate(films, 1):
     if os.path.exists(trailer_path) and os.path.getsize(trailer_path) > 100000:
         print(f"   ⏭️  [{i}/{len(films)}] {entry} — bereits vorhanden")
         uebersprungen += 1
+        continue
+
+    if skip_other_zip(i, entry, tmdb_id_hint):
         continue
 
     # TMDB: bei [tmdb:ID]-Hint direkt nachschlagen (eindeutig), sonst Titelsuche
@@ -300,6 +322,8 @@ for i, entry in enumerate(films, 1):
 
     movie = search['results'][0]
     movie_id = movie['id']
+    if not tmdb_id_hint and skip_other_zip(i, entry, movie_id):
+        continue
     # Originaltitel nur fuer die YouTube-Suche uebernehmen, wenn TMDB plausibel
     # denselben Film meint (Erscheinungsjahr +-1). Sonst sucht ein fremder
     # Originaltitel den falschen Film ("Beach Party Animals" -> "The Quest").

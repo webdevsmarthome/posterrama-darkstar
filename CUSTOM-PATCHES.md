@@ -1,6 +1,6 @@
 # Posterrama Custom Patches & Erweiterungen
 
-**Stand:** 2026-09-08 (basierend auf Version 3.0.1z-19)
+**Stand:** 2026-09-13 (basierend auf Version 3.0.1z-20)
 **Zweck:** Diese Datei dokumentiert alle Custom-Patches und Erweiterungen, die nach einem offiziellen Posterrama-Update erneut eingespielt werden muessen.
 **Release-Historie:** Siehe [CHANGELOG.md](./CHANGELOG.md) fuer die versionierte Uebersicht aller Aenderungen seit v3.0.1.
 
@@ -103,6 +103,10 @@
 | 74 | Trailer-Pflicht-Filter (requireTrailer) | lib/media-aggregator.js, config.schema.json, config.example.json, public/admin.html, public/admin.js, __tests__/lib/media-aggregator-require-trailer.test.js | Config-Option `localDirectory.requireTrailer` (default false): lokale Filme ohne trailerUrl fliegen aus der Playlist, bis ein Trailer geladen/hochgeladen ist (dynamisch, kein Blacklisting). Motion-Poster und Standalone-Backgrounds ausgenommen; nur der lokale Aggregations-Zweig betroffen. Admin-Toggle im Local-Directory-Panel, Save triggert Playlist-Refresh |
 | 75 | Playlist-Refresh nach Trailer-Lauf + apiCache-Invalidierung | lib/poster-updater-runner.js (setOnTrailerJobDone), server.js, routes/posterpack-creator.js, __tests__/lib/poster-updater-runner.hook.test.js | Nach einem Trailer-Lauf mit downloaded>0 baut der Server die Playlist sofort neu (Hook im close-Handler des Runners). /api/admin/refresh-media und PosterPack-Creator-Upload leeren zusaetzlich den HTTP-Response-Cache (apiCache, TTL 30 min) — vorher bis zu 30 min stale /get-media-Antworten trotz frischer Playlist |
 | 76 | Doppelte lokale Playlist-Items behoben | lib/media-aggregator.js | fetchFromLocal haengte normalized selbst an allMedia an UND gab es zurueck (zweites Concat beim Aufrufer) — jedes lokale Item lag doppelt in der Playlist (live: 2572 statt 1286), durch den Shuffle unbemerkt. Internes Concat entfernt. Dazu: trailerUrl im Dedup-Merge, directory-Feld durchgereicht, _findLocalTrailer-readdir mit 30-s-Memo |
+| 77 | TMDB-basierter Abgleich der Emby-Sync | lib/zip-tmdb-index.js (neu), lib/emby-sync.js, lib/poster-updater-runner.js, public/admin.js, __tests__/lib/zip-tmdb-index.test.js, __tests__/lib/emby-sync.test.js, __tests__/lib/poster-updater-runner.append.test.js | Vorhandene Filme werden per Name ODER TMDB-ID erkannt (ZIP-Scan-Cache + Filmlisten-Hints); derselbe Film von zwei Servern im selben Lauf nur einmal; appendFilms weist eine bekannte [tmdb:N]-ID unter anderem Titel ab; Auto-Playlist mit echten ZIP-Namen, atomar, mit Leer-Schutz; runSyncCycle mit injizierbaren deps (Tests schreiben nicht mehr nach cache/) |
+| 78 | TMDB-ID-Skip in Poster- und Trailer-Script | poster-updater/zip_index.py (neu), poster-updater/tmdb-get-posters-direct.py, poster-updater/download-trailers.py | Kein zweites PosterPack und kein zweiter Trailer fuer eine TMDB-ID, die unter anderem Namen schon ein ZIP hat (Quelle ZIP-Scan-Cache, im Lauf erzeugte IDs werden nachgetragen) |
+| 79 | Scan-Cache raeumt geloeschte ZIPs aus | sources/local.js | scanZipPosterPacks entfernt Cache-Eintraege fehlender ZIPs in vollstaendig gelesenen Verzeichnissen — vorher lieferte die Quick-Start-Phase geloeschte ZIPs nach jedem Neustart erneut aus |
+| 80 | Offline-Dedup per TMDB-ID (ersetzt dedup-posterpacks.js) | scripts/dedup-by-tmdb.js (neu), scripts/dedup-posterpacks.js (entfernt), docs/EMBY-SYNC-PIPELINE.md, __tests__/scripts/dedup-by-tmdb.test.js | Einmalige Bereinigung: pro TMDB-ID bleibt ein vorhandener Name (nur loeschen), Quarantaene ausserhalb des Projekts mit Backup, Manifest und --rollback; Dry-Run-Default, --execute nur mit Plan-Hash, gueltigem Emby-Report ab z-20 und gestopptem Server |
 
 ---
 

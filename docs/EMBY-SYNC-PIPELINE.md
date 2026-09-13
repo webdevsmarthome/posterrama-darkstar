@@ -1,7 +1,7 @@
 # Emby-Sync Pipeline (Darkstar-Fork)
 
 **Scope:** Darkstar-Fork, nicht Teil des Upstream-Posterrama-Releases
-**Eingeführt:** 3.0.1r (Kern-Feature); erweitert in 3.0.1s/t/u/v
+**Eingeführt:** 3.0.1r (Kern-Feature); erweitert in 3.0.1s/t/u/v und 3.0.1z-20 (TMDB-basierter Abgleich)
 **Zweck:** Voll-automatisches Poster-/Trailer-Lifecycle-Management: neue Filme auf den Emby-Servern werden erkannt, zugehörige PosterPacks und Trailer heruntergeladen, eine Auto-Playlist „Die letzten 20 hinzugefügten Filme" wird gepflegt. Eine Ignore-Liste schließt unerwünschte Titel aus. TMDB ist die Single-Source-of-Truth für Titel- und Jahresangaben.
 
 ---
@@ -57,7 +57,8 @@
 - Reihenfolge: **DarkStar zuerst**, dann LightStar. Beide offline → stumm überspringen.
 - Scannt alle Movie-Libraries jedes Online-Servers, sortiert nach `DateCreated desc`, bis `movieLimitPerRun` (Default 500).
 - Multi-Server-Dedup per canonicalKey `"Titel (Jahr)"` (NFC-normalisiert): frühestes DateCreated gewinnt, IDs werden konsolidiert, `sourceServers` akkumuliert.
-- Diff gegen vorhandene PosterPack-ZIPs (alle 5 Unterordner von `media/complete/*`) und gegen `config.embySync.ignoredMovies`.
+- Diff gegen vorhandene PosterPack-ZIPs (alle Unterordner von `media/complete/*`) — **per Name oder TMDB-ID** — und gegen `config.embySync.ignoredMovies`. Seit 3.0.1z-20 kennt `lib/zip-tmdb-index.js` die TMDB-ID jedes ZIPs aus `cache/zip-scan-cache.json`, dazu kommen die `[tmdb:N]`-Hints der Filmliste für frisch geladene ZIPs. Vorher galt ein Film, den die zwei Server unterschiedlich benennen („Top Gun - Maverick" / „Top Gun: Maverick"), als neu und wurde doppelt geladen.
+- Report-Gründe in `skipped` (jeder Eintrag trägt die `tmdbId`): `has-zip` (Name), `has-zip-tmdb` (anderer Name, gleiche ID — mit `zip` und `via`), `duplicate-in-run-tmdb` (derselbe Film von beiden Servern im selben Lauf, nur einmal geladen).
 - Fehlende Filme landen in `filmliste.txt` — wenn TMDB-ID aus Emby bekannt, **mit** `[tmdb:NNNN]`-Suffix.
 
 HTTP-Endpoints (alle unter `adminAuth`):
@@ -79,7 +80,8 @@ Singleton, wird sowohl von `routes/poster-updater.js` (Admin-UI-Downloads) als a
 - `sseClients` — Live-Log-Stream an Admin-UI für beide Trigger-Pfade.
 
 Wichtige Helfer:
-- `appendFilms(newFilms)` — Dedup auf Title-Year-Basis; ein Eintrag ohne Hint wird durch einen mit Hint "upgraded" (kein Duplikat).
+- `appendFilms(newFilms)` — Dedup auf Title-Year-Basis; ein Eintrag ohne Hint wird durch einen mit Hint "upgraded" (kein Duplikat). Seit 3.0.1z-20 gilt auch eine bereits vorhandene `[tmdb:N]`-ID unter anderem Titel als Duplikat (`duplicateIds`), ebenso innerhalb einer Charge und beim Upgrade.
+- `writeFilmList(films)` — entfernt wortgleiche Doppelzeilen und schreibt atomar.
 - `stripTmdbHint(entry)` / `hasTmdbHint(entry)` — Suffix-Handling.
 - `spawnPosterPackJob()`, `spawnTrailerJob()` — idempotent, loggen `already-running` wenn Kollision.
 
@@ -96,19 +98,20 @@ Einfacher-Eintrag-Ohne-ID (1999)
 - Pflicht: `{Titel} (JJJJ)`.
 - Optional: `[tmdb:NNNN]`-Suffix (TMDB-ID-Hint). Wenn vorhanden, **überspringt der Python-Downloader die TMDB-Suche komplett** und nutzt `GET /movie/{id}` direkt.
 - Bei ungültigem Hint (z. B. ID entfernt) → Fallback auf Title+Year-Suche.
-- Dedup ignoriert den Suffix (Title+Year ist Primärschlüssel).
+- Dedup: Title+Year ist Primärschlüssel; zusätzlich ist eine TMDB-ID nur einmal erlaubt (seit 3.0.1z-20).
 
 ### 4. Python-Downloader
 
 `poster-updater/tmdb-get-posters-direct.py` — generiert PosterPack-ZIPs.
 `poster-updater/download-trailers.py` — lädt Trailer-MP4s via yt-dlp.
 
-Beide parsen den `[tmdb:N]`-Hint und nutzen die ID direkt.
+Beide parsen den `[tmdb:N]`-Hint und nutzen die ID direkt. Seit 3.0.1z-20 überspringen beide eine TMDB-ID, die unter anderem Namen schon ein ZIP hat (`poster-updater/zip_index.py`, Quelle ZIP-Scan-Cache; im Lauf erzeugte IDs werden nachgetragen). Das deckt auch Emby-Filme ohne ProviderIds ab, deren ID erst die TMDB-Suche liefert.
 
 ### 5. Auto-Playlist „Die letzten 20 hinzugefügten Filme"
 
 - Playlist-ID: `auto_recent_20` (in `public/cinema-playlists.json`).
-- Wird bei jedem Sync mit den Top 20 nach `DateCreated` (von Emby) aktualisiert — nur Filme mit existierendem ZIP.
+- Wird bei jedem Sync mit den Top 20 nach `DateCreated` (von Emby) aktualisiert — nur Filme mit existierendem ZIP (per Name oder TMDB-ID). Der Titel ist der tatsächliche ZIP-Name, zwei Emby-Namen desselben Films belegen nur einen Slot.
+- Geschrieben wird atomar; eine befüllte Auto-Playlist wird nie durch eine leere ersetzt (Leer-Schutz) — die meisten Geräte sind auf sie gepinnt.
 - `autoActivate: true` (Default) → beim **ersten** Sync wird sie als `activePlaylistId` gesetzt. Danach idempotent via `initiallyActivated: true`.
 - Geschützt: `DELETE /api/poster-selector/playlists/auto_recent_20` → 403. `PUT` akzeptiert nur `name`, nicht `titles`.
 
@@ -132,22 +135,23 @@ Ein Match (per title+year, imdbId oder tmdbId) → kein Download, kein Playlist-
 
 Alle in `scripts/`, Dry-Run-Default, `--execute` für Schreiben.
 
-### `dedup-posterpacks.js`
+### `dedup-by-tmdb.js`
 
-Räumt ZIP-Duplikate auf (gleiche `tmdb_id`, unterschiedlicher Dateiname). Zwei Modi:
+Einmalige Bereinigung von PosterPack-Dubletten (gleiche TMDB-ID, unterschiedliche Dateinamen) — offline, ohne TMDB-Abfragen und ohne ZIPs zu öffnen (Quelle: `cache/zip-scan-cache.json`). Ersetzt `dedup-posterpacks.js` (3.0.1s/t): Das korrigierte die Filmliste nie, verlor beim Umbenennen Trailer und folgte driftenden TMDB-Titeln.
 
-| Modus | Was wird korrigiert |
-|---|---|
-| Default (Year-only) | Jahr im Dateinamen → TMDB-authoritative |
-| `--normalize-title` | Zusätzlich Titel-Varianten (Komma vs. Punkt, Doppelpunkt, Umlaut, Alternativtitel) → TMDB-kanonischer Titel |
-
-Aktualisiert atomar: ZIPs, `.poster.json`-Sidecars, `cinema-playlists.json`, `cinema-playlist.json`, `filmliste.txt`, `trailer-info.json`, Trailer-Dateien.
+- Pro TMDB-ID bleibt **ein vorhandener Name** — es wird nur gelöscht, nie umbenannt. Regeln in dieser Reihenfolge: `--keep`, Emby-Schutz (ein Name, den Emby ohne passende TMDB-ID liefert, wird nie gelöscht), Poster vorhanden, Jahr = TMDB-Erscheinungsjahr, Emby-Schreibweise, steht in der Filmliste, hat Trailer, größeres ZIP.
+- Trailer: Eine identische Kopie (md5) wird entfernt. Hatte nur der gelöschte Name einen Trailer, zieht er auf den bleibenden Namen um; bei abweichenden Trailern gewinnt das bessere Label (DE-offiziell > DE > EN-offiziell > EN).
+- Angepasst werden `filmliste.txt` (eine Zeile pro ID), `cinema-playlists.json` und `cinema-playlist.json` (Einträge umgelenkt), `trailer-info.json` und der ZIP-Scan-Cache.
+- „Löschen" heißt Verschieben nach `../posterrama-quarantine/dedup-tmdb-<Zeitstempel>/` — außerhalb des Projekts, nicht im NAS-Mirror — mit Backups der geänderten Dateien und `manifest.json`.
+- `--execute` verlangt den Plan-Hash des geprüften Dry-Runs, einen aktuellen Emby-Sync-Report ab 3.0.1z-20 (TMDB-IDs in `skipped`), einen **gestoppten Server** und keine laufenden Pipeline-Jobs.
 
 ```bash
-node scripts/dedup-posterpacks.js                         # Dry-Run Year-Only
-node scripts/dedup-posterpacks.js --execute               # Execute Year-Only
-node scripts/dedup-posterpacks.js --normalize-title       # Dry-Run Year+Title
-node scripts/dedup-posterpacks.js --normalize-title --execute
+node scripts/dedup-by-tmdb.js                                     # Dry-Run: Plan + Plan-Hash
+node scripts/dedup-by-tmdb.js --keep "Top Gun: Maverick (2022)"   # bleibenden Namen erzwingen
+pm2 stop posterrama
+node scripts/dedup-by-tmdb.js --execute --expect-plan <hash>
+pm2 start posterrama
+node scripts/dedup-by-tmdb.js --rollback ../posterrama-quarantine/dedup-tmdb-<Zeitstempel>
 ```
 
 ### `backfill-tmdb-hints.js`
@@ -213,7 +217,7 @@ node scripts/backfill-tmdb-hints.js --execute   # Ausführen
 | Keine Films werden herunter geladen nach Restart | Scheduler startet erst nach `initialDelaySeconds` (60s). `systemctl --user restart` / `pm2 restart posterrama` neu starten. Log prüfen: `pm2 logs posterrama \| grep EmbySync`. |
 | "409 Conflict" bei manuellem Trigger | Ein Sync läuft bereits. `GET /api/emby-sync/status` zeigt `running: true`. Kurz warten. |
 | Playlist `auto_recent_20` leer | Keine Filme mit TMDB-Match UND lokalem ZIP. Erst warten bis Python-Downloader ein paar ZIPs gemacht hat. |
-| Neue PosterPack-Duplikate | Sollte nicht mehr vorkommen (Prevention 3.0.1u). Falls doch: `scripts/dedup-posterpacks.js --normalize-title --execute` laufen lassen. |
+| Neue PosterPack-Duplikate | Sollte nicht mehr vorkommen: Seit 3.0.1z-20 erkennt die Sync Filme per TMDB-ID, Poster- und Trailer-Script überspringen bekannte IDs. Im Report auf `has-zip-tmdb` achten; Emby-Filme ganz ohne TMDB-ID werden weiter nur per Name abgeglichen. Bereinigen: `node scripts/dedup-by-tmdb.js` (Dry-Run), dann `--execute` bei gestopptem Server. |
 | Film in Ignore-Liste, wird trotzdem runtergeladen | Ignore-Liste wird nur beim NÄCHSTEN Sync wirksam. Vorhandene Einträge in `filmliste.txt` manuell per Admin-UI löschen. |
 | Admin-UI zeigt Emby-Sync-Status nicht | Seite neu laden; im Sidebar auf "Emby-Sync" klicken → Status-Poll startet alle 10 s. |
 | Beide Emby-Server offline → wo sieht man das | `cache/emby-sync-last-report.json` → `report.servers` und `report.result === "all-offline"`. Log ist `logger.info`, nicht error (bewusst stumm). |
@@ -225,10 +229,11 @@ node scripts/backfill-tmdb-hints.js --execute   # Ausführen
 | Release | Inhalt |
 |---|---|
 | **3.0.1r** | Kern: Emby-Sync, Auto-Playlist, Ignore-Liste, Admin-UI, LightStar als 2. Server, Shared Runner |
-| **3.0.1s** | `dedup-posterpacks.js` (Year-Only) |
-| **3.0.1t** | `dedup-posterpacks.js --normalize-title` (auch Titel) |
+| **3.0.1s** | `dedup-posterpacks.js` (Year-Only) — ersetzt in 3.0.1z-20 |
+| **3.0.1t** | `dedup-posterpacks.js --normalize-title` (auch Titel) — ersetzt in 3.0.1z-20 |
 | **3.0.1u** | TMDB-ID-Hint-Format in filmliste.txt (Prevention) |
 | **3.0.1v** | `backfill-tmdb-hints.js` (Migration bestehender Einträge) |
+| **3.0.1z-20** | TMDB-basierter Abgleich (Sync, `appendFilms`, Python-Scripts), Auto-Playlist mit ZIP-Namen und Leer-Schutz, Scan-Cache räumt gelöschte ZIPs aus, `dedup-by-tmdb.js` ersetzt `dedup-posterpacks.js` |
 
 ---
 
@@ -247,4 +252,4 @@ node scripts/backfill-tmdb-hints.js --execute   # Ausführen
 
 - **Monitor Power Watcher** (`docs/MONITOR-POWER-WATCHER.md`) — unabhängig. Der Watcher friert Chromium ein, der Emby-Sync läuft weiter (er ist Server-seitig).
 - **Kiosk Performance** (`docs/KIOSK-PERFORMANCE.md`) — unabhängig. Kiosk zeigt die Auto-Playlist; der Sync pflegt sie.
-- **CUSTOM-PATCHES.md** — Patches 49–52 dokumentieren diese Pipeline.
+- **CUSTOM-PATCHES.md** — Patches 49–52 und 77–80 dokumentieren diese Pipeline.

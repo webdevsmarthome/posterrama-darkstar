@@ -33539,9 +33539,10 @@ if (!document.__niwDelegatedFallback) {
             if (entry.dateCreated) meta.push(entry.dateCreated);
             if (entry.where) meta.push(entry.where);
             if (entry.message) meta.push(entry.message);
+            if (entry.zip) meta.push('ZIP ' + entry.zip);
             return '<div class="es-entry">' +
                 '<span>' + (key.replace ? key.replace(/</g, '&lt;') : key) + '</span>' +
-                (meta.length > 0 ? '<span class="es-entry-meta">' + meta.join(' · ') + '</span>' : '') +
+                (meta.length > 0 ? '<span class="es-entry-meta">' + meta.join(' · ').replace(/</g, '&lt;') + '</span>' : '') +
                 '</div>';
         }).join('');
     }

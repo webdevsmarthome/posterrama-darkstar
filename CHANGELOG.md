@@ -6,6 +6,28 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 
 ---
 
+## [3.0.1z-20] – 2026-09-13
+
+Doppelte Filme: Die Emby-Sync erkennt vorhandene Filme jetzt per TMDB-ID statt nur per Dateiname — und ein neues Script räumt die vorhandenen Dubletten auf.
+
+### Behoben
+
+- **Doppelte PosterPacks, Trailer und Filmlisten-Zeilen** — die beiden Emby-Server benennen denselben Film teils unterschiedlich („Top Gun - Maverick" / „Top Gun: Maverick", „Der letzte Fußgänger (1969)" / „(1960)"). Die Sync verglich nur Dateinamen, `appendFilms` nur Titel+Jahr: Der zweite Name galt als neu und wurde komplett nachgeladen. Bestand am Produktivsystem: 53 doppelte TMDB-IDs in der Filmliste (43 Paare + 10 wortgleiche Zeilen), 45 überzählige PosterPacks, rund 1,6 GB doppelte Trailer — die betroffenen Filme liefen doppelt so oft.
+  - Neues `lib/zip-tmdb-index.js`: TMDB-ID → ZIP-Namen aus dem ZIP-Scan-Cache (metadata.json jedes ZIPs, es wird kein ZIP geöffnet) mit Resolver Name → Cache-ID → Filmlisten-Hint; es zählen nur ZIPs, die auf der Platte liegen.
+  - `lib/emby-sync.js`: vorhanden ist ein Film per Name oder TMDB-ID (Report-Grund `has-zip-tmdb` mit ZIP-Namen); derselbe Film von beiden Servern im selben Lauf wird nur einmal geladen (`duplicate-in-run-tmdb`); jeder `skipped`-Eintrag trägt die TMDB-ID, das Ergebnis von `appendFilms` steht im Report.
+  - Auto-Playlist: Der Titel ist der tatsächliche ZIP-Name, zwei Emby-Namen desselben Films belegen einen Slot; atomare Writes und Leer-Schutz (eine befüllte Auto-Playlist wird nie durch eine leere ersetzt — die meisten Geräte hängen an ihr).
+  - `lib/poster-updater-runner.js`: `appendFilms` weist eine bekannte `[tmdb:N]`-ID unter anderem Titel ab (auch innerhalb einer Charge, auch als Upgrade), `writeFilmList` entfernt wortgleiche Doppelzeilen und schreibt atomar.
+  - Poster- und Trailer-Script (`poster-updater/zip_index.py`): kein zweites PosterPack und kein zweiter Trailer für eine TMDB-ID, die unter anderem Namen schon ein ZIP hat — das deckt auch Emby-Filme ohne ProviderIds ab.
+- **Gelöschte ZIPs blieben für immer im Scan-Cache** — `scanZipPosterPacks` fügte nur hinzu; die Quick-Start-Phase lieferte ein gelöschtes ZIP nach jedem Neustart erneut aus. Einträge fehlender ZIPs werden jetzt entfernt, und zwar nur für vollständig gelesene Verzeichnisse.
+- **Der Emby-Sync-Test überschrieb den echten Report** unter `cache/` — `runSyncCycle` nimmt Ping und Pfade jetzt injizierbar entgegen.
+
+### Hinzugefügt
+
+- **`scripts/dedup-by-tmdb.js`** — einmalige, offline arbeitende Bereinigung; ersetzt `scripts/dedup-posterpacks.js` (korrigierte die Filmliste nie, verlor Trailer beim Umbenennen, folgte driftenden TMDB-Titeln). Pro TMDB-ID bleibt ein vorhandener Name, es wird nur gelöscht. Regeln in dieser Reihenfolge: `--keep`, Emby-Schutz (ein Emby-Name ohne passende ID wird nie gelöscht), Poster vorhanden, Jahr = TMDB-Erscheinungsjahr, Emby-Schreibweise, Filmliste, Trailer, ZIP-Größe. Trailer: identische Kopie weg (md5), Umzug, wenn nur der gelöschte Name einen hatte, sonst gewinnt das bessere Label. Filmliste (eine Zeile pro ID), Playlists samt Live-Playlist, trailer-info und Scan-Cache werden angepasst. „Löschen" heißt Verschieben in eine Quarantäne außerhalb des Projekts, mit Backups und Manifest; `--rollback` stellt alles byte-identisch wieder her. Dry-Run ist Standard, `--execute` verlangt den Plan-Hash, einen aktuellen Emby-Report ab z-20, einen gestoppten Server und keine laufenden Pipeline-Jobs.
+- Tests: `__tests__/lib/zip-tmdb-index.test.js`, `__tests__/lib/poster-updater-runner.append.test.js`, `__tests__/scripts/dedup-by-tmdb.test.js` und ein erweitertes `__tests__/lib/emby-sync.test.js` — 68 Tests in den betroffenen Suiten.
+
+---
+
 ## [3.0.1z-19] – 2026-09-08
 
 Filme ohne Trailer verschwinden auf Wunsch aus der Anzeige — und ein lange unbemerkter Bug hatte jedes lokale Item doppelt in die Playlist gelegt.
